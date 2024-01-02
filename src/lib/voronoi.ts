@@ -1,3 +1,23 @@
+import { event_comparison, point_comparison } from "./voronoiPredicates";
+import { Beachsection, RBTree } from "./rbtree"
+
+export class BBox {
+    xl: number;
+    xr: number;
+    yt: number;
+    yb: number;
+    constructor(
+        xl: number,
+        xr: number,
+        yt: number,
+        yb: number) {
+        this.xl = xl;
+        this.xr = xr;
+        this.yt = yt;
+        this.yb = yb;
+    }
+};
+
 export default class Voronoi {
     vertices: Vertex[];
     edges: Edge[];
@@ -10,8 +30,11 @@ export default class Voronoi {
     cellJunkyard: Cell[] = [];
 
     beachline: RBTree = new RBTree();
+    sweepline: number = 0;
     circleEvents: RBTree = new RBTree();
     firstCircleEvent: Beachsection | null = null;
+
+    siteEvents: SiteEvent[] = []; 
 
     constructor() {
         this.vertices = [];
@@ -31,19 +54,21 @@ export default class Voronoi {
         }
         // Move leftover beachsections to the beachsection junkyard.
         if (this.beachline.root) {
-            let beachsection: Beachsection = this.beachline.getFirst(this.beachline.root);
+            let beachsection: Beachsection = this.beachline.getFirst(this.beachline.root)!;
             while (beachsection) {
                 this.beachsectionJunkyard.push(beachsection); // mark for reuse
                 beachsection = beachsection.rbNext!;
             }
         }
         this.beachline.root = null;
+        this.sweepline = 0;
 
         this.circleEvents.root = null;
         this.firstCircleEvent = null;
         this.vertices = [];
         this.edges = [];
         this.cells = [];
+        this.siteEvents = [];
     };
 
     static sqrt = Math.sqrt;
@@ -56,7 +81,7 @@ export default class Voronoi {
     static lessThanWithEpsilon = function (a: number, b: number) { return b - a > 1e-9; };
     static lessThanOrEqualWithEpsilon = function (a: number, b: number) { return a - b < 1e-9; };
 
-    createHalfedge(edge: Edge, lSite: Site, rSite: Site | null): Halfedge {
+    createHalfedge(edge: Edge, lSite: SiteEvent, rSite: SiteEvent | null): Halfedge {
         return new Halfedge(edge, lSite, rSite);
     };
 
@@ -78,7 +103,7 @@ export default class Voronoi {
     // two halfedges which are added to each site's counterclockwise array
     // of halfedges.
 
-    createEdge(lSite: Site, rSite: Site, va: Vertex | undefined, vb: Vertex | undefined) {
+    createEdge(lSite: SiteEvent, rSite: SiteEvent, va: Vertex | undefined, vb: Vertex | undefined) {
         let edge = this.edgeJunkyard.pop();
         if (!edge) {
             edge = new Edge(lSite, rSite);
@@ -101,7 +126,7 @@ export default class Voronoi {
         return edge;
     };
 
-    createCell(site: Site) {
+    createCell(site: SiteEvent) {
         let cell = this.cellJunkyard.pop();
         if (cell) {
             return cell.init(site);
@@ -109,7 +134,7 @@ export default class Voronoi {
         return new Cell(site);
     };
 
-    createBorderEdge(lSite: Site, va: Vertex, vb: Vertex) {
+    createBorderEdge(lSite: SiteEvent, va: Vertex, vb: Vertex) {
         let edge = this.edgeJunkyard.pop();
         if (!edge) {
             edge = new Edge(lSite, null);
@@ -124,7 +149,7 @@ export default class Voronoi {
         return edge;
     };
 
-    setEdgeStartpoint(edge: Edge, lSite: Site, rSite: Site, vertex: Vertex) {
+    setEdgeStartpoint(edge: Edge, lSite: SiteEvent, rSite: SiteEvent, vertex: Vertex) {
         if (!edge.va && !edge.vb) {
             edge.va = vertex;
             edge.lSite = lSite;
@@ -138,7 +163,7 @@ export default class Voronoi {
         }
     };
 
-    setEdgeEndpoint(edge: Edge, lSite: Site, rSite: Site, vertex: Vertex) {
+    setEdgeEndpoint(edge: Edge, lSite: SiteEvent, rSite: SiteEvent, vertex: Vertex) {
         this.setEdgeStartpoint(edge, rSite, lSite, vertex);
     };
 
@@ -151,7 +176,7 @@ export default class Voronoi {
     // to avoid new memory allocation. This resulted in a measurable
     // performance gain.
 
-    createBeachsection(site: Site) {
+    createBeachsection(site: SiteEvent) {
         let beachsection: Beachsection | undefined = this.beachsectionJunkyard.pop();
         if (!beachsection) {
             beachsection = new Beachsection();
@@ -162,7 +187,7 @@ export default class Voronoi {
 
     // calculate the left break point of a particular beach section,
     // given a particular sweep line
-    leftBreakPoint(arc: Beachsection, directrix: number) {
+    static leftBreakPoint(arc: Beachsection, directrix: number) {
         // http://en.wikipedia.org/wiki/Parabola
         // http://en.wikipedia.org/wiki/Quadratic_equation
         // h1 = x1,
@@ -198,8 +223,8 @@ export default class Voronoi {
         // Maybe can still be improved, will see if any more of this
         // kind of errors pop up again.
         let site = arc.site!,
-            rfocx = site.x,
-            rfocy = site.y,
+            rfocx = site.x(),
+            rfocy = site.y(),
             pby2 = rfocy - directrix;
         // parabola in degenerate case where focus is on directrix
         if (!pby2) {
@@ -210,8 +235,8 @@ export default class Voronoi {
             return -Infinity;
         }
         site = lArc.site!;
-        let lfocx = site.x,
-            lfocy = site.y,
+        let lfocx = site.x(),
+            lfocy = site.y(),
             plby2 = lfocy - directrix;
         // parabola in degenerate case where focus is on directrix
         if (!plby2) {
@@ -229,13 +254,13 @@ export default class Voronoi {
 
     // calculate the right break point of a particular beach section,
     // given a particular directrix
-    rightBreakPoint(arc: Beachsection, directrix: number) {
+    static rightBreakPoint(arc: Beachsection, directrix: number) {
         let rArc = arc.rbNext;
         if (rArc) {
-            return this.leftBreakPoint(rArc, directrix);
+            return Voronoi.leftBreakPoint(rArc, directrix);
         }
         let site = arc.site!;
-        return site.y === directrix ? site.x : Infinity;
+        return site.y() === directrix ? site.x() : Infinity;
     };
 
     detachBeachsection(beachsection: Beachsection) {
@@ -320,9 +345,9 @@ export default class Voronoi {
         this.attachCircleEvent(rArc);
     };
 
-    addBeachsection(site: Site) {
-        let x = site.x,
-            directrix = site.y;
+    addBeachsection(site: SiteEvent) {
+        let x = site.x();
+        let directrix = site.y();
 
         // find the left and right beach sections which will surround the newly
         // created beach section.
@@ -333,7 +358,7 @@ export default class Voronoi {
             node = this.beachline.root;
 
         while (node) {
-            dxl = this.leftBreakPoint(node, directrix) - x;
+            dxl = Voronoi.leftBreakPoint(node, directrix) - x;
             // x lessThanWithEpsilon xl => falls somewhere before the left edge of the beachsection
             if (dxl > 1e-9) {
                 // this case should never happen
@@ -344,7 +369,7 @@ export default class Voronoi {
                 node = node.rbLeft;
             }
             else {
-                dxr = x - this.rightBreakPoint(node, directrix);
+                dxr = x - Voronoi.rightBreakPoint(node, directrix);
                 // x greaterThanWithEpsilon xr => falls somewhere after the right edge of the beachsection
                 if (dxr > 1e-9) {
                     if (!node.rbRight) {
@@ -466,13 +491,13 @@ export default class Voronoi {
             // Except that I bring the origin at A to simplify
             // calculation
             let lSite = lArc!.site!,
-                ax = lSite.x,
-                ay = lSite.y,
-                bx = site.x - ax,
-                by = site.y - ay,
+                ax = lSite.x(),
+                ay = lSite.y(),
+                bx = site.x() - ax,
+                by = site.y() - ay,
                 rSite = rArc!.site!,
-                cx = rSite.x - ax,
-                cy = rSite.y - ay,
+                cx = rSite.x() - ax,
+                cy = rSite.y() - ay,
                 d = 2 * (bx * cy - by * cx),
                 hb = bx * bx + by * by,
                 hc = cx * cx + cy * cy,
@@ -515,12 +540,12 @@ export default class Voronoi {
         // The bottom-most part of the circumcircle is our Fortune 'circle
         // event', and its center is a vertex potentially part of the final
         // Voronoi diagram.
-        let bx = cSite!.x,
-            by = cSite!.y,
-            ax = lSite!.x - bx,
-            ay = lSite!.y - by,
-            cx = rSite!.x - bx,
-            cy = rSite!.y - by;
+        let bx = cSite!.x(),
+            by = cSite!.y(),
+            ax = lSite!.x() - bx,
+            ay = lSite!.y() - by,
+            cx = rSite!.x() - bx,
+            cy = rSite!.y() - by;
 
         // If points l->c->r are clockwise, then center beach section does not
         // collapse, hence it can't end up as a vertex (we reuse 'd' here, which
@@ -615,10 +640,10 @@ export default class Voronoi {
             yb = bbox.yb,
             lSite = edge.lSite!,
             rSite = edge.rSite!,
-            lx = lSite.x,
-            ly = lSite.y,
-            rx = rSite.x,
-            ry = rSite.y,
+            lx = lSite.x(),
+            ly = lSite.y(),
+            rx = rSite.x(),
+            ry = rSite.y(),
             fx = (lx + rx) / 2,
             fy = (ly + ry) / 2,
             fm, fb;
@@ -1004,7 +1029,7 @@ export default class Voronoi {
     // those users who uses coord values which are known to be fine, no overhead is
     // added.
 
-    quantizeSites(sites: Site[]) {
+    quantizeSites(sites: SitePoint[]) {
         let ε = Voronoi.ε,
             n = sites.length,
             site;
@@ -1040,13 +1065,15 @@ export default class Voronoi {
     //   user to freely modify content. At compute time,
     //   *references* to sites are copied locally.
 
-    compute(sites: Site[], bbox: BBox) {
+    compute(steps: number, sitesP: SitePoint[], sitesS: SiteSegment[], bbox: BBox) {
         // to measure execution time
         let startTime = new Date();
 
         // init internal state
         this.reset();
 
+        
+        
         // any diagram data available for recycling?
         // I do that here so that this is included in execution time
         if (this.toRecycle) {
@@ -1055,48 +1082,53 @@ export default class Voronoi {
             this.cellJunkyard = this.cellJunkyard.concat(this.toRecycle!.cells);
             this.toRecycle = null;
         }
+        
+        this.InsertPoints(sitesP);
+        // this.InsertSegmets(sitesS);
 
         // Initialize site event queue
-        let siteEvents = sites.slice(0);
-        siteEvents.sort(function (a, b) {
-            let r = b.y - a.y;
-            if (r) { return r; }
-            return b.x - a.x;
-        });
+        // siteEventsP.sort((rhs, lhs) => point_comparison(rhs, lhs) ? -1 : 1);
+        this.siteEvents.sort((lhs, rhs) => event_comparison(lhs, rhs) ? 1 : -1); //we sort in reverse because we pop from the back of the array
+        // this.siteEvents.forEach(s =>
+        //     console.log(s)
+        // );
 
         // process queue
-        let site = siteEvents.pop(),
-            siteid = 0,
-            xsitex, // to avoid duplicate sites
-            xsitey,
-            cells = this.cells,
-            circle;
-
+        let site: SiteEvent | undefined = this.siteEvents.pop();
+        let siteid = 0;
+        let xsitex: number | undefined; // to avoid duplicate sites;
+        let xsitey: number | undefined;
+        let cells: Cell[] = this.cells;
+        let circle: Beachsection | null = null;
         // main loop
-        for (; ;) {
+        for (let i = 0; i < steps ; i++) {
             // we need to figure whether we handle a site or circle event
             // for this we find out if there is a site event and it is
             // 'earlier' than the circle event
             circle = this.firstCircleEvent;
 
             // add beach section
-            if (site && (!circle || site.y < circle.y || (site.y === circle.y && site.x < circle.x))) {
+            if (site && (!circle || site.y() < circle.y || (site.y() === circle.y && site.x() < circle.x))) {
+                // process_site_event
                 // only if site is not a duplicate
-                if (site.x !== xsitex || site.y !== xsitey) {
+                if (site.x() !== xsitex || site.y() !== xsitey) {
                     // first create cell for new site
                     cells[siteid] = this.createCell(site);
                     site.voronoiId = siteid++;
                     // then create a beachsection for that site
                     this.addBeachsection(site);
                     // remember last site coords to detect duplicate
-                    xsitey = site.y;
-                    xsitex = site.x;
+                    xsitey = site.y();
+                    xsitex = site.x();
                 }
-                site = siteEvents.pop();
+                this.sweepline = site!.y();
+                site = this.siteEvents.pop();
             }
 
             // remove beach section
             else if (circle) {
+                // process_circle_event
+                this.sweepline = circle.arc!.y;
                 this.removeBeachsection(circle!.arc!);
             }
 
@@ -1106,6 +1138,7 @@ export default class Voronoi {
             }
         }
 
+
         // wrapping-up:
         //   connect dangling edges to bounding box
         //   cut edges as per bounding box
@@ -1114,7 +1147,7 @@ export default class Voronoi {
         this.clipEdges(bbox);
 
         //   add missing edges in order to close opened cells
-        this.closeCells(bbox);
+        // this.closeCells(bbox);
 
         // to measure execution time
         let stopTime = new Date();
@@ -1124,386 +1157,154 @@ export default class Voronoi {
         diagram.cells = this.cells;
         diagram.edges = this.edges;
         diagram.vertices = this.vertices;
+        diagram.beachline = this.beachline;
+        diagram.sweepline = this.sweepline;
         diagram.execTime = stopTime.getTime() - startTime.getTime();
 
         // clean up
-        this.reset();
+        // this.reset();
 
         return diagram;
+    }
+    
+    
+    InsertPoints(sitesP: SitePoint[]) {
+
+        sitesP.forEach(p => {
+            this.siteEvents.push(SiteEvent.SiteEventP(p, SiteEventType.SINGLE_POINT));
+            })   
+    }
+
+    InsertSegmets(sitesS: SiteSegment[]) {
+        sitesS.forEach(s => {
+            let p1 = new SitePoint(s.x1, s.y1); 
+            let p2 = new SitePoint(s.x2, s.y2); 
+            this.siteEvents.push(SiteEvent.SiteEventP(p1, SiteEventType.SEGMENT_START_POINT));
+            this.siteEvents.push(SiteEvent.SiteEventP(p2, SiteEventType.SEGMENT_END_POINT));
+            // if (point_comparison(p1, p2)) {
+            //     this.siteEvents.push(SiteEvent.SiteEventS(p1, p2, SiteEventType.INITIAL_SEGMENT));
+            // } else {
+            //     this.siteEvents.push(SiteEvent.SiteEventS(p2, p1, SiteEventType.REVERSE_SEGMENT));
+            // }
+
+        });
+    }
+
+    // ---------------------------------------------------------------------------
+    // Debugging helper
+
+    dumpBeachline(y: number) {
+        console.log('Voronoi.dumpBeachline(%f) > Beachsections, from left to right:', y);
+        if (!this.beachline) {
+            console.log('  None');
+        }
+        else {
+            let bs = this.beachline.getFirst(this.beachline.root);
+            while (bs) {
+                console.log('  site %d: xl: %f, xr: %f', bs.site!.voronoiId, Voronoi.leftBreakPoint(bs, y), Voronoi.rightBreakPoint(bs, y));
+                bs = bs.rbNext!;
+            }
+        }
     };
 
 }
 
-class BBox {
-    xl: number;
-    xr: number;
-    yt: number;
-    yb: number;
-    constructor(
-        xl: number,
-        xr: number,
-        yt: number,
-        yb: number) {
-        this.xl = xl;
-        this.xr = xr;
-        this.yt = yt;
-        this.yb = yb;
-    }
-};
-
-// ---------------------------------------------------------------------------
-// Circle event methods
-// Beachsection = CircleEvent 
-
-// ---------------------------------------------------------------------------
-// Red-Black tree code (based on C version of "rbtree" by Franck Bui-Huu
-// https://github.com/fbuihuu/libtree/blob/master/rb.c
-
-// rhill 2011-06-07: For some reasons, performance suffers significantly
-// when instanciating a literal object instead of an empty ctor
-class Beachsection {
-    // rhill 2013-10-12: it helps to state exactly what we are at ctor time.
-    arc: Beachsection | null | undefined = null;
-    site: Site | null = null;
-
-    rbLeft: Beachsection | null = null;
-    rbRight: Beachsection | null = null;
-    rbNext: Beachsection | null = null;
-    rbParent: Beachsection | null = null;
-    rbPrevious: Beachsection | null = null;
-    rbRed: boolean = false;
-
-    x: number = 0;
-    y: number = 0;
-    ycenter: number = 0;
-
-    circleEvent: Beachsection | null = null;
-    edge: Edge | null = null;
-
-    constructor() {
-        this.arc = null;
-        this.rbLeft = null;
-        this.rbNext = null;
-        this.rbParent = null;
-        this.rbPrevious = null;
-        this.rbRed = false;
-        this.rbRight = null;
-        this.site = null;
-    }
-};
 
 
 
-class RBTree {
-    root: Beachsection | null;
-    constructor() {
-        this.root = null;
-
-    }
-
-    rbInsertSuccessor(node: Beachsection | null | undefined, successor: Beachsection) {
-        let parent;
-        if (node) {
-            // >>> rhill 2011-05-27: Performance: cache previous/next nodes
-            successor.rbPrevious = node;
-            successor.rbNext = node.rbNext;
-            if (node.rbNext) {
-                node.rbNext.rbPrevious = successor;
-            }
-            node.rbNext = successor;
-            // <<<
-            if (node.rbRight) {
-                // in-place expansion of node.rbRight.getFirst();
-                node = node.rbRight;
-                while (node.rbLeft) { node = node.rbLeft; }
-                node.rbLeft = successor;
-            }
-            else {
-                node.rbRight = successor;
-            }
-            parent = node;
-        }
-        // rhill 2011-06-07: if node is null, successor must be inserted
-        // to the left-most part of the tree
-        else if (this.root) {
-            node = this.getFirst(this.root);
-            // >>> Performance: cache previous/next nodes
-            successor.rbPrevious = null;
-            successor.rbNext = node;
-            node.rbPrevious = successor;
-            // <<<
-            node.rbLeft = successor;
-            parent = node;
-        }
-        else {
-            // >>> Performance: cache previous/next nodes
-            successor.rbPrevious = successor.rbNext = null;
-            // <<<
-            this.root = successor;
-            parent = null;
-        }
-        successor.rbLeft = successor.rbRight = null;
-        successor.rbParent = parent;
-        successor.rbRed = true;
-        // Fixup the modified tree by recoloring nodes and performing
-        // rotations (2 at most) hence the red-black tree properties are
-        // preserved.
-        let grandpa: Beachsection;
-        let uncle: Beachsection;
-        node = successor;
-        while (parent && parent.rbRed) {
-            grandpa = parent.rbParent!;
-            if (parent === grandpa.rbLeft) {
-                uncle = grandpa.rbRight!;
-                if (uncle && uncle.rbRed) {
-                    parent.rbRed = uncle.rbRed = false;
-                    grandpa.rbRed = true;
-                    node = grandpa;
-                }
-                else {
-                    if (node === parent.rbRight) {
-                        this.rbRotateLeft(parent);
-                        node = parent;
-                        parent = node.rbParent;
-                    }
-                    parent!.rbRed = false;
-                    grandpa.rbRed = true;
-                    this.rbRotateRight(grandpa);
-                }
-            }
-            else {
-                uncle = grandpa.rbLeft!;
-                if (uncle && uncle.rbRed) {
-                    parent.rbRed = uncle.rbRed = false;
-                    grandpa.rbRed = true;
-                    node = grandpa;
-                }
-                else {
-                    if (node === parent.rbLeft) {
-                        this.rbRotateRight(parent);
-                        node = parent;
-                        parent = node.rbParent;
-                    }
-                    parent!.rbRed = false;
-                    grandpa.rbRed = true;
-                    this.rbRotateLeft(grandpa);
-                }
-            }
-            parent = node.rbParent;
-        }
-        this.root!.rbRed = false;
-    };
-
-    rbRemoveNode(node: Beachsection) {
-        // >>> rhill 2011-05-27: Performance: cache previous/next nodes
-        if (node.rbNext) {
-            node.rbNext.rbPrevious = node.rbPrevious;
-        }
-        if (node.rbPrevious) {
-            node.rbPrevious.rbNext = node.rbNext;
-        }
-        node.rbNext = node.rbPrevious = null;
-        // <<<
-        let parent = node.rbParent,
-            left = node.rbLeft,
-            right = node.rbRight,
-            next;
-        if (!left) {
-            next = right;
-        }
-        else if (!right) {
-            next = left;
-        }
-        else {
-            next = this.getFirst(right);
-        }
-        if (parent) {
-            if (parent.rbLeft === node) {
-                parent.rbLeft = next;
-            }
-            else {
-                parent.rbRight = next;
-            }
-        }
-        else {
-            this.root = next;
-        }
-        // enforce red-black rules
-        let isRed;
-        if (left && right) {
-            isRed = next!.rbRed;
-            next!.rbRed = node.rbRed;
-            next!.rbLeft = left;
-            left.rbParent = next;
-            if (next !== right) {
-                parent = next!.rbParent;
-                next!.rbParent = node.rbParent;
-                node = next!.rbRight!;
-                parent!.rbLeft = node;
-                next!.rbRight = right;
-                right.rbParent = next;
-            }
-            else {
-                next.rbParent = parent;
-                parent = next;
-                node = next!.rbRight!;
-            }
-        }
-        else {
-            isRed = node.rbRed;
-            node = next!;
-        }
-        // 'node' is now the sole successor's child and 'parent' its
-        // new parent (since the successor can have been moved)
-        if (node) {
-            node.rbParent = parent;
-        }
-        // the 'easy' cases
-        if (isRed) { return; }
-        if (node && node.rbRed) {
-            node.rbRed = false;
-            return;
-        }
-        // the other cases
-        let sibling: Beachsection;
-        do {
-            if (node === this.root) {
-                break;
-            }
-            if (node === parent!.rbLeft) {
-                sibling = parent!.rbRight!;
-                if (sibling!.rbRed) {
-                    sibling!.rbRed = false;
-                    parent!.rbRed = true;
-                    this.rbRotateLeft(parent!);
-                    sibling = parent!.rbRight!;
-                }
-                if ((sibling.rbLeft && sibling.rbLeft.rbRed) || (sibling.rbRight && sibling.rbRight.rbRed)) {
-                    if (!sibling.rbRight || !sibling.rbRight.rbRed) {
-                        sibling.rbLeft!.rbRed = false;
-                        sibling.rbRed = true;
-                        this.rbRotateRight(sibling);
-                        sibling = parent!.rbRight!;
-                    }
-                    sibling.rbRed = parent!.rbRed!;
-                    parent!.rbRed = sibling!.rbRight!.rbRed = false;
-                    this.rbRotateLeft(parent!);
-                    node = this.root!;
-                    break;
-                }
-            }
-            else {
-                sibling = parent!.rbLeft!;
-                if (sibling.rbRed) {
-                    sibling.rbRed = false;
-                    parent!.rbRed = true;
-                    this.rbRotateRight(parent!);
-                    sibling = parent!.rbLeft!;
-                }
-                if ((sibling.rbLeft && sibling.rbLeft.rbRed) || (sibling.rbRight && sibling.rbRight.rbRed)) {
-                    if (!sibling.rbLeft || !sibling.rbLeft.rbRed) {
-                        sibling!.rbRight!.rbRed = false;
-                        sibling.rbRed = true;
-                        this.rbRotateLeft(sibling);
-                        sibling = parent!.rbLeft!;
-                    }
-                    sibling.rbRed = parent!.rbRed;
-                    parent!.rbRed = sibling!.rbLeft!.rbRed = false;
-                    this.rbRotateRight(parent!);
-                    node = this.root!;
-                    break;
-                }
-            }
-            sibling.rbRed = true;
-            node = parent!;
-            parent = parent!.rbParent;
-        } while (!node.rbRed);
-        if (node) { node.rbRed = false; }
-    }
-
-    rbRotateLeft(node: Beachsection) {
-        let p: Beachsection = node;
-        let q: Beachsection = node.rbRight!; // can't be null
-        let parent: Beachsection = p.rbParent!;
-        if (parent) {
-            if (parent.rbLeft === p) {
-                parent.rbLeft = q;
-            }
-            else {
-                parent.rbRight = q;
-            }
-        }
-        else {
-            this.root = q;
-        }
-        q.rbParent = parent;
-        p.rbParent = q;
-        p.rbRight = q.rbLeft;
-        if (p.rbRight) {
-            p.rbRight.rbParent = p;
-        }
-        q.rbLeft = p;
-    }
-
-    rbRotateRight(node: Beachsection) {
-        let p: Beachsection = node;
-        let q: Beachsection = node.rbLeft!; // can't be null
-        let parent: Beachsection = p.rbParent!;
-        if (parent) {
-            if (parent.rbLeft === p) {
-                parent.rbLeft = q;
-            }
-            else {
-                parent.rbRight = q;
-            }
-        }
-        else {
-            this.root = q;
-        }
-        q.rbParent = parent;
-        p.rbParent = q;
-        p.rbLeft = q.rbRight;
-        if (p.rbLeft) {
-            p.rbLeft.rbParent = p;
-        }
-        q.rbRight = p;
-    }
-
-    getFirst(node: Beachsection): Beachsection {
-        while (node.rbLeft) {
-            node = node.rbLeft;
-        }
-        return node;
-    }
-
-    getLast(node: Beachsection): Beachsection {
-        while (node.rbRight) {
-            node = node.rbRight;
-        }
-        return node;
-    }
+enum SiteEventType{
+    SINGLE_POINT,
+    SEGMENT_START_POINT,
+    SEGMENT_END_POINT,
+    INITIAL_SEGMENT,
+    REVERSE_SEGMENT
 }
 
-// ---------------------------------------------------------------------------
-// Diagram methods
-
-export class Site {
-    x: number = 0;
-    y: number = 0;
+export class SiteEvent {
+    point0: SitePoint | null = null;
+    point1: SitePoint | null = null;
     voronoiId: number = -1;
+    
+    
+    siteEventType: SiteEventType = SiteEventType.SINGLE_POINT;
+    
+    static SiteEventP(p: SitePoint, siteEventType: SiteEventType = SiteEventType.SINGLE_POINT): SiteEvent {
+        let s = new SiteEvent();
+        s.point0 = p;
+        s.point1 = p;
+        s.siteEventType = siteEventType;
+        return s;
+    }
+
+    static SiteEventS(p1: SitePoint, p2: SitePoint, siteEventType: SiteEventType): SiteEvent {
+        let s = new SiteEvent();
+        s.point0 = p1;
+        s.point1 = p2;
+        s.siteEventType = siteEventType;
+        return s;
+    }
+    
+    x0(): number {
+        return this.point0!.x;
+    }
+    x1(): number {
+        return this.point1!.x;
+    }
+    y0(): number {
+        return this.point0!.y;
+    }
+    y1(): number {
+        return this.point1!.y;
+    }
+    
+    x(): number {
+        return this.point0!.x;
+    }
+    
+    y(): number {
+        return this.point0!.y;
+    }
+    is_segment() {
+        return this.siteEventType == SiteEventType.INITIAL_SEGMENT ||this.siteEventType == SiteEventType.REVERSE_SEGMENT;
+    }
+    
+}
+
+export class SitePoint {
+    x: number = 0;
+    y: number = 0;
+    // voronoiId: number = -1;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+export class SiteSegment {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    constructor(x1: number, y1: number, x2: number, y2: number) {
+        this.x1 = x1;
+        this.y1 = y1;
+        this.x2 = x2;
+        this.y2 = y2;
+    }
 }
 
 export class Cell {
-    site: Site;
+    site: SiteEvent;
     halfedges: Halfedge[];
     closeMe: boolean;
 
-    constructor(site: Site) {
+    constructor(site: SiteEvent) {
         this.site = site;
         this.halfedges = [];
         this.closeMe = false;
     }
-    init(site: Site) {
+    init(site: SiteEvent) {
         this.site = site;
         this.halfedges = [];
         this.closeMe = false;
@@ -1618,20 +1419,22 @@ export class Cell {
 }
 
 export class Diagram {
-    site: Site | null;
+    site: SitePoint | null;
     vertices: Vertex[] = [];
+    beachline: RBTree | null = null;
+    sweepline: number = 0;
     edges: Edge[] = [];
     cells: Cell[] = [];
 
     execTime: number = 0;
 
 
-    constructor(site: Site | null) {
+    constructor(site: SitePoint | null) {
         this.site = site;
     };
 }
 
-class Vertex {
+export class Vertex {
     x: number;
     y: number;
     constructor(x: number, y: number) {
@@ -1640,13 +1443,13 @@ class Vertex {
     }
 }
 
-class Edge {
-    lSite: Site | null;
-    rSite: Site | null;
+export class Edge {
+    lSite: SiteEvent | null;
+    rSite: SiteEvent | null;
     va: Vertex | null;
     vb: Vertex | null;
 
-    constructor(lSite: Site | null, rSite: Site | null) {
+    constructor(lSite: SiteEvent | null, rSite: SiteEvent | null) {
         this.lSite = lSite;
         this.rSite = rSite;
         this.va = null;
@@ -1656,11 +1459,11 @@ class Edge {
 }
 
 class Halfedge {
-    site: Site | null;
+    site: SiteEvent | null;
     edge: Edge;
     angle: number;
 
-    constructor(edge: Edge, lSite: Site, rSite: Site | null) {
+    constructor(edge: Edge, lSite: SiteEvent, rSite: SiteEvent | null) {
         this.site = lSite;
         this.edge = edge;
         // 'angle' is a value to be used for properly sorting the
@@ -1671,7 +1474,7 @@ class Halfedge {
         // use the angle of line perpendicular to the halfsegment (the
         // edge should have both end points defined in such case.)
         if (rSite) {
-            this.angle = Math.atan2(rSite.y - lSite.y, rSite.x - lSite.x);
+            this.angle = Math.atan2(rSite.y() - lSite.y(), rSite.x() - lSite.x());
         }
         else {
             let va = edge.va,
@@ -1696,21 +1499,6 @@ class Halfedge {
 
 
 
-// ---------------------------------------------------------------------------
-// Debugging helper
-/*
-Voronoi.prototype.dumpBeachline = function(y) {
-    console.log('Voronoi.dumpBeachline(%f) > Beachsections, from left to right:', y);
-    if ( !this.beachline ) {
-        console.log('  None');
-        }
-    else {
-        let bs = this.beachline.getFirst(this.beachline.root);
-        while ( bs ) {
-            console.log('  site %d: xl: %f, xr: %f', bs.site.voronoiId, this.leftBreakPoint(bs, y), this.rightBreakPoint(bs, y));
-            bs = bs.rbNext;
-            }
-        }
-    };
-*/
+
+
 
