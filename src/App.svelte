@@ -1,15 +1,18 @@
+
 <script lang="ts">
   import { onMount } from "svelte";
   import MainPage from "./lib/MainPage.svelte";
   import UploadImage from "./lib/UploadImage.svelte";
-  import Voronoi, {
+  import Voronoi, { BBox } from "./lib/voronoi";
+  import {
     Diagram,
     SitePoint,
     Edge,
-    BBox,
     SiteSegment,
-  } from "./lib/voronoi";
-    import Beachline from "./lib/Beachline.svelte";
+  } from "./lib/voronoiDataStructures";
+  import Beachline from "./lib/Beachline.svelte";
+  import instantiate_wasmVoronoi, { type VoronoiWasmModule } from "./lib/wasm/wasmVoronoi"
+
 
   let voronoi: Voronoi;
   let diagram: Diagram;
@@ -22,12 +25,21 @@
   let bbox: BBox = { xl: 0, xr: 500, yt: 0, yb: 300 };
   let steps = 0;
 
-  onMount(() => {
+  let wasmVoronoi: VoronoiWasmModule;
+
+  onMount(async () => {
+    
+    wasmVoronoi = await instantiate_wasmVoronoi();
+
+    let ncells = wasmVoronoi._testNumCells();
+    console.log(wasmVoronoi._compute(2, 3, [1,2,3,4]));
+
+
     sitePoints = [new SitePoint(350, 150), new SitePoint(150, 251), new SitePoint(100, 100)
         // ,new SitePoint(10, 200),
         // new SitePoint(400, 250)
     ];
-    siteSegments = []; //[new SiteSegment(10, 200, 400, 250)];
+    siteSegments = [new SiteSegment(10, 200, 400, 250)];
 
     voronoi = new Voronoi();
     // voronoi = new Voronoi(sitePoints, siteSegments , bbox);
@@ -68,10 +80,14 @@
     voronoiVertices = diagram.vertices;
     voronoiEdges = diagram.edges;
   }
+
+  /** @type {any} */ var module: any;
+
+
 </script>
 
 <main>
-  <MainPage>
+<MainPage>
     <div class="parent-container grid">
       <div class="col1">
         <p>Upload Image</p>
@@ -96,12 +112,6 @@
             stroke-width="3"
             fill="rgb(240, 238, 231)"
           />
-          <!-- <path
-            d="M 10 10 q 200 200 300 0"
-            stroke="blue"
-            stroke-width="1"
-            fill="none"
-          ></path> -->
           {#each sitePoints as siteP, idx}
             <circle cx={siteP.x} cy={siteP.y} r="4" fill="black"></circle>
           {/each}

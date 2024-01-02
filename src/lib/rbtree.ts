@@ -3,7 +3,8 @@
 // Circle event methods
 // Beachsection = CircleEvent 
 
-import type { Edge, SiteEvent } from "./voronoi";
+import type { SiteEvent } from "./voronoi";
+import type { Edge } from "./voronoiDataStructures";
 
 // ---------------------------------------------------------------------------
 // Red-Black tree code (based on C version of "rbtree" by Franck Bui-Huu

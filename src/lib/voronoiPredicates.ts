@@ -1,4 +1,5 @@
-import type { SiteEvent, SitePoint } from "./voronoi";
+import type { SiteEvent } from "./voronoi";
+import type { SitePoint } from "./voronoiDataStructures";
 
 export function point_comparison(lhs: SitePoint, rhs: SitePoint): boolean {
     if (lhs.x == rhs.x)
