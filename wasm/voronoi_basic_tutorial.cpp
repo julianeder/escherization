@@ -6,21 +6,27 @@
 //          http://www.boost.org/LICENSE_1_0.txt)
 
 // See http://www.boost.org for updates, documentation, and revision history.
-#include <emscripten/emscripten.h>
+// #include <emscripten/emscripten.h>
+#include <emscripten/bind.h>
+using namespace emscripten;
 
 
 #include <cstdio>
 #include <vector>
 
 #include <boost/polygon/voronoi.hpp>
+#include <boost/polygon/polygon.hpp>
+
 using boost::polygon::voronoi_builder;
 using boost::polygon::voronoi_diagram;
 using boost::polygon::x;
 using boost::polygon::y;
 using boost::polygon::low;
 using boost::polygon::high;
+using namespace boost::polygon;
 
-// #include "voronoi_visual_utils.hpp"
+
+// // #include "voronoi_visual_utils.hpp"
 
 struct Point {
   int a;
@@ -69,163 +75,198 @@ struct segment_traits<Segment> {
 }  // polygon
 }  // boost
 
-// Traversing Voronoi edges using edge iterator.
-int iterate_primary_edges1(const voronoi_diagram<double>& vd) {
-  int result = 0;
-  for (voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin();
-       it != vd.edges().end(); ++it) {
-    if (it->is_primary())
-      ++result;
+
+  typedef double coordinate_type;
+  typedef point_data<coordinate_type> point_type;
+  typedef segment_data<coordinate_type> segment_type;
+  typedef rectangle_data<coordinate_type> rect_type;
+  typedef voronoi_builder<int> VB;
+  typedef voronoi_diagram<coordinate_type> VD;
+  typedef VD::cell_type cell_type;
+  typedef VD::cell_type::source_index_type source_index_type;
+  typedef VD::cell_type::source_category_type source_category_type;
+  typedef VD::edge_type edge_type;
+  typedef VD::cell_container_type cell_container_type;
+  typedef VD::cell_container_type vertex_container_type;
+  typedef VD::edge_container_type edge_container_type;
+  typedef VD::const_cell_iterator const_cell_iterator;
+  typedef VD::const_vertex_iterator const_vertex_iterator;
+  typedef VD::const_edge_iterator const_edge_iterator;
+
+// #ifdef __cplusplus
+// #define EXTERN extern "C"
+// #else
+// #define EXTERN
+// #endif
+
+struct EdgeResult {
+  double x1;
+  double y1;
+  double x2;
+  double y2;
+  bool isFinite;
+};
+struct DiagrammResult {
+  std::vector<double> vertices;
+  std::vector<EdgeResult> edges;
+  int numVerticies;
+};
+
+point_type retrieve_point(
+  const voronoi_diagram<double>::cell_type& cell,   
+  std::vector<point_type> pointSites,
+  std::vector<segment_type> lineSites
+  ) {
+  voronoi_diagram<double>::cell_type::source_index_type index = cell.source_index();
+  voronoi_diagram<double>::cell_type::source_category_type category = cell.source_category();
+  if (category == boost::polygon::SOURCE_CATEGORY_SINGLE_POINT) {
+    return pointSites[index];
   }
-  return result;
+  index -= pointSites.size();
+  if (category == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT) {
+    return low(lineSites[index]);
+  } else {
+    return high(lineSites[index]);
+  }
 }
 
-// Traversing Voronoi edges using cell iterator.
-int iterate_primary_edges2(const voronoi_diagram<double> &vd) {
-  int result = 0;
-  for (voronoi_diagram<double>::const_cell_iterator it = vd.cells().begin();
-       it != vd.cells().end(); ++it) {
-    const voronoi_diagram<double>::cell_type& cell = *it;
-    const voronoi_diagram<double>::edge_type* edge = cell.incident_edge();
-    // This is convenient way to iterate edges around Voronoi cell.
-    do {
-      if (edge->is_primary())
-        ++result;
-      edge = edge->next();
-    } while (edge != cell.incident_edge());
-  }
-  return result;
+segment_type retrieve_segment(const cell_type& cell, std::vector<point_type> pointSites, std::vector<segment_type> lineSites) {
+  source_index_type index = cell.source_index() - pointSites.size();
+  return lineSites[index];
 }
 
-// Traversing Voronoi edges using vertex iterator.
-// As opposite to the above two functions this one will not iterate through
-// edges without finite endpoints and will iterate only once through edges
-// with single finite endpoint.
-int iterate_primary_edges3(const voronoi_diagram<double> &vd) {
-  int result = 0;
-  for (voronoi_diagram<double>::const_vertex_iterator it =
-       vd.vertices().begin(); it != vd.vertices().end(); ++it) {
-    const voronoi_diagram<double>::vertex_type& vertex = *it;
-    const voronoi_diagram<double>::edge_type* edge = vertex.incident_edge();
-    // This is convenient way to iterate edges around Voronoi vertex.
-    do {
-      if (edge->is_primary())
-        ++result;
-      edge = edge->rot_next();
-    } while (edge != vertex.incident_edge());
+void clip_infinite_edge(
+  const voronoi_diagram<double>::edge_type& edge, 
+  EdgeResult* clipped_edge,   
+  std::vector<point_type> pointSites,
+  std::vector<segment_type> lineSites,
+  std::vector<double> bbox
+  ) {
+
+    const voronoi_diagram<double>::cell_type& cell1 = *edge.cell();
+    const voronoi_diagram<double>::cell_type& cell2 = *edge.twin()->cell();
+
+    point_type origin, direction;
+    // Infinite edges could not be created by two segment sites.
+    if (cell1.contains_point() && cell2.contains_point()) {
+      point_type p1 = retrieve_point(cell1, pointSites, lineSites);
+      point_type p2 = retrieve_point(cell2, pointSites, lineSites);
+      origin.x((p1.x() + p2.x()) * 0.5);
+      origin.y((p1.y() + p2.y()) * 0.5);
+      direction.x(p1.y() - p2.y());
+      direction.y(p2.x() - p1.x());
+    } else {
+      origin = cell1.contains_segment() ?
+          retrieve_point(cell2, pointSites, lineSites) :
+          retrieve_point(cell1, pointSites, lineSites);
+      segment_type segment = cell1.contains_segment() ?
+          retrieve_segment(cell1, pointSites, lineSites) :
+          retrieve_segment(cell2, pointSites, lineSites);
+      coordinate_type dx = high(segment).x() - low(segment).x();
+      coordinate_type dy = high(segment).y() - low(segment).y();
+      if ((low(segment) == origin) ^ cell1.contains_point()) {
+        direction.x(dy);
+        direction.y(-dx);
+      } else {
+        direction.x(-dy);
+        direction.y(dx);
+      }
+    }
+    coordinate_type side = bbox[2]; //width
+    coordinate_type koef =
+        side / (std::max)(fabs(direction.x()), fabs(direction.y()));
+    if (edge.vertex0() == NULL) {
+      clipped_edge->x1 = origin.x() - direction.x() * koef;
+      clipped_edge->y1 = origin.y() - direction.y() * koef;
+    } else {
+      clipped_edge->x1 = edge.vertex0()->x();
+      clipped_edge->y1 = edge.vertex0()->y();
+    }
+    if (edge.vertex1() == NULL) {
+      clipped_edge->x2 = origin.x() + direction.x() * koef;
+      clipped_edge->y2 = origin.y() + direction.y() * koef;
+    } else {
+      clipped_edge->x2 = edge.vertex1()->x();
+      clipped_edge->y2 = edge.vertex1()->y();
+    }
   }
-  return result;
-}
 
-// int main() {
-//   // Preparing Input Geometries.
-//   std::vector<Point> points;
-//   points.push_back(Point(0, 0));
-//   points.push_back(Point(1, 6));
-//   std::vector<Segment> segments;
-//   segments.push_back(Segment(-4, 5, 5, -1));
-//   segments.push_back(Segment(3, -11, 13, -1));
+EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<int> points) {  
+  std::vector<point_type> pointSites;
+  std::vector<segment_type> lineSites;
 
-//   // Construction of the Voronoi Diagram.
-//   voronoi_diagram<double> vd;
-//   construct_voronoi(points.begin(), points.end(),
-//                     segments.begin(), segments.end(),
-//                     &vd);
+  std::vector<double> bbox;
+  bbox.push_back(0);
+  bbox.push_back(0);
+  bbox.push_back(500);
+  bbox.push_back(500);
 
-//   // // Traversing Voronoi Graph.
-//   // {
-//   //   printf("Traversing Voronoi graph.\n");
-//   //   printf("Number of visited primary edges using edge iterator: %d\n",
-//   //       iterate_primary_edges1(vd));
-//   //   printf("Number of visited primary edges using cell iterator: %d\n",
-//   //       iterate_primary_edges2(vd));
-//   //   printf("Number of visited primary edges using vertex iterator: %d\n",
-//   //       iterate_primary_edges3(vd));
-//   //   printf("\n");
-//   // }
+  for (size_t i = 0; i < points.size() * 2; i+=2)
+  {
+      pointSites.push_back(point_type(points[i], points[i+1]));
+  }
 
-//   // // Using color member of the Voronoi primitives to store the average number
-//   // // of edges around each cell (including secondary edges).
-//   // {
-//   //   printf("Number of edges (including secondary) around the Voronoi cells:\n");
-//   //   for (voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin();
-//   //        it != vd.edges().end(); ++it) {
-//   //     std::size_t cnt = it->cell()->color();
-//   //     it->cell()->color(cnt + 1);
-//   //   }
-//   //   for (voronoi_diagram<double>::const_cell_iterator it = vd.cells().begin();
-//   //        it != vd.cells().end(); ++it) {
-//   //     printf("%lu ", it->color());
-//   //   }
-//   //   printf("\n");
-//   //   printf("\n");
-//   // }
-
-//   // // Linking Voronoi cells with input geometries.
-//   // {
-//   //   unsigned int cell_index = 0;
-//   //   for (voronoi_diagram<double>::const_cell_iterator it = vd.cells().begin();
-//   //        it != vd.cells().end(); ++it) {
-//   //     if (it->contains_point()) {
-//   //       if (it->source_category() ==
-//   //           boost::polygon::SOURCE_CATEGORY_SINGLE_POINT) {
-//   //         std::size_t index = it->source_index();
-//   //         Point p = points[index];
-//   //         printf("Cell #%u contains a point: (%d, %d).\n",
-//   //                cell_index, x(p), y(p));
-//   //       } else if (it->source_category() ==
-//   //                  boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT) {
-//   //         std::size_t index = it->source_index() - points.size();
-//   //         Point p0 = low(segments[index]);
-//   //         printf("Cell #%u contains segment start point: (%d, %d).\n",
-//   //                cell_index, x(p0), y(p0));
-//   //       } else if (it->source_category() ==
-//   //                  boost::polygon::SOURCE_CATEGORY_SEGMENT_END_POINT) {
-//   //         std::size_t index = it->source_index() - points.size();
-//   //         Point p1 = high(segments[index]);
-//   //         printf("Cell #%u contains segment end point: (%d, %d).\n",
-//   //                cell_index, x(p1), y(p1));
-//   //       }
-//   //     } else {
-//   //       std::size_t index = it->source_index() - points.size();
-//   //       Point p0 = low(segments[index]);
-//   //       Point p1 = high(segments[index]);
-//   //       printf("Cell #%u contains a segment: ((%d, %d), (%d, %d)). \n",
-//   //              cell_index, x(p0), y(p0), x(p1), y(p1));
-//   //     }
-//   //     ++cell_index;
-//   //   }
-//   // }
-//   return 0;
-// }
-
-#ifdef __cplusplus
-#define EXTERN extern "C"
-#else
-#define EXTERN
-#endif
-
-EXTERN EMSCRIPTEN_KEEPALIVE std::size_t testNumCells() {
-  // Preparing Input Geometries.
-  std::vector<Point> points;
-  points.push_back(Point(0, 0));
-  points.push_back(Point(1, 6));
-  std::vector<Segment> segments;
-  segments.push_back(Segment(-4, 5, 5, -1));
-  segments.push_back(Segment(3, -11, 13, -1));
 
   // Construction of the Voronoi Diagram.
   voronoi_diagram<double> vd;
-  construct_voronoi(points.begin(), points.end(),
-                    segments.begin(), segments.end(),
+  construct_voronoi(pointSites.begin(), pointSites.end(),
+                    lineSites.begin(), lineSites.end(),
                     &vd);
 
-  return vd.num_cells();
 
+
+  DiagrammResult result;
+  result.numVerticies = vd.num_vertices();
+  for (voronoi_diagram<double>::const_vertex_iterator it = vd.vertices().begin(); it != vd.vertices().end(); ++it) {
+    const voronoi_diagram<double>::vertex_type& vertex = *it;
+    result.vertices.push_back(vertex.x());
+    result.vertices.push_back(vertex.y());
+  }
+
+
+  for (voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin(); it != vd.edges().end(); ++it) {
+    if (false && !it->is_primary()) {
+      continue;
+    }
+      EdgeResult edgeResult;
+      edgeResult.isFinite= it->is_finite();
+      if(it->is_finite()){
+        edgeResult.x1 = it->vertex0()->x();
+        edgeResult.y1 = it->vertex0()->y();
+        edgeResult.x2 = it->vertex1()->x();
+        edgeResult.y2 = it->vertex1()->y();
+      }else{
+        clip_infinite_edge(*it, &edgeResult, pointSites, lineSites, bbox);
+      }
+      result.edges.push_back(edgeResult);
+  }
+
+  return result;  
 }
 
-EXTERN EMSCRIPTEN_KEEPALIVE std::size_t compute(std::size_t numPoints, std::size_t numSegments, std::size_t points[]) {  
-  return numPoints * numSegments;
+
+// // Binding code
+EMSCRIPTEN_BINDINGS(myvoronoi) {
+  register_vector<int>("VectorInt");
+  register_vector<double>("VectorDouble");
+  register_vector<EdgeResult>("VectorEdgeResult");
+  
+  value_object<EdgeResult>("EdgeResult")
+    .field("x1", &EdgeResult::x1)
+    .field("y1", &EdgeResult::y1)
+    .field("x2", &EdgeResult::x2)
+    .field("y2", &EdgeResult::y2)
+    .field("isFinite", &EdgeResult::isFinite)
+    ;
+
+  value_object<DiagrammResult>("DiagrammResult")
+    .field("vertices", &DiagrammResult::vertices)
+    .field("edges", &DiagrammResult::edges)
+    .field("numVerticies", &DiagrammResult::numVerticies)
+    ;
+
+  emscripten::function("computevoronoi", &compute);
+
+
+ 
 }
-
-

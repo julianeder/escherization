@@ -11,7 +11,7 @@
     SiteSegment,
   } from "./lib/voronoiDataStructures";
   import Beachline from "./lib/Beachline.svelte";
-  import instantiate_wasmVoronoi, { type VoronoiWasmModule } from "./lib/wasm/wasmVoronoi"
+  import instantiate_wasmVoronoi, { type VoronoiWasmModule, type EdgeResult } from "./lib/wasm/wasmVoronoi"
 
 
   let voronoi: Voronoi;
@@ -27,12 +27,54 @@
 
   let wasmVoronoi: VoronoiWasmModule;
 
+  function wasmWraper(){
+    
+    const pointVector = new wasmVoronoi.VectorInt();
+    sitePoints.forEach(sp => {
+      pointVector.push_back(sp.x)
+      pointVector.push_back(sp.y)
+    });
+    siteSegments.forEach(ss => {
+      pointVector.push_back(ss.x1)
+      pointVector.push_back(ss.y1)
+      pointVector.push_back(ss.x2)
+      pointVector.push_back(ss.y2)
+    });
+    // console.log(pointVector)
+    
+    
+    let result = wasmVoronoi.computevoronoi(pointVector);
+    let newVoronoiVertices = [];
+    for (var i = 0; i < result.vertices.size(); i+=2) {
+      // console.log("Vert: ", result.vertices.get(i));
+      newVoronoiVertices.push({x: result.vertices.get(i), y: result.vertices.get(i+1)})
+    }
+    
+    let newVoronoiEdges = [];
+    for (var i = 0; i < result.edges.size(); i++) {
+      let e: EdgeResult = result.edges.get(i);
+      if(e.isFinite){
+        newVoronoiEdges.push({
+          va: {x: e.x1, y: e.y1},
+          vb: {x: e.x2, y: e.y2}
+        })
+      }else{
+        console.log("edge: ", e);
+      }
+    }
+
+    // console.log(newVoronoiEdges)
+    
+    return [newVoronoiVertices, newVoronoiEdges];
+  }
+  
   onMount(async () => {
     
     wasmVoronoi = await instantiate_wasmVoronoi();
 
-    let ncells = wasmVoronoi._testNumCells();
-    console.log(wasmVoronoi._compute(2, 3, [1,2,3,4]));
+    // let ncells = wasmVoronoi.__Z12testNumCellsv();
+    // console.log(ncells);
+
 
 
     sitePoints = [new SitePoint(350, 150), new SitePoint(150, 251), new SitePoint(100, 100)
@@ -41,47 +83,46 @@
     ];
     siteSegments = [new SiteSegment(10, 200, 400, 250)];
 
-    voronoi = new Voronoi();
+    // voronoi = new Voronoi();
     // voronoi = new Voronoi(sitePoints, siteSegments , bbox);
 
-    diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
-    voronoiVertices = diagram.vertices;
-    voronoiEdges = diagram.edges;
+    // diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
+    // voronoiVertices = diagram.vertices;
+    // voronoiEdges = diagram.edges;
 
-    console.log(diagram.beachline?.root);
+    [voronoiVertices, voronoiEdges] = wasmWraper();
+
     // console.log("mounted");
 
   });
 
   function addPoint(event: MouseEvent) {
     sitePoints = [...sitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
-    diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
+    // diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
     // voronoi.construct_voronoi(sitePoints, siteSegments, bbox);
-    voronoiVertices = diagram.vertices;
-    voronoiEdges = diagram.edges;
-    console.log(voronoiVertices);
+    // voronoiVertices = diagram.vertices;
+    // voronoiEdges = diagram.edges;
+    [voronoiVertices, voronoiEdges]  = wasmWraper();
 
   }
 
-  function inc(){
-    steps++;
+  // function inc(){
+  //   steps++;
 
-    diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
-    // voronoi.construct_voronoi(sitePoints, siteSegments, bbox);
-    voronoiVertices = diagram.vertices;
-    voronoiEdges = diagram.edges;
-  }
+  //   diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
+  //   // voronoi.construct_voronoi(sitePoints, siteSegments, bbox);
+  //   voronoiVertices = diagram.vertices;
+  //   voronoiEdges = diagram.edges;
+  // }
 
-  function dec(){
-    steps--;
+  // function dec(){
+  //   steps--;
 
-    diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
-    // voronoi.construct_voronoi(sitePoints, siteSegments, bbox);
-    voronoiVertices = diagram.vertices;
-    voronoiEdges = diagram.edges;
-  }
-
-  /** @type {any} */ var module: any;
+  //   diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
+  //   // voronoi.construct_voronoi(sitePoints, siteSegments, bbox);
+  //   voronoiVertices = diagram.vertices;
+  //   voronoiEdges = diagram.edges;
+  // }
 
 
 </script>
@@ -146,9 +187,9 @@
             ></path>
           {/if}
         </svg>
-        <button on:click={inc}> + </button>
+        <!-- <button on:click={inc}> + </button>
         <button on:click={dec}> - </button>
-        <p>{steps}</p>
+        <p>{steps}</p> -->
       </div>
     </div>
   </MainPage>

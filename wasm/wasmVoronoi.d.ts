@@ -1,8 +1,15 @@
 /// <reference types="emscripten" />
 
+export interface EdgeResult{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    isFinite: boolean;
+}
+
 export interface VoronoiWasmModule extends EmscriptenModule {
-    _testNumCells(): number;
-    _compute(numPoints: number, numSegments: number, points: Array<number>): number;
+    computevoronoi(points: any): any;
 }
 
 export default function instantiate_wasmVoronoi(mod?: any): Promise<VoronoiWasmModule>;
