@@ -3,127 +3,90 @@
   import { onMount } from "svelte";
   import MainPage from "./lib/MainPage.svelte";
   import UploadImage from "./lib/UploadImage.svelte";
-  import Voronoi, { BBox } from "./lib/voronoi";
   import {
-    Diagram,
+    type Vertex,
+    type Edge,
     SitePoint,
-    Edge,
     SiteSegment,
+    BBox
   } from "./lib/voronoiDataStructures";
-  import Beachline from "./lib/Beachline.svelte";
   import instantiate_wasmVoronoi, { type VoronoiWasmModule, type EdgeResult } from "./lib/wasm/wasmVoronoi"
-
-
-  let voronoi: Voronoi;
-  let diagram: Diagram;
 
   let sitePoints: SitePoint[] = [];
   let siteSegments: SiteSegment[] = [];
-  let voronoiVertices: any = [];
-  let voronoiEdges: any = [];
+  let voronoiVertices: Vertex[] = [];
+  let voronoiEdges: Edge[] = [];
 
-  let bbox: BBox = { xl: 0, xr: 500, yt: 0, yb: 300 };
+  let bbox: BBox = { xl: 0, xh: 500, yl: 0, yh: 300 };
   let steps = 0;
 
   let wasmVoronoi: VoronoiWasmModule;
 
   function wasmWraper(){
     
+    const bboxVector = new wasmVoronoi.VectorDouble();
+    bboxVector.push_back(bbox.xl)
+    bboxVector.push_back(bbox.yl)
+    bboxVector.push_back(bbox.xh)
+    bboxVector.push_back(bbox.yh)
+
     const pointVector = new wasmVoronoi.VectorInt();
     sitePoints.forEach(sp => {
       pointVector.push_back(sp.x)
       pointVector.push_back(sp.y)
     });
+    const segmentVector = new wasmVoronoi.VectorInt();
     siteSegments.forEach(ss => {
-      pointVector.push_back(ss.x1)
-      pointVector.push_back(ss.y1)
-      pointVector.push_back(ss.x2)
-      pointVector.push_back(ss.y2)
+      segmentVector.push_back(ss.x1)
+      segmentVector.push_back(ss.y1)
+      segmentVector.push_back(ss.x2)
+      segmentVector.push_back(ss.y2)
     });
-    // console.log(pointVector)
     
-    
-    let result = wasmVoronoi.computevoronoi(pointVector);
-    let newVoronoiVertices = [];
+    let result = wasmVoronoi.computevoronoi(bboxVector, pointVector, segmentVector);
+    let newVoronoiVertices: Vertex[] = [];
     for (var i = 0; i < result.vertices.size(); i+=2) {
       // console.log("Vert: ", result.vertices.get(i));
       newVoronoiVertices.push({x: result.vertices.get(i), y: result.vertices.get(i+1)})
     }
     
-    let newVoronoiEdges = [];
+    let newVoronoiEdges: Edge[] = [];
     for (var i = 0; i < result.edges.size(); i++) {
       let e: EdgeResult = result.edges.get(i);
-      if(e.isFinite){
-        newVoronoiEdges.push({
-          va: {x: e.x1, y: e.y1},
-          vb: {x: e.x2, y: e.y2}
-        })
-      }else{
-        console.log("edge: ", e);
+      let samples: Vertex[] = [];
+      for (var j = 0; j < e.samples.size(); j+=2) {
+        samples.push({x: e.samples.get(j), y: e.samples.get(j+1)})
       }
+
+      newVoronoiEdges.push({
+        va: {x: e.x1, y: e.y1},
+        vb: {x: e.x2, y: e.y2},
+        samples: samples,
+        isPrimary: e.isPrimary
+      })
     }
 
     // console.log(newVoronoiEdges)
-    
-    return [newVoronoiVertices, newVoronoiEdges];
+    voronoiVertices = newVoronoiVertices;
+    voronoiEdges = newVoronoiEdges;
   }
   
   onMount(async () => {
     
     wasmVoronoi = await instantiate_wasmVoronoi();
 
-    // let ncells = wasmVoronoi.__Z12testNumCellsv();
-    // console.log(ncells);
-
-
-
-    sitePoints = [new SitePoint(350, 150), new SitePoint(150, 251), new SitePoint(100, 100)
-        // ,new SitePoint(10, 200),
-        // new SitePoint(400, 250)
-    ];
+    sitePoints = [new SitePoint(200, 200), new SitePoint(300, 100), new SitePoint(100, 100)];
     siteSegments = [new SiteSegment(10, 200, 400, 250)];
 
-    // voronoi = new Voronoi();
-    // voronoi = new Voronoi(sitePoints, siteSegments , bbox);
+    wasmWraper();
 
-    // diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
-    // voronoiVertices = diagram.vertices;
-    // voronoiEdges = diagram.edges;
-
-    [voronoiVertices, voronoiEdges] = wasmWraper();
-
-    // console.log("mounted");
 
   });
 
   function addPoint(event: MouseEvent) {
     sitePoints = [...sitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
-    // diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
-    // voronoi.construct_voronoi(sitePoints, siteSegments, bbox);
-    // voronoiVertices = diagram.vertices;
-    // voronoiEdges = diagram.edges;
-    [voronoiVertices, voronoiEdges]  = wasmWraper();
-
+    wasmWraper();
   }
-
-  // function inc(){
-  //   steps++;
-
-  //   diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
-  //   // voronoi.construct_voronoi(sitePoints, siteSegments, bbox);
-  //   voronoiVertices = diagram.vertices;
-  //   voronoiEdges = diagram.edges;
-  // }
-
-  // function dec(){
-  //   steps--;
-
-  //   diagram = voronoi.compute(steps, sitePoints, siteSegments, bbox);
-  //   // voronoi.construct_voronoi(sitePoints, siteSegments, bbox);
-  //   voronoiVertices = diagram.vertices;
-  //   voronoiEdges = diagram.edges;
-  // }
-
 
 </script>
 
@@ -140,7 +103,7 @@
         <svg
           width="500"
           height="300"
-          viewBox="{bbox.xl} {bbox.yt} {bbox.xr} {bbox.yb}"
+          viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
           xmlns="http://www.w3.org/2000/svg"
           on:click={addPoint}
         >
@@ -166,26 +129,36 @@
             <circle cx={siteS.x1} cy={siteS.y1} r="4" fill="black"></circle>
             <circle cx={siteS.x2} cy={siteS.y2} r="4" fill="black"></circle>
           {/each}
-          {#each voronoiVertices as v, idx}
-            <circle cx={v.x} cy={v.y} r="3" fill="green"></circle>
-          {/each}
+          <!-- {#each voronoiVertices as v, idx}
+            <circle cx={v.x} cy={v.y} r="5" fill="red"></circle>
+          {/each} -->
           {#each voronoiEdges as e, idx}
-            <path
-              d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+            <circle cx={e.va.x} cy={e.va.y} r="3" fill="green"></circle>
+            <circle cx={e.vb.x} cy={e.vb.y} r="3" fill="green"></circle>
+            {#if e.samples.length == 0}
+              {#if e.isPrimary}
+                <path
+                d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+                stroke="blue"
+                stroke-width="1"
+                fill="none"
+                ></path>
+              {:else}
+                <path
+                d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+                stroke="green"
+                stroke-width="1"
+                fill="none"
+                ></path>
+              {/if}
+            {:else}
+              <path d="M {e.va.x} {e.va.y} {e.samples.map((s) => 'L ' + s.x + ' ' + s.y).reduce((a,b) => a + ' ' + b)} "             
               stroke="blue"
               stroke-width="1"
               fill="none"
-            ></path>
+              ></path>
+            {/if}
           {/each}
-          <Beachline node={diagram?.beachline?.getFirst(diagram?.beachline?.root)}></Beachline>
-          {#if diagram}
-            <path
-              d="M 0 {diagram?.sweepline} L 500 {diagram?.sweepline}"
-              stroke="red"
-              stroke-width="1"
-              fill="none"
-            ></path>
-          {/if}
         </svg>
         <!-- <button on:click={inc}> + </button>
         <button on:click={dec}> - </button>

@@ -6,10 +6,14 @@ export interface EdgeResult{
     x2: number;
     y2: number;
     isFinite: boolean;
+    isCurved: boolean;
+    samples: any;
 }
 
 export interface VoronoiWasmModule extends EmscriptenModule {
-    computevoronoi(points: any): any;
+    VectorInt: any;
+    VectorDouble: any;
+    computevoronoi(bbox: any, points: any, segments: any): any;
 }
 
 export default function instantiate_wasmVoronoi(mod?: any): Promise<VoronoiWasmModule>;
