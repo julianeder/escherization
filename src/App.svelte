@@ -76,7 +76,7 @@
     wasmVoronoi = await instantiate_wasmVoronoi();
 
     sitePoints = [new SitePoint(200, 200), new SitePoint(300, 100), new SitePoint(100, 100)];
-    siteSegments = [new SiteSegment(10, 200, 400, 250)];
+    siteSegments = [new SiteSegment(10, 200, 400, 250), new SiteSegment(380, 50, 400, 200)];
 
     wasmWraper();
 

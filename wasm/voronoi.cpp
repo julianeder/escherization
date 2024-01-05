@@ -118,7 +118,7 @@ struct DiagrammResult {
 };
 
 point_type retrieve_point(
-  const voronoi_diagram<double>::cell_type& cell,   
+  const voronoi_diagram<double>::cell_type& cell,
   std::vector<point_type> pointSites,
   std::vector<segment_type> lineSites
   ) {
@@ -145,7 +145,7 @@ void sample_curved_edge(
     std::vector<point_type>* sampled_edge,
     std::vector<point_type> pointSites,
     std::vector<segment_type> lineSites,
-    std::vector<double> bbox) 
+    std::vector<double> bbox)
 {
   double xl = bbox[0];
   double xh = bbox[2];
@@ -161,8 +161,8 @@ void sample_curved_edge(
 }
 
 void createVertex(
-  const voronoi_diagram<double>::edge_type& edge, 
-  EdgeResult* edgeResult, 
+  const voronoi_diagram<double>::edge_type& edge,
+  EdgeResult* edgeResult,
   double x, double y){
   if (edge.vertex0() == NULL) {
     edgeResult->x1 = x;
@@ -182,9 +182,9 @@ void createVertex(
 
 
 void clip_finite_edge(
-  const voronoi_diagram<double>::edge_type& edge, 
+  const voronoi_diagram<double>::edge_type& edge,
   DiagrammResult* result,
-  EdgeResult* edgeResult, 
+  EdgeResult* edgeResult,
   std::vector<point_type> pointSites,
   std::vector<segment_type> lineSites,
   std::vector<double> bbox
@@ -197,13 +197,13 @@ void clip_finite_edge(
     double yh = bbox[3];
 
     // completely outside
-    if((edge.vertex0()->x() <= xl && edge.vertex1()->x() <= xl)  
-    || (edge.vertex0()->x() >= xh && edge.vertex1()->x() >= xh)  
-    || (edge.vertex0()->y() <= yl && edge.vertex1()->y() <= yl)  
+    if((edge.vertex0()->x() <= xl && edge.vertex1()->x() <= xl)
+    || (edge.vertex0()->x() >= xh && edge.vertex1()->x() >= xh)
+    || (edge.vertex0()->y() <= yl && edge.vertex1()->y() <= yl)
     || (edge.vertex0()->y() >= yh && edge.vertex1()->y() >= yh)){
-      printf("compl outside \n");
-      return; 
-    } 
+      // printf("compl outside \n");
+      return;
+    }
 
 
     point_type direction;
@@ -217,17 +217,17 @@ void clip_finite_edge(
       edgeResult->x1 = edge.vertex0()->x() + (xl - edge.vertex0()->x()) ;
       edgeResult->y1 = edge.vertex0()->y() + (xl - edge.vertex0()->x()) * dydx;
 
-      printf("clip x1a %f -> %f \n", 
-        edge.vertex0()->x(),
-        edgeResult->x1);
+      // printf("clip x1a %f -> %f \n",
+      //   edge.vertex0()->x(),
+      //   edgeResult->x1);
     }
     else if(edge.vertex0()->x() > xh){
       edgeResult->x1 = edge.vertex0()->x() + (xh - edge.vertex0()->x());
       edgeResult->y1 = edge.vertex0()->y() + (xh - edge.vertex0()->x()) * dydx;
 
-      printf("clip x1b %f -> %f \n", 
-        edge.vertex0()->x(),
-        edgeResult->x1);
+      // printf("clip x1b %f -> %f \n",
+      //   edge.vertex0()->x(),
+      //   edgeResult->x1);
     }
     else {
       edgeResult->x1 = edge.vertex0()->x();
@@ -239,17 +239,17 @@ void clip_finite_edge(
       edgeResult->x2 = edge.vertex1()->x() + (xl - edge.vertex1()->x());
       edgeResult->y2 = edge.vertex1()->y() + (xl - edge.vertex1()->x()) * dydx;
 
-      printf("clip x2a %f -> %f \n", 
-        edge.vertex1()->x(),
-        edgeResult->x2);
+      // printf("clip x2a %f -> %f \n",
+      //   edge.vertex1()->x(),
+      //   edgeResult->x2);
     }
     else if(edge.vertex1()->x() > xh){
       edgeResult->x2 = edge.vertex1()->x() + (xh - edge.vertex1()->x());
       edgeResult->y2 = edge.vertex1()->y() + (xh - edge.vertex1()->x()) * dydx;
 
-      printf("clip x2b %f -> %f \n", 
-        edge.vertex1()->x(),
-        edgeResult->x2);
+      // printf("clip x2b %f -> %f \n",
+      //   edge.vertex1()->x(),
+      //   edgeResult->x2);
     }
     else {
       edgeResult->x2 = edge.vertex1()->x();
@@ -258,40 +258,50 @@ void clip_finite_edge(
 
     // Clip Y1
     if(edgeResult->y1 < yl){
+      // printf("clip y1a %f -> %f \n",
+      //   edgeResult->y1,
+      //   edgeResult->y1 + (yl - edgeResult->y1));
+
       edgeResult->x1 = edgeResult->x1 + (yl - edgeResult->y1) * dxdy;
       edgeResult->y1 = edgeResult->y1 + (yl - edgeResult->y1);
-      printf("clip y1 \n");
     }
     else if(edgeResult->y1 > yh){
-      if(edgeResult->y2 > yh) return; // completely outside
+      // printf("clip y1b %f -> %f \n",
+      //   edgeResult->y1,
+      //   edgeResult->y1 + (yh - edgeResult->y1));
+
       edgeResult->x1 = edgeResult->x1 + (yh - edgeResult->y1) * dxdy;
       edgeResult->y1 = edgeResult->y1 + (yh - edgeResult->y1);
-      printf("clip y1 \n");
-
     }
-    // else // unchanged 
+    // else // unchanged
 
     // Clip Y2
     if(edgeResult->y2 < yl){
+      // printf("clip y2a %f -> %f \n",
+      //   edgeResult->y2,
+      //   edgeResult->y2 + (yl - edgeResult->y2));
+
       edgeResult->x2 = edgeResult->x2 + (yl - edgeResult->y2) * dxdy;
       edgeResult->y2 = edgeResult->y2 + (yl - edgeResult->y2);
-      printf("clip y2 \n");
 
     }
     else if(edgeResult->y2 > yh){
+      // printf("clip y2b %f -> %f \n",
+      //   edgeResult->y2,
+      //   edgeResult->y2 + (yh - edgeResult->y2));
+
       edgeResult->x2 = edgeResult->x2 + (yh - edgeResult->y2) * dxdy;
       edgeResult->y2 = edgeResult->y2 + (yh - edgeResult->y2);
-      printf("clip y2 \n");
     }
-    // else // unchanged 
+    // else // unchanged
 
-    printf("finite %d %f %f - %f %f \n", 
-      edge.is_primary(),
-      edgeResult->x1,
-      edgeResult->y1,
-      edgeResult->x2,
-      edgeResult->y2);
-    
+    // printf("finite %d %f %f - %f %f \n",
+    //   edge.is_primary(),
+    //   edgeResult->x1,
+    //   edgeResult->y1,
+    //   edgeResult->x2,
+    //   edgeResult->y2);
+
     if (edge.is_curved()) { // only finite edges can be curved
       samples_.push_back(point_type(edgeResult->x1, edgeResult->y1));
       samples_.push_back(point_type(edgeResult->x2, edgeResult->y2));
@@ -307,22 +317,39 @@ void clip_finite_edge(
 
 }
 void clip_infinite_edge(
-  const voronoi_diagram<double>::edge_type& edge, 
-  DiagrammResult* result,  
-  EdgeResult* edgeResult, 
+  const voronoi_diagram<double>::edge_type& edge,
+  DiagrammResult* result,
+  EdgeResult* edgeResult,
   std::vector<point_type> pointSites,
   std::vector<segment_type> lineSites,
   std::vector<double> bbox
   ) {
+    // vertex - voronoi vertex from which the voronoi edge starts
+    // p1, p2 - sitePoints that the edge is equal distance from
+
     if (edge.vertex0() == NULL)
       return;
 
-    printf("infinite %d %f %f - %f %f \n", 
-      edge.is_primary(),
-      edge.vertex0()->x(),
-      edge.vertex0()->y(),
-      edge.vertex1()->x(),
-      edge.vertex1()->y());
+    // printf("infinite %d %f %f - %f %f \n",
+    //   edge.is_primary(),
+    //   edge.vertex0()->x(),
+    //   edge.vertex0()->y(),
+    //   edge.vertex1()->x(),
+    //   edge.vertex1()->y());
+
+    double xl = bbox[0];
+    double xh = bbox[2];
+    double yl = bbox[1];
+    double yh = bbox[3];
+
+    // completely outside
+    if((edge.vertex0()->x() <= xl)
+    || (edge.vertex0()->x() >= xh)
+    || (edge.vertex0()->y() <= yl)
+    || (edge.vertex0()->y() >= yh)){
+      // printf("compl outside \n");
+      return;
+    }
 
     const voronoi_diagram<double>::cell_type& cell1 = *edge.cell();
     const voronoi_diagram<double>::cell_type& cell2 = *edge.twin()->cell();
@@ -331,11 +358,11 @@ void clip_infinite_edge(
     if (cell1.contains_point() && cell2.contains_point()) {
       point_type p1 = retrieve_point(cell1, pointSites, lineSites);
       point_type p2 = retrieve_point(cell2, pointSites, lineSites);
-      printf("p1 %f %f p2 %f %f \n", 
-        p1.x(),
-        p1.y(),
-        p2.x(),
-        p2.y());
+      // printf("p1 %f %f p2 %f %f \n",
+      //   p1.x(),
+      //   p1.y(),
+      //   p2.x(),
+      //   p2.y());
       origin.x((p1.x() + p2.x()) * 0.5);
       origin.y((p1.y() + p2.y()) * 0.5);
       direction.x(p1.y() - p2.y()); // orthogonal to the direction between the points
@@ -363,42 +390,37 @@ void clip_infinite_edge(
     direction.x(direction.x() / l);
     direction.y(direction.y() / l);
 
-    printf("  origin %f %f \n",
-      origin.x(),
-      origin.y());
-    printf("  direction %f %f \n", 
-      direction.x(),
-      direction.y()
-      );
-
-    double xl = bbox[0];
-    double xh = bbox[2];
-    double yl = bbox[1];
-    double yh = bbox[3];
+    // printf("  origin %f %f \n",
+    //   origin.x(),
+    //   origin.y());
+    // printf("  direction %f %f \n",
+    //   direction.x(),
+    //   direction.y()
+    //   );
 
     double fm, fb;
 
     if(direction.x() == 0){ // Vertical
       // doesn't intersect with viewport
-      if (origin.x() < xl || origin.x() > xh) { 
-        return; 
+      if (origin.x() < xl || origin.x() > xh) {
+        return;
       }
       // downward
       if (direction.y() < 0) {
-        // printf("v %f %f \n", 
+        // printf("v %f %f \n",
         //   origin.x(),
         //   yl);
         createVertex(edge, edgeResult, origin.x(), yl);
       }
       // upward
       else {
-        // printf("v %f %f \n", 
+        // printf("v %f %f \n",
         //   origin.x(),
         //   yh);
         createVertex(edge, edgeResult, origin.x(), yh);
       }
     }
-    
+
     else{
       // Ray Box Intersection
       // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection.html
@@ -417,40 +439,40 @@ void clip_infinite_edge(
       double tmin = (t0x < t0y) ? t0x : t0y; // (3333 < 50) = 50
       double tmax = (t1x > t1y) ? t1x : t1y; // (-833,33 > -252,27) = -252,27
 
-      printf("t %f %f \n", 
-        tmin,
-        tmax);
+      // printf("t %f %f \n",
+      //   tmin,
+      //   tmax);
       // the one in the same dir as the ray is >0
       if(tmin > 0){
         double cx = origin.x() + tmin * direction.x();
         double cy = origin.y() + tmin * direction.y();
-        printf("c %f %f \n", 
-          cx,
-          cy);
+        // printf("c %f %f \n",
+        //   cx,
+        //   cy);
         createVertex(edge, edgeResult, cx, cy);
       }
       else if(tmax > 0){
         double cx = origin.x() + tmax * direction.x();
         double cy = origin.y() + tmax * direction.y();
-        printf("c %f %f \n", 
-          cx,
-          cy);
+        // printf("c %f %f \n",
+        //   cx,
+        //   cy);
         createVertex(edge, edgeResult, cx, cy);
       }
     }
     result->edges.push_back(*edgeResult);
 }
 
-EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vector<int> points, std::vector<int> segments) {  
+EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vector<int> points, std::vector<int> segments) {
   std::vector<point_type> pointSites;
   std::vector<segment_type> lineSites;
 
-  // printf("size %zu \n", 
+  // printf("size %zu \n",
   //         points.size());
   for (size_t i = 0; i < points.size(); i += 2)
   {
       pointSites.push_back(point_type(points[i], points[i+1]));
-      // printf("pointSite %zu %f %f \n", 
+      // printf("pointSite %zu %f %f \n",
       //     i,
       //     pointSites[i/2].x(),
       //     pointSites[i/2].y());
@@ -472,19 +494,21 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
 
   for (voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin(); it != vd.edges().end(); ++it) {
 
+    
+
     EdgeResult edgeResult;
 
     edgeResult.isFinite = it->is_finite();
     edgeResult.isPrimary = it->is_primary();
-    edgeResult.isCurved = it->is_curved(); 
-    
+    edgeResult.isCurved = it->is_curved();
+
     if(it->is_finite()){
-      clip_finite_edge(*it, &result, &edgeResult, pointSites, lineSites, bbox);      
+      clip_finite_edge(*it, &result, &edgeResult, pointSites, lineSites, bbox);
     }else{
       clip_infinite_edge(*it, &result, &edgeResult, pointSites, lineSites, bbox);
     }
 
-      
+
   }
 
   result.numVerticies = vd.num_vertices();
@@ -494,7 +518,7 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
     result.vertices.push_back(vertex.y());
   }
 
-  return result;  
+  return result;
 }
 
 
@@ -503,7 +527,7 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
   register_vector<int>("VectorInt");
   register_vector<double>("VectorDouble");
   register_vector<EdgeResult>("VectorEdgeResult");
-  
+
   value_object<EdgeResult>("EdgeResult")
     .field("x1", &EdgeResult::x1)
     .field("y1", &EdgeResult::y1)
@@ -524,5 +548,5 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
   emscripten::function("computevoronoi", &compute);
 
 
- 
+
 }
