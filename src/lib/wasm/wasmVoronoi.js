@@ -2283,17 +2283,17 @@ var wasmImports = {
  /** @export */ E: _emscripten_memcpy_js,
  /** @export */ D: _emscripten_resize_heap,
  /** @export */ b: invoke_ii,
- /** @export */ i: invoke_iii,
+ /** @export */ j: invoke_iii,
  /** @export */ C: invoke_iiii,
  /** @export */ m: invoke_iiiii,
  /** @export */ B: invoke_iiiiii,
- /** @export */ j: invoke_v,
+ /** @export */ t: invoke_iiiiiii,
+ /** @export */ i: invoke_v,
  /** @export */ c: invoke_vi,
  /** @export */ l: invoke_vii,
  /** @export */ A: invoke_viidii,
  /** @export */ z: invoke_viiii,
- /** @export */ t: invoke_viiiii,
- /** @export */ s: invoke_viiiiii,
+ /** @export */ s: invoke_viiiii,
  /** @export */ g: invoke_viiiiiiiiii
 };
 
@@ -2408,10 +2408,10 @@ function invoke_iii(index, a1, a2) {
  }
 }
 
-function invoke_viiiiii(index, a1, a2, a3, a4, a5, a6) {
+function invoke_iiiiiii(index, a1, a2, a3, a4, a5, a6) {
  var sp = stackSave();
  try {
-  getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6);
+  return getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6);
  } catch (e) {
   stackRestore(sp);
   if (e !== e + 0) throw e;

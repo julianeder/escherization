@@ -142,9 +142,9 @@ class voronoi_visual_utils {
     // Clip
     // for(typename std::vector< Point<CT> >::iterator it = discretization->begin(); it != discretization->end(); )    
     // {
-    //   if((*it).x() < xl || (*it).x() > xh)
+    //   if(it->x() < xl || it->x() > xh)
     //     it = discretization->erase(it);
-    //   else if((*it).y() < yl || (*it).y() > yh)
+    //   else if(it->y() < yl || it->y() > yh)
     //     it = discretization->erase(it);
     //   else 
     //     it++;
