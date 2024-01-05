@@ -57,11 +57,16 @@
       for (var j = 0; j < e.samples.size(); j+=2) {
         samples.push({x: e.samples.get(j), y: e.samples.get(j+1)})
       }
+      let controlPoints: Vertex[] = [];
+      for (var j = 0; j < e.controll_points.size(); j+=2) {
+        controlPoints.push({x: e.controll_points.get(j), y: e.controll_points.get(j+1)})
+      }
 
       newVoronoiEdges.push({
         va: {x: e.x1, y: e.y1},
         vb: {x: e.x2, y: e.y2},
         samples: samples,
+        controlPoints: controlPoints,
         isPrimary: e.isPrimary
       })
     }
@@ -152,12 +157,17 @@
                 ></path>
               {/if}
             {:else}
-              <path d="M {e.va.x} {e.va.y} {e.samples.map((s) => 'L ' + s.x + ' ' + s.y).reduce((a,b) => a + ' ' + b)} "             
+            <path d="M {e.va.x} {e.va.y} {e.samples.map((s) => 'L ' + s.x + ' ' + s.y).reduce((a,b) => a + ' ' + b)} "
               stroke="blue"
               stroke-width="1"
               fill="none"
               ></path>
-            {/if}
+              <path d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e.controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2].x} {e.controlPoints[2].y}"
+                stroke="red"
+                stroke-width="1"
+                fill="none"
+                ></path>
+              {/if}
           {/each}
         </svg>
         <!-- <button on:click={inc}> + </button>

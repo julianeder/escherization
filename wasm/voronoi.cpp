@@ -112,6 +112,7 @@ struct EdgeResult {
   bool isCurved;
   bool isPrimary;
   std::vector<double> samples;
+  std::vector<double> controll_points;
 };
 struct DiagrammResult {
   std::vector<double> vertices;
@@ -142,9 +143,109 @@ segment_type retrieve_segment(const cell_type& cell, std::vector<point_type> poi
   return lineSites[index];
 }
 
+double get_point_projection(
+      const point_type& point, const segment_type& segment) {
+    double segment_vec_x = x(high(segment)) - x(low(segment));
+    double segment_vec_y = y(high(segment)) - y(low(segment));
+    double point_vec_x = x(point) - x(low(segment));
+    double point_vec_y = y(point) - y(low(segment));
+    double sqr_segment_length =
+        segment_vec_x * segment_vec_x + segment_vec_y * segment_vec_y;
+    double vec_dot = segment_vec_x * point_vec_x + segment_vec_y * point_vec_y;
+    return vec_dot / sqr_segment_length;
+  }
+
+// Compute y(x) = ((x - a) * (x - a) + b * b) / (2 * b)
+static double parabola_y(double x, double a, double b) {
+  return ((x - a) * (x - a) + b * b) / (b + b);
+}
+
+  // Compute dy(x)/dx = ((x - a)² + b²) / (2b)' = (x-a) / b
+static double parabola_deriv_y(double x, double a, double b) {
+  return (x - a) / b;
+}
+
+void calc_control_points(
+  const point_type& point,
+  const segment_type& segment,
+  std::vector<point_type>* control_points)
+{
+    // Save the first and last point.
+    point_type c0 = (*control_points)[0];
+    point_type c1;
+    point_type c2 = (*control_points)[1];
+    control_points->pop_back();
+    control_points->pop_back();
+
+    // Apply the linear transformation to move start point of the segment to
+    // the point with coordinates (0, 0) and the direction of the segment to
+    // coincide the positive direction of the x-axis.
+    double segm_vec_x = high(segment).x() - low(segment).x();
+    double segm_vec_y = high(segment).y() - low(segment).y();
+    double sqr_segment_length = segm_vec_x * segm_vec_x + segm_vec_y * segm_vec_y;
+
+    // Compute x-coordinates of the endpoints of the edge
+    // in the transformed space.
+    double c0_x_proj = sqr_segment_length * // = u0
+        get_point_projection(c0, segment);
+    double c2_x_proj = sqr_segment_length * // = u2
+        get_point_projection(c2, segment);
+
+    // Compute parabola parameters in the transformed space.
+    // Parabola has next representation:
+    // f(x) = ((x-rot_x)^2 + rot_y^2) / (2.0*rot_y).
+    double point_vec_x = point.x() - low(segment).x();
+    double point_vec_y = point.y() - low(segment).y();
+    double rot_x = segm_vec_x * point_vec_x + segm_vec_y * point_vec_y;
+    double rot_y = segm_vec_x * point_vec_y - segm_vec_y * point_vec_x;
+
+    double y_0_proj = parabola_y(c0_x_proj, rot_x, rot_y); // = v0
+    double y_2_proj = parabola_y(c2_x_proj, rot_x, rot_y); // = v2
+
+    double dy_0_proj = parabola_deriv_y(c0_x_proj, rot_x, rot_y);
+    double dy_2_proj = parabola_deriv_y(c2_x_proj, rot_x, rot_y);
+
+    // Equations
+    // (v1-v0) / (u1-u0) = dy_0
+    // (v2-v1) / (u2-u1) = dy_2
+
+    // Solve for u1
+    // dy_0 * (u1-u0) = (v1-v0) 
+    // u1 = (((v1-v0) + dy_0*u0) / dy_0)
+    
+    // Solve for v1
+    // (v2-v1) / (u2 - (((v1-v0) + dy_0 * u0) / dy_0) ) = dy_2
+    // (v2-v1) = dy_2 * (u2 - (((v1-v0) + dy_0 * u0) / dy_0) )
+    // (v2-v1) = dy_2 * u2 -  (dy_2/dy_0 * ( (v1-v0) + dy_0 * u0 ) ) 
+    // (v2-v1) = dy_2 * u2 -  (  (dy_2/dy_0) * v1 + (dy_2/dy_0) * (-v0) + dy_2 * u0 ) 
+    // (v2-v1) = dy_2 * u2 -(dy_2/dy_0) * v1 - (dy_2/dy_0) * (-v0) - dy_2 * u0
+    // - v1 + v1(dy_2/dy_0) = dy_2 * u2  - (dy_2/dy_0) * (-v0) - dy_2 * u0 - v2
+    // v1 (-1 + dy_2/dy_0) = dy_2 * u2  - (dy_2/dy_0) * (-v0) - dy_2 * u0 - v2
+    // v1  = (dy_2 * u2  - (dy_2/dy_0) * (-v0) - dy_2 * u0 - v2) / (dy_2/dy_0 - 1)
+
+    double v1_proj = (dy_2_proj * c2_x_proj + (dy_2_proj/dy_0_proj) * (y_0_proj) - dy_2_proj * c0_x_proj - y_2_proj) / ((dy_2_proj/dy_0_proj) - 1);
+    double u1_proj = (((v1_proj-y_0_proj) + dy_0_proj*c0_x_proj) / dy_0_proj);
+
+    // Project Back
+    double u1 = (segm_vec_x * u1_proj - segm_vec_y * v1_proj) /
+        sqr_segment_length + x(low(segment));
+    double v1 = (segm_vec_x * v1_proj + segm_vec_y * u1_proj) /
+        sqr_segment_length + y(low(segment));
+
+
+    c1.x(u1);
+    c1.y(v1);
+
+    control_points->push_back(c0);
+    control_points->push_back(c1);
+    control_points->push_back(c2);
+
+}
+
 void sample_curved_edge(
     const edge_type& edge,
     std::vector<point_type>* sampled_edge,
+    std::vector<point_type>* control_points,
     std::vector<point_type> pointSites,
     std::vector<segment_type> lineSites,
     std::vector<double> bbox)
@@ -160,6 +261,7 @@ void sample_curved_edge(
       retrieve_segment(*edge.cell(), pointSites, lineSites);
   voronoi_visual_utils<coordinate_type>::discretize(
       point, segment, max_dist, sampled_edge, bbox);
+  calc_control_points(point, segment, control_points);
 }
 
 void createVertex(
@@ -183,7 +285,7 @@ void createVertex(
 }
 
 
-bool clip_finite_edge(
+bool clip_add_finite_edge(
   const voronoi_diagram<double>::edge_type& edge,
   DiagrammResult* result,
   EdgeResult* edgeResult,
@@ -193,6 +295,7 @@ bool clip_finite_edge(
   ) {
 
   std::vector<point_type> samples_;
+  std::vector<point_type> controll_points_;
   double xl = bbox[0];
   double xh = bbox[2];
   double yl = bbox[1];
@@ -306,19 +409,26 @@ bool clip_finite_edge(
 
   if (edge.is_curved()) { // only finite edges can be curved
     samples_.push_back(point_type(edgeResult->x1, edgeResult->y1));
-    samples_.push_back(point_type(edgeResult->x2, edgeResult->y2));
-    sample_curved_edge(edge, &samples_, pointSites, lineSites, bbox);
+    samples_.push_back(point_type(edgeResult->x2, edgeResult->y2));    
+    controll_points_.push_back(point_type(edgeResult->x1, edgeResult->y1));
+    controll_points_.push_back(point_type(edgeResult->x2, edgeResult->y2));
+    sample_curved_edge(edge, &samples_, &controll_points_, pointSites, lineSites, bbox);
   }
   for (size_t i = 0; i < samples_.size(); i++)
   {
     edgeResult->samples.push_back(samples_[i].x());
     edgeResult->samples.push_back(samples_[i].y());
   }
+  for (size_t i = 0; i < controll_points_.size(); i++)
+  {
+    edgeResult->controll_points.push_back(controll_points_[i].x());
+    edgeResult->controll_points.push_back(controll_points_[i].y());
+  }
 
   result->edges.push_back(*edgeResult);
   return true;
 }
-bool clip_infinite_edge(
+bool clip_add_infinite_edge(
   const voronoi_diagram<double>::edge_type& edge,
   DiagrammResult* result,
   EdgeResult* edgeResult,
@@ -519,9 +629,9 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
 
     bool added = false;
     if(edge->is_finite()){
-      added = clip_finite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox);
+      added = clip_add_finite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox);
     }else{
-      added = clip_infinite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox);
+      added = clip_add_infinite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox);
     }
 
     if(added){
@@ -556,6 +666,7 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
     .field("isCurved", &EdgeResult::isCurved)
     .field("isPrimary", &EdgeResult::isPrimary)
     .field("samples", &EdgeResult::samples)
+    .field("controll_points", &EdgeResult::controll_points)
     ;
 
   value_object<DiagrammResult>("DiagrammResult")

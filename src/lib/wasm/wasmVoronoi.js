@@ -2258,43 +2258,43 @@ var wasmImports = {
  /** @export */ N: ___cxa_begin_catch,
  /** @export */ a: ___cxa_find_matching_catch_2,
  /** @export */ k: ___cxa_find_matching_catch_3,
- /** @export */ r: ___cxa_throw,
+ /** @export */ q: ___cxa_throw,
  /** @export */ d: ___resumeException,
  /** @export */ M: __embind_finalize_value_object,
- /** @export */ y: __embind_register_bigint,
+ /** @export */ x: __embind_register_bigint,
  /** @export */ L: __embind_register_bool,
- /** @export */ q: __embind_register_class,
- /** @export */ p: __embind_register_class_constructor,
- /** @export */ f: __embind_register_class_function,
+ /** @export */ p: __embind_register_class,
+ /** @export */ o: __embind_register_class_constructor,
+ /** @export */ g: __embind_register_class_function,
  /** @export */ K: __embind_register_emval,
- /** @export */ x: __embind_register_float,
+ /** @export */ w: __embind_register_float,
  /** @export */ J: __embind_register_function,
- /** @export */ h: __embind_register_integer,
+ /** @export */ j: __embind_register_integer,
  /** @export */ e: __embind_register_memory_view,
- /** @export */ w: __embind_register_std_string,
- /** @export */ o: __embind_register_std_wstring,
- /** @export */ v: __embind_register_value_object,
+ /** @export */ v: __embind_register_std_string,
+ /** @export */ n: __embind_register_std_wstring,
+ /** @export */ u: __embind_register_value_object,
  /** @export */ I: __embind_register_value_object_field,
  /** @export */ H: __embind_register_void,
  /** @export */ G: __emval_decref,
  /** @export */ F: __emval_incref,
- /** @export */ n: __emval_take_value,
- /** @export */ u: _abort,
+ /** @export */ m: __emval_take_value,
+ /** @export */ t: _abort,
  /** @export */ E: _emscripten_memcpy_js,
  /** @export */ D: _emscripten_resize_heap,
  /** @export */ b: invoke_ii,
- /** @export */ j: invoke_iii,
+ /** @export */ f: invoke_iii,
  /** @export */ C: invoke_iiii,
- /** @export */ m: invoke_iiiii,
  /** @export */ B: invoke_iiiiii,
- /** @export */ t: invoke_iiiiiii,
+ /** @export */ s: invoke_iiiiiii,
  /** @export */ i: invoke_v,
  /** @export */ c: invoke_vi,
  /** @export */ l: invoke_vii,
  /** @export */ A: invoke_viidii,
- /** @export */ z: invoke_viiii,
- /** @export */ s: invoke_viiiii,
- /** @export */ g: invoke_viiiiiiiiii
+ /** @export */ r: invoke_viiii,
+ /** @export */ z: invoke_viiiii,
+ /** @export */ y: invoke_viiiiii,
+ /** @export */ h: invoke_viiiiiiiiii
 };
 
 var wasmExports = createWasm();
@@ -2375,10 +2375,21 @@ function invoke_v(index) {
  }
 }
 
-function invoke_viiiii(index, a1, a2, a3, a4, a5) {
+function invoke_viiiiii(index, a1, a2, a3, a4, a5, a6) {
  var sp = stackSave();
  try {
-  getWasmTableEntry(index)(a1, a2, a3, a4, a5);
+  getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6);
+ } catch (e) {
+  stackRestore(sp);
+  if (e !== e + 0) throw e;
+  _setThrew(1, 0);
+ }
+}
+
+function invoke_iii(index, a1, a2) {
+ var sp = stackSave();
+ try {
+  return getWasmTableEntry(index)(a1, a2);
  } catch (e) {
   stackRestore(sp);
   if (e !== e + 0) throw e;
@@ -2397,10 +2408,10 @@ function invoke_vii(index, a1, a2) {
  }
 }
 
-function invoke_iii(index, a1, a2) {
+function invoke_viiiii(index, a1, a2, a3, a4, a5) {
  var sp = stackSave();
  try {
-  return getWasmTableEntry(index)(a1, a2);
+  getWasmTableEntry(index)(a1, a2, a3, a4, a5);
  } catch (e) {
   stackRestore(sp);
   if (e !== e + 0) throw e;
@@ -2445,17 +2456,6 @@ function invoke_viiiiiiiiii(index, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) {
  var sp = stackSave();
  try {
   getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
- } catch (e) {
-  stackRestore(sp);
-  if (e !== e + 0) throw e;
-  _setThrew(1, 0);
- }
-}
-
-function invoke_iiiii(index, a1, a2, a3, a4) {
- var sp = stackSave();
- try {
-  return getWasmTableEntry(index)(a1, a2, a3, a4);
  } catch (e) {
   stackRestore(sp);
   if (e !== e + 0) throw e;

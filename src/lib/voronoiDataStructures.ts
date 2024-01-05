@@ -50,6 +50,7 @@ export interface Edge {
     va: Vertex;
     vb: Vertex;
     samples: Vertex[];
+    controlPoints: Vertex[];
     isPrimary: boolean;
 }
 
