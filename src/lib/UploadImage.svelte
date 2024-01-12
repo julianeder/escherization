@@ -296,8 +296,7 @@
         ctx.putImageData(thinImgageData, imgX,imgY);  
 
 
-        subdivideTreeRec(n, thinImag);
-        console.log(n);
+        subdivideTreeRec(n);
 
         let ss: Array<SiteSegment> = [];
         segemntsFromTreeRec(n, ss);
@@ -313,19 +312,24 @@
             this.parent = parent;
             if(parent != null)
                 parent.children.push(this);
-            this.pixel.push(sitePoint);
         }
         sitePoint: SitePoint | null;
         parent: Node | null = null;
         children: Array<Node> = [];
         pixel: Array<SitePoint> = [];
+        loops: Array<SitePoint> = [];
     }
 
     function vectorize(thinImag:number[], crossings: Array<SitePoint>, ends: Array<SitePoint>): Node{
-        let n = new Node(ends[0], null);
-        thinImag[fromXY(n.sitePoint!.x, n.sitePoint!.y)] = 4; // Set Visited
-        vectorizeRec(n, n.sitePoint!, [n.sitePoint!], thinImag, crossings, ends);
-        return n;
+        let currNode = new Node(ends[0], null);
+        thinImag[fromXY(currNode.sitePoint!.x, currNode.sitePoint!.y)] = 4; // Set Visited
+        let neigh: Array<SitePoint> = neighbourIdxs(thinImag, currNode.sitePoint!.x, currNode.sitePoint!.y);
+        neigh.forEach((n: SitePoint) => {
+            if(thinImag[fromXY(n.x, n.y)] < 4){ // Skip already Visited
+                vectorizeRec(currNode, n, [currNode.sitePoint!], thinImag, crossings, ends);
+            }
+        });
+        return currNode;
     }
 
     // thinImag --- Legend
@@ -333,28 +337,40 @@
     // 1 - Line
     // 2 - Crossing
     // 3 - End
-    // 4 - Visited
+    // 4 - Visited    
+    // 5 - Visited Crossing
     function vectorizeRec(currNode: Node, currPos: SitePoint, pixel: Array<SitePoint>, thinImag:number[], crossings: Array<SitePoint>, ends: Array<SitePoint>){
-        let neigh: Array<SitePoint> = neighbourIdxs(thinImag, currPos.x, currPos.y);
-        neigh
-        .forEach((n: SitePoint) => {
-            if(thinImag[fromXY(n.x, n.y)] != 4){ // Skip already Visited
-                pixel.push(n);
-                if(thinImag[fromXY(n.x, n.y)] == 2){ // Crossing
-                    thinImag[fromXY(n.x, n.y)] = 4; // Set Visited
-                    let node = new Node(n, currNode);
-                    currNode.pixel = pixel;
+        let node: Node;
+        pixel.push(currPos);    
+        if(thinImag[fromXY(currPos.x, currPos.y)] == 2){ // Crossing
+            thinImag[fromXY(currPos.x, currPos.y)] = 5; // Set Visited
+            node = new Node(currPos, currNode);
+            node.pixel = pixel;
+            let neigh: Array<SitePoint> = neighbourIdxs(thinImag, currPos.x, currPos.y);
+            neigh.forEach((n: SitePoint) => {
+                if(thinImag[fromXY(n.x, n.y)] < 4){ // Skip already Visited
                     vectorizeRec(node, n, [], thinImag, crossings, ends);
-                }else if(thinImag[fromXY(n.x, n.y)] == 3){ // End
-                    thinImag[fromXY(n.x, n.y)] = 4; // Set Visited
-                    let node = new Node(n, currNode);
-                    currNode.pixel = pixel;
-                }else if(thinImag[fromXY(n.x, n.y)] == 1){ // Line
-                    thinImag[fromXY(n.x, n.y)] = 4; // Set Visited
-                    vectorizeRec(currNode, n, pixel, thinImag, crossings, ends);
                 }
-            }
-        });
+            });
+        }else if(thinImag[fromXY(currPos.x, currPos.y)] == 3){ // End
+            thinImag[fromXY(currPos.x, currPos.y)] = 4; // Set Visited
+            node = new Node(currPos, currNode);
+            node.pixel = pixel;
+        }
+        else if(thinImag[fromXY(currPos.x, currPos.y)] == 1){ // Line
+            thinImag[fromXY(currPos.x, currPos.y)] = 4; // Set Visited
+            node = currNode;
+            let neigh: Array<SitePoint> = neighbourIdxs(thinImag, currPos.x, currPos.y);
+            neigh.forEach((n: SitePoint) => {
+                if(thinImag[fromXY(n.x, n.y)] < 4){ // Skip already Visited
+                    vectorizeRec(node, n, pixel, thinImag, crossings, ends);
+                }
+                else if(thinImag[fromXY(n.x, n.y)] == 5){
+                    currNode.loops.push(currPos);
+                }
+            });
+        }
+        
     }
     
     function neighbourIdxs(thinImag:number[], x: number, y: number): Array<SitePoint>{
@@ -375,6 +391,9 @@
             segments.push(new SiteSegment(n.sitePoint!.x, n.sitePoint!.y, c.sitePoint!.x, c.sitePoint!.y));
             segemntsFromTreeRec(c, segments);
         });
+        n.loops.forEach(l => {
+            segments.push(new SiteSegment(n.sitePoint!.x, n.sitePoint!.y, l.x, l.y));
+        });
 
         return segments;
     }
@@ -386,16 +405,74 @@
             thinImagRGB[fromXY(p.x, p.y) * 4 + 1] = col[1];
             thinImagRGB[fromXY(p.x, p.y) * 4 + 2] = col[2];
         });
+
+        thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4    ] = col[0];
+        thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4 + 1] = col[1];
+        thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4 + 2] = col[2];
+
+        thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4    ] = col[0];
+        thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4 + 1] = col[1];
+        thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4 + 2] = col[2];
+
+        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4    ] = col[0];
+        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4 + 1] = col[1];
+        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4 + 2] = col[2];
+
+        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4    ] = col[0];
+        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4 + 1] = col[1];
+        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4 + 2] = col[2];
+
+
         n.children.forEach(c => {
             visualizeTreeRec(c, thinImagRGB);
         });
     }
 
-    function subdivideTreeRec(n: Node, thinImag:number[]){
-        n.pixel.forEach(p => {            
-        });
+    function subdivideTreeRec(n: Node){
+        if(n.sitePoint!.x == 86 && n.sitePoint!.y == 230)
+            console.log(n.children);
         n.children.forEach(c => {
-            subdivideTreeRec(c, thinImag);
+            if(c.pixel.length > 10){
+                let idx = Math.floor(c.pixel.length / 2);
+                let halfPoint = c.pixel[idx];
+                let x = halfPoint.x;
+                let y = halfPoint.y;
+                let x1 = n.sitePoint!.x;
+                let y1 = n.sitePoint!.y;
+                let x2 = c.sitePoint!.x;
+                let y2 = c.sitePoint!.y;
+                let dist;
+
+                // Cross-Track-Error
+                let t = ((x-x1)*(x2-x1) + (y-y1)*(y2-y1)) / ( (y2-y1)*(y2-y1) + (x2-x1)*(x2-x1));
+                if(t < 0){
+                    dist = Math.sqrt((x1-x) * (x1-x) + (y1-y) * (y1-y));
+                }else if(t > 1){
+                    dist = Math.sqrt((x2-x) * (x2-x) + (y2-y) * (y2-y));
+                }else{
+                    dist = ((y2-y1) * x - (x2-x1) * y + x2 * y1 - y2 * x1) / Math.sqrt((y2-y1)*(y2-y1) + (x2-x1)*(x2-x1));
+                }
+                dist = Math.abs(dist);
+                if(dist > 2){
+                    console.log("dividing " + halfPoint.x + " " + halfPoint.y);
+                    let center = new Node(halfPoint, null);
+                    
+                    center.parent = n;
+                    center.children = [c];
+                    
+                    center.pixel = c.pixel.slice(0,idx);
+                    c.pixel = c.pixel.slice(idx,c.pixel.length);
+                    
+                    n.children = [center, ...n.children.filter(ch => ch != c)];
+                    c.parent = center;
+                    
+                    subdivideTreeRec(n);
+                }
+            }
+        });
+
+        n.children.forEach(c => {
+            subdivideTreeRec(c);
         });
     }
 
@@ -422,10 +499,10 @@
 
 <div id="app">
     <div class="drawingContainer">
-
-        <canvas class="uploadCanvas"
+        <canvas
+            class="uploadCanvas"
             bind:this={canvas}
-            width={canvasWidth} 
+            width={canvasWidth}
             height={canvasHeight}
             style="width: {canvasWidth}px; height: {canvasHeight}px"
         ></canvas>
@@ -434,40 +511,48 @@
             bind:this={svgContainer}
             style="left: {imgX}px; top: {imgY}px; width: {width}px; height: {height}px;"
         >
-        <svg 
-        width={width}
-        height={height}
-        viewBox="0 0 {width} {height}"
-        xmlns="http://www.w3.org/2000/svg">
-            {#each siteSegments as siteS}
-                <path
-                d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-                stroke="red"
-                stroke-width="1"
-                fill="none"
-                ></path>
-                <circle cx={siteS.x1} cy={siteS.y1} r="2" fill="red"></circle>
-                <circle cx={siteS.x2} cy={siteS.y2} r="2" fill="red"></circle>
-            {/each}
-        </svg>
-    </div>
+            <svg
+                {width}
+                {height}
+                viewBox="0 0 {width} {height}"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                {#each siteSegments as siteS}
+                    <path
+                        d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
+                        stroke="red"
+                        stroke-width="1"
+                        fill="none"
+                    ></path>
+                    <circle cx={siteS.x1} cy={siteS.y1} r="2" fill="red"
+                    ></circle>
+                    <circle cx={siteS.x2} cy={siteS.y2} r="2" fill="red"
+                    ></circle>
+                {/each}
+            </svg>
+        </div>
     </div>
     <div class:purple-theme={false} class="resolution-slider">
         <label for="basic-range">Resolution</label>
-        <Range min={5} max={100} initialValue={resolution} on:change={(e) => onResolutionChanged(e.detail.value)} />
+        <Range
+            min={5}
+            max={100}
+            initialValue={resolution}
+            on:change={(e) => onResolutionChanged(e.detail.value)}
+        />
     </div>
     <button
         class="upload"
         on:click={() => {
             fileinput.click();
-        }}
-    >Upload Image</button>
+        }}>Upload Image</button
+    >
     <button
         class="upload"
         on:click={() => {
             downloadCanvasImage();
-        }}
-    >Download</button>
+        }}>Download</button
+    >
     <input
         style="display:none"
         type="file"
@@ -491,21 +576,20 @@
         background-color: #9af4fa;
         margin: 20px;
     }
-    .drawingContainer{
+    .drawingContainer {
         position: relative;
-
     }
-    .uploadCanvas{
+    .uploadCanvas {
         border-color: #000;
         background-color: #f8f8f8;
-        border-style:solid;
+        border-style: solid;
         border-width: 1px;
     }
-    .overdrawSvg{
+    .overdrawSvg {
         position: absolute;
         z-index: 10;
     }
-    .resolution-slider{
+    .resolution-slider {
         width: 300px;
     }
 </style>
