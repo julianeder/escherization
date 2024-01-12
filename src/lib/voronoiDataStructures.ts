@@ -15,6 +15,11 @@ export class BBox {
     }
 };
 
+export class Sites{
+    sitePoints: SitePoint[] = [];
+    siteSegments: SiteSegment[] = [];
+}
+
 export class SitePoint {
     x: number = 0;
     y: number = 0;

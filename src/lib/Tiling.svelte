@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { writable, get, type Writable } from 'svelte/store';
   import { onMount } from "svelte";
-  import { BBox, type Edge, SitePoint, SiteSegment, type Vertex } from "./voronoiDataStructures";
+  import { BBox, type Edge, SitePoint, SiteSegment, type Vertex, Sites } from "./voronoiDataStructures";
   import instantiate_wasmVoronoi, { type VoronoiWasmModule, type EdgeResult } from "../lib/wasm/wasmVoronoi"
 
+  export let siteStore: Writable<Sites>;
+
   let wasmVoronoi: VoronoiWasmModule;
-
-
   let bbox: BBox = { xl: 0, xh: 500, yl: 0, yh: 300 };
 
   let sitePoints: SitePoint[] = [];
@@ -13,7 +14,9 @@
   let voronoiVertices: Vertex[] = [];
   let voronoiEdges: Edge[] = [];
 
-  function wasmWraper(){
+  let showSecondary: boolean = false;
+
+  function updateVoronoi(){
     
     const bboxVector = new wasmVoronoi.VectorDouble();
     bboxVector.push_back(bbox.xl)
@@ -71,17 +74,25 @@
     
     wasmVoronoi = await instantiate_wasmVoronoi();
 
-    sitePoints = [new SitePoint(200, 200), new SitePoint(300, 100), new SitePoint(100, 100)];
-    siteSegments = [new SiteSegment(10, 200, 400, 250), new SiteSegment(380, 50, 400, 200)];
-
-    wasmWraper();
-
+    siteStore.subscribe((value: Sites) => {
+      sitePoints = value.sitePoints;
+      siteSegments = value.siteSegments;
+      updateVoronoi();
+    });
+    sitePoints = []; //new SitePoint(200, 200), new SitePoint(300, 100), new SitePoint(100, 100)];
+    siteSegments = [
+      new SiteSegment(10, 10, 490, 10), 
+      new SiteSegment(490, 10, 490, 290),
+      new SiteSegment(490, 290, 10, 290),
+      new SiteSegment(10, 290, 10, 10),
+    ];
+    siteStore.set({sitePoints: sitePoints, siteSegments: siteSegments})
 
   });
 
   function addPoint(event: MouseEvent) {
     sitePoints = [...sitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
-    wasmWraper();
+    siteStore.set({sitePoints: sitePoints, siteSegments: siteSegments})
   }
 </script>
 
@@ -104,24 +115,24 @@
             fill="rgb(240, 238, 231)"
           />
           {#each sitePoints as siteP, idx}
-            <circle cx={siteP.x} cy={siteP.y} r="4" fill="black"></circle>
+            <circle cx={siteP.x} cy={siteP.y} r="2" fill="black"></circle>
           {/each}
           {#each siteSegments as siteS, idx}
             <path
               d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
               stroke="black"
-              stroke-width="2"
+              stroke-width="1"
               fill="none"
             ></path>
-            <circle cx={siteS.x1} cy={siteS.y1} r="4" fill="black"></circle>
-            <circle cx={siteS.x2} cy={siteS.y2} r="4" fill="black"></circle>
+            <circle cx={siteS.x1} cy={siteS.y1} r="2" fill="black"></circle>
+            <circle cx={siteS.x2} cy={siteS.y2} r="2" fill="black"></circle>
           {/each}
           <!-- {#each voronoiVertices as v, idx}
             <circle cx={v.x} cy={v.y} r="5" fill="red"></circle>
           {/each} -->
           {#each voronoiEdges as e, idx}
-            <circle cx={e.va.x} cy={e.va.y} r="3" fill="green"></circle>
-            <circle cx={e.vb.x} cy={e.vb.y} r="3" fill="green"></circle>
+            <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
+            <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
             {#if e.samples.length == 0}
               {#if e.isPrimary}
                 <path
@@ -131,21 +142,23 @@
                 fill="none"
                 ></path>
               {:else}
-                <path
-                d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-                stroke="green"
-                stroke-width="1"
-                fill="none"
-                ></path>
+                {#if showSecondary}
+                  <path
+                  d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+                  stroke="green"
+                  stroke-width="1"
+                  fill="none"
+                  ></path>
+                {/if}
               {/if}
             {:else}
-            <path d="M {e.va.x} {e.va.y} {e.samples.map((s) => 'L ' + s.x + ' ' + s.y).reduce((a,b) => a + ' ' + b)} "
-              stroke="blue"
+            <!-- <path d="M {e.va.x} {e.va.y} {e.samples.map((s) => 'L ' + s.x + ' ' + s.y).reduce((a,b) => a + ' ' + b)} "
+              stroke="red"
               stroke-width="1"
               fill="none"
-              ></path>
+              ></path> -->
               <path d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e.controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2].x} {e.controlPoints[2].y}"
-                stroke="red"
+                stroke="blue"
                 stroke-width="1"
                 fill="none"
                 ></path>

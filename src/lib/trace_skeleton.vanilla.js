@@ -19,6 +19,7 @@ var TraceSkeleton = new function(){ var that = this;
       diff &= thinningZSIteration(im,w,h,0);
       diff &= thinningZSIteration(im,w,h,1);
     }while (diff);
+    return im;
   }
   // 1 pass of Zhang-Suen thinning 
   function thinningZSIteration(im, w, h, iter) {
@@ -359,6 +360,7 @@ var TraceSkeleton = new function(){ var that = this;
       polylines:polys,
       width:W,
       height:H,
+      thinImag: im,
     }
   }
 
@@ -372,18 +374,27 @@ var TraceSkeleton = new function(){ var that = this;
   that.fromCharString = function(im,w,h){
     return that.trace(im.split('').map(x=>x.charCodeAt(0)),w,h,10);
   }
-  that.fromImageData = function(im, resolution){
+
+  that.imageDataToBinary = function(im){
     var w = im.width;
     var h = im.height;
     var data = im.data;
     var m = [];
     for (var i = 0; i < data.length; i+=4){
-      if (data[i]){
+      if (data[i] || data[i+1] || data[i+2]){
         m.push(1)
       }else{
         m.push(0)
       }
     }
+    return m;
+  }
+
+  that.fromImageData = function(im, resolution){
+    var w = im.width;
+    var h = im.height;
+    
+    var m = that.imageDataToBinary(im);
     return that.trace(m,w,h,resolution);
   }
   that.fromCanvas = function(im){
@@ -399,7 +410,7 @@ var TraceSkeleton = new function(){ var that = this;
     var s = args.scale == undefined ? 1 : args.scale;
     var sw = args.strokeWidth == undefined ? 1 : args.strokeWidth;
     var dr = (args.rects == undefined || args.rects == true) ? 1 : 0;
-    var kpt = args.keypoints = undefined ? 0 : 1;
+    var kpt = (args.keypoints = undefined || args.keypoints == false) ? 0 : 1;
 
     var svg = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="${ret.width*s}" height="${ret.height*s}">`
 
