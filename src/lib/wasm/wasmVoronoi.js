@@ -14,6 +14,15 @@ Module["ready"] = new Promise((resolve, reject) => {
  readyPromiseReject = reject;
 });
 
+[ "_main", "getExceptionMessage", "___get_exception_message", "_free", "_memory", "__Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_", "___indirect_function_table", "_fflush", "onRuntimeInitialized" ].forEach(prop => {
+ if (!Object.getOwnPropertyDescriptor(Module["ready"], prop)) {
+  Object.defineProperty(Module["ready"], prop, {
+   get: () => abort("You are getting " + prop + " on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js"),
+   set: () => abort("You are setting " + prop + " on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js")
+  });
+ }
+});
+
 var moduleOverrides = Object.assign({}, Module);
 
 var arguments_ = [];
@@ -28,6 +37,14 @@ var ENVIRONMENT_IS_WEB = true;
 
 var ENVIRONMENT_IS_WORKER = false;
 
+var ENVIRONMENT_IS_NODE = false;
+
+var ENVIRONMENT_IS_SHELL = false;
+
+if (Module["ENVIRONMENT"]) {
+ throw new Error("Module.ENVIRONMENT has been deprecated. To force the environment, use the ENVIRONMENT compile-time option (for example, -sENVIRONMENT=web or -sENVIRONMENT=node)");
+}
+
 var scriptDirectory = "";
 
 function locateFile(path) {
@@ -39,7 +56,54 @@ function locateFile(path) {
 
 var read_, readAsync, readBinary;
 
-if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
+if (ENVIRONMENT_IS_SHELL) {
+ if ((typeof process == "object" && typeof require === "function") || typeof window == "object" || typeof importScripts == "function") throw new Error("not compiled for this environment (did you build to HTML and try to run it not on the web, or set ENVIRONMENT to something - like node - and run it someplace else - like on the web?)");
+ if (typeof read != "undefined") {
+  read_ = read;
+ }
+ readBinary = f => {
+  if (typeof readbuffer == "function") {
+   return new Uint8Array(readbuffer(f));
+  }
+  let data = read(f, "binary");
+  assert(typeof data == "object");
+  return data;
+ };
+ readAsync = (f, onload, onerror) => {
+  setTimeout(() => onload(readBinary(f)));
+ };
+ if (typeof clearTimeout == "undefined") {
+  globalThis.clearTimeout = id => {};
+ }
+ if (typeof setTimeout == "undefined") {
+  globalThis.setTimeout = f => (typeof f == "function") ? f() : abort();
+ }
+ if (typeof scriptArgs != "undefined") {
+  arguments_ = scriptArgs;
+ } else if (typeof arguments != "undefined") {
+  arguments_ = arguments;
+ }
+ if (typeof quit == "function") {
+  quit_ = (status, toThrow) => {
+   setTimeout(() => {
+    if (!(toThrow instanceof ExitStatus)) {
+     let toLog = toThrow;
+     if (toThrow && typeof toThrow == "object" && toThrow.stack) {
+      toLog = [ toThrow, toThrow.stack ];
+     }
+     err(`exiting due to exception: ${toLog}`);
+    }
+    quit(status);
+   });
+   throw toThrow;
+  };
+ }
+ if (typeof print != "undefined") {
+  if (typeof console == "undefined") console = /** @type{!Console} */ ({});
+  console.log = /** @type{!function(this:Console, ...*): undefined} */ (print);
+  console.warn = console.error = /** @type{!function(this:Console, ...*): undefined} */ (typeof printErr != "undefined" ? printErr : print);
+ }
+} else  if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
  if (ENVIRONMENT_IS_WORKER) {
   scriptDirectory = self.location.href;
  } else if (typeof document != "undefined" && document.currentScript) {
@@ -53,6 +117,7 @@ if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
  } else {
   scriptDirectory = "";
  }
+ if (!(typeof window == "object" || typeof importScripts == "function")) throw new Error("not compiled for this environment (did you build to HTML and try to run it not on the web, or set ENVIRONMENT to something - like node - and run it someplace else - like on the web?)");
  {
   read_ = url => {
    var xhr = new XMLHttpRequest;
@@ -84,7 +149,9 @@ if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
    xhr.send(null);
   };
  }
-} else {}
+} else  {
+ throw new Error("environment detection error");
+}
 
 var out = Module["print"] || console.log.bind(console);
 
@@ -94,15 +161,59 @@ Object.assign(Module, moduleOverrides);
 
 moduleOverrides = null;
 
+checkIncomingModuleAPI();
+
 if (Module["arguments"]) arguments_ = Module["arguments"];
+
+legacyModuleProp("arguments", "arguments_");
 
 if (Module["thisProgram"]) thisProgram = Module["thisProgram"];
 
+legacyModuleProp("thisProgram", "thisProgram");
+
 if (Module["quit"]) quit_ = Module["quit"];
+
+legacyModuleProp("quit", "quit_");
+
+assert(typeof Module["memoryInitializerPrefixURL"] == "undefined", "Module.memoryInitializerPrefixURL option was removed, use Module.locateFile instead");
+
+assert(typeof Module["pthreadMainPrefixURL"] == "undefined", "Module.pthreadMainPrefixURL option was removed, use Module.locateFile instead");
+
+assert(typeof Module["cdInitializerPrefixURL"] == "undefined", "Module.cdInitializerPrefixURL option was removed, use Module.locateFile instead");
+
+assert(typeof Module["filePackagePrefixURL"] == "undefined", "Module.filePackagePrefixURL option was removed, use Module.locateFile instead");
+
+assert(typeof Module["read"] == "undefined", "Module.read option was removed (modify read_ in JS)");
+
+assert(typeof Module["readAsync"] == "undefined", "Module.readAsync option was removed (modify readAsync in JS)");
+
+assert(typeof Module["readBinary"] == "undefined", "Module.readBinary option was removed (modify readBinary in JS)");
+
+assert(typeof Module["setWindowTitle"] == "undefined", "Module.setWindowTitle option was removed (modify emscripten_set_window_title in JS)");
+
+assert(typeof Module["TOTAL_MEMORY"] == "undefined", "Module.TOTAL_MEMORY has been renamed Module.INITIAL_MEMORY");
+
+legacyModuleProp("asm", "wasmExports");
+
+legacyModuleProp("read", "read_");
+
+legacyModuleProp("readAsync", "readAsync");
+
+legacyModuleProp("readBinary", "readBinary");
+
+legacyModuleProp("setWindowTitle", "setWindowTitle");
+
+assert(!ENVIRONMENT_IS_WORKER, "worker environment detected but not enabled at build time.  Add 'worker' to `-sENVIRONMENT` to enable.");
+
+assert(!ENVIRONMENT_IS_NODE, "node environment detected but not enabled at build time.  Add 'node' to `-sENVIRONMENT` to enable.");
+
+assert(!ENVIRONMENT_IS_SHELL, "shell environment detected but not enabled at build time.  Add 'shell' to `-sENVIRONMENT` to enable.");
 
 var wasmBinary;
 
 if (Module["wasmBinary"]) wasmBinary = Module["wasmBinary"];
+
+legacyModuleProp("wasmBinary", "wasmBinary");
 
 if (typeof WebAssembly != "object") {
  abort("no native wasm support detected");
@@ -113,6 +224,12 @@ var wasmMemory;
 var ABORT = false;
 
 var EXITSTATUS;
+
+/** @type {function(*, string=)} */ function assert(condition, text) {
+ if (!condition) {
+  abort("Assertion failed" + (text ? ": " + text : ""));
+ }
+}
 
 var /** @type {!Int8Array} */ HEAP8, /** @type {!Uint8Array} */ HEAPU8, /** @type {!Int16Array} */ HEAP16, /** @type {!Uint16Array} */ HEAPU16, /** @type {!Int32Array} */ HEAP32, /** @type {!Uint32Array} */ HEAPU32, /** @type {!Float32Array} */ HEAPF32, /** @type {!Float64Array} */ HEAPF64;
 
@@ -127,6 +244,48 @@ function updateMemoryViews() {
  Module["HEAPF32"] = HEAPF32 = new Float32Array(b);
  Module["HEAPF64"] = HEAPF64 = new Float64Array(b);
 }
+
+assert(!Module["STACK_SIZE"], "STACK_SIZE can no longer be set at runtime.  Use -sSTACK_SIZE at link time");
+
+assert(typeof Int32Array != "undefined" && typeof Float64Array !== "undefined" && Int32Array.prototype.subarray != undefined && Int32Array.prototype.set != undefined, "JS engine does not provide full typed array support");
+
+assert(!Module["wasmMemory"], "Use of `wasmMemory` detected.  Use -sIMPORTED_MEMORY to define wasmMemory externally");
+
+assert(!Module["INITIAL_MEMORY"], "Detected runtime INITIAL_MEMORY setting.  Use -sIMPORTED_MEMORY to define wasmMemory dynamically");
+
+function writeStackCookie() {
+ var max = _emscripten_stack_get_end();
+ assert((max & 3) == 0);
+ if (max == 0) {
+  max += 4;
+ }
+ HEAPU32[((max) >> 2)] = 34821223;
+ HEAPU32[(((max) + (4)) >> 2)] = 2310721022;
+ HEAPU32[((0) >> 2)] = 1668509029;
+}
+
+function checkStackCookie() {
+ if (ABORT) return;
+ var max = _emscripten_stack_get_end();
+ if (max == 0) {
+  max += 4;
+ }
+ var cookie1 = HEAPU32[((max) >> 2)];
+ var cookie2 = HEAPU32[(((max) + (4)) >> 2)];
+ if (cookie1 != 34821223 || cookie2 != 2310721022) {
+  abort(`Stack overflow! Stack cookie has been overwritten at ${ptrToString(max)}, expected hex dwords 0x89BACDFE and 0x2135467, but received ${ptrToString(cookie2)} ${ptrToString(cookie1)}`);
+ }
+ if (HEAPU32[((0) >> 2)] != 1668509029) /* 'emsc' */ {
+  abort("Runtime error: The application has corrupted its heap memory area (address zero)!");
+ }
+}
+
+(function() {
+ var h16 = new Int16Array(1);
+ var h8 = new Int8Array(h16.buffer);
+ h16[0] = 25459;
+ if (h8[0] !== 115 || h8[1] !== 99) throw "Runtime error: expected the system to be little-endian! (Run with -sSUPPORT_BIG_ENDIAN to bypass)";
+})();
 
 var __ATPRERUN__ = [];
 
@@ -147,11 +306,14 @@ function preRun() {
 }
 
 function initRuntime() {
+ assert(!runtimeInitialized);
  runtimeInitialized = true;
+ checkStackCookie();
  callRuntimeCallbacks(__ATINIT__);
 }
 
 function postRun() {
+ checkStackCookie();
  if (Module["postRun"]) {
   if (typeof Module["postRun"] == "function") Module["postRun"] = [ Module["postRun"] ];
   while (Module["postRun"].length) {
@@ -173,20 +335,62 @@ function addOnPostRun(cb) {
  __ATPOSTRUN__.unshift(cb);
 }
 
+assert(Math.imul, "This browser does not support Math.imul(), build with LEGACY_VM_SUPPORT or POLYFILL_OLD_MATH_FUNCTIONS to add in a polyfill");
+
+assert(Math.fround, "This browser does not support Math.fround(), build with LEGACY_VM_SUPPORT or POLYFILL_OLD_MATH_FUNCTIONS to add in a polyfill");
+
+assert(Math.clz32, "This browser does not support Math.clz32(), build with LEGACY_VM_SUPPORT or POLYFILL_OLD_MATH_FUNCTIONS to add in a polyfill");
+
+assert(Math.trunc, "This browser does not support Math.trunc(), build with LEGACY_VM_SUPPORT or POLYFILL_OLD_MATH_FUNCTIONS to add in a polyfill");
+
 var runDependencies = 0;
 
 var runDependencyWatcher = null;
 
 var dependenciesFulfilled = null;
 
+var runDependencyTracking = {};
+
 function addRunDependency(id) {
  runDependencies++;
  Module["monitorRunDependencies"]?.(runDependencies);
+ if (id) {
+  assert(!runDependencyTracking[id]);
+  runDependencyTracking[id] = 1;
+  if (runDependencyWatcher === null && typeof setInterval != "undefined") {
+   runDependencyWatcher = setInterval(() => {
+    if (ABORT) {
+     clearInterval(runDependencyWatcher);
+     runDependencyWatcher = null;
+     return;
+    }
+    var shown = false;
+    for (var dep in runDependencyTracking) {
+     if (!shown) {
+      shown = true;
+      err("still waiting on run dependencies:");
+     }
+     err(`dependency: ${dep}`);
+    }
+    if (shown) {
+     err("(end of list)");
+    }
+   }, 1e4);
+  }
+ } else {
+  err("warning: run dependency added without ID");
+ }
 }
 
 function removeRunDependency(id) {
  runDependencies--;
  Module["monitorRunDependencies"]?.(runDependencies);
+ if (id) {
+  assert(runDependencyTracking[id]);
+  delete runDependencyTracking[id];
+ } else {
+  err("warning: run dependency removed without ID");
+ }
  if (runDependencies == 0) {
   if (runDependencyWatcher !== null) {
    clearInterval(runDependencyWatcher);
@@ -206,11 +410,47 @@ function removeRunDependency(id) {
  err(what);
  ABORT = true;
  EXITSTATUS = 1;
- what += ". Build with -sASSERTIONS for more info.";
  /** @suppress {checkTypes} */ var e = new WebAssembly.RuntimeError(what);
  readyPromiseReject(e);
  throw e;
 }
+
+var FS = {
+ error() {
+  abort("Filesystem support (FS) was not included. The problem is that you are using files from JS, but files were not used from C/C++, so filesystem support was not auto-included. You can force-include filesystem support with -sFORCE_FILESYSTEM");
+ },
+ init() {
+  FS.error();
+ },
+ createDataFile() {
+  FS.error();
+ },
+ createPreloadedFile() {
+  FS.error();
+ },
+ createLazyFile() {
+  FS.error();
+ },
+ open() {
+  FS.error();
+ },
+ mkdev() {
+  FS.error();
+ },
+ registerDevice() {
+  FS.error();
+ },
+ analyzePath() {
+  FS.error();
+ },
+ ErrnoError() {
+  FS.error();
+ }
+};
+
+Module["FS_createDataFile"] = FS.createDataFile;
+
+Module["FS_createPreloadedFile"] = FS.createPreloadedFile;
 
 var dataURIPrefix = "data:application/octet-stream;base64,";
 
@@ -218,6 +458,34 @@ var dataURIPrefix = "data:application/octet-stream;base64,";
  * Indicates whether filename is a base64 data URI.
  * @noinline
  */ var isDataURI = filename => filename.startsWith(dataURIPrefix);
+
+/**
+ * Indicates whether filename is delivered via file protocol (as opposed to http/https)
+ * @noinline
+ */ var isFileURI = filename => filename.startsWith("file://");
+
+function createExportWrapper(name) {
+ return function() {
+  assert(runtimeInitialized, `native function \`${name}\` called before runtime initialization`);
+  var f = wasmExports[name];
+  assert(f, `exported native function \`${name}\` not found`);
+  return f.apply(null, arguments);
+ };
+}
+
+class EmscriptenEH extends Error {}
+
+class EmscriptenSjLj extends EmscriptenEH {}
+
+class CppException extends EmscriptenEH {
+ constructor(excPtr) {
+  super(excPtr);
+  this.excPtr = excPtr;
+  const excInfo = getExceptionMessage(excPtr);
+  this.name = excInfo[0];
+  this.message = excInfo[1];
+ }
+}
 
 var wasmBinaryFile;
 
@@ -259,6 +527,9 @@ function getBinaryPromise(binaryFile) {
 function instantiateArrayBuffer(binaryFile, imports, receiver) {
  return getBinaryPromise(binaryFile).then(binary => WebAssembly.instantiate(binary, imports)).then(instance => instance).then(receiver, reason => {
   err(`failed to asynchronously prepare wasm: ${reason}`);
+  if (isFileURI(wasmBinaryFile)) {
+   err(`warning: Loading from a file URI (${wasmBinaryFile}) is not supported in most browsers. See https://emscripten.org/docs/getting_started/FAQ.html#how-do-i-run-a-local-webserver-for-testing-why-does-my-program-stall-in-downloading-or-preparing`);
+  }
   abort(reason);
  });
 }
@@ -281,19 +552,25 @@ function instantiateAsync(binary, binaryFile, imports, callback) {
 
 function createWasm() {
  var info = {
-  "a": wasmImports
+  "env": wasmImports,
+  "wasi_snapshot_preview1": wasmImports
  };
  /** @param {WebAssembly.Module=} module*/ function receiveInstance(instance, module) {
   wasmExports = instance.exports;
-  wasmMemory = wasmExports["O"];
+  wasmMemory = wasmExports["memory"];
+  assert(wasmMemory, "memory not found in wasm exports");
   updateMemoryViews();
-  wasmTable = wasmExports["R"];
-  addOnInit(wasmExports["P"]);
+  wasmTable = wasmExports["__indirect_function_table"];
+  assert(wasmTable, "table not found in wasm exports");
+  addOnInit(wasmExports["__wasm_call_ctors"]);
   removeRunDependency("wasm-instantiate");
   return wasmExports;
  }
  addRunDependency("wasm-instantiate");
+ var trueModule = Module;
  function receiveInstantiationResult(result) {
+  assert(Module === trueModule, "the Module object should not be replaced during async compilation - perhaps the order of HTML elements is wrong?");
+  trueModule = null;
   receiveInstance(result["instance"]);
  }
  if (Module["instantiateWasm"]) {
@@ -308,13 +585,204 @@ function createWasm() {
  return {};
 }
 
+function legacyModuleProp(prop, newName, incomming = true) {
+ if (!Object.getOwnPropertyDescriptor(Module, prop)) {
+  Object.defineProperty(Module, prop, {
+   configurable: true,
+   get() {
+    let extra = incomming ? " (the initial value can be provided on Module, but after startup the value is only looked for on a local variable of that name)" : "";
+    abort(`\`Module.${prop}\` has been replaced by \`${newName}\`` + extra);
+   }
+  });
+ }
+}
+
+function ignoredModuleProp(prop) {
+ if (Object.getOwnPropertyDescriptor(Module, prop)) {
+  abort(`\`Module.${prop}\` was supplied but \`${prop}\` not included in INCOMING_MODULE_JS_API`);
+ }
+}
+
+function isExportedByForceFilesystem(name) {
+ return name === "FS_createPath" || name === "FS_createDataFile" || name === "FS_createPreloadedFile" || name === "FS_unlink" || name === "addRunDependency" ||  name === "FS_createLazyFile" || name === "FS_createDevice" || name === "removeRunDependency";
+}
+
+function missingGlobal(sym, msg) {
+ if (typeof globalThis !== "undefined") {
+  Object.defineProperty(globalThis, sym, {
+   configurable: true,
+   get() {
+    warnOnce(`\`${sym}\` is not longer defined by emscripten. ${msg}`);
+    return undefined;
+   }
+  });
+ }
+}
+
+missingGlobal("buffer", "Please use HEAP8.buffer or wasmMemory.buffer");
+
+missingGlobal("asm", "Please use wasmExports instead");
+
+function missingLibrarySymbol(sym) {
+ if (typeof globalThis !== "undefined" && !Object.getOwnPropertyDescriptor(globalThis, sym)) {
+  Object.defineProperty(globalThis, sym, {
+   configurable: true,
+   get() {
+    var msg = `\`${sym}\` is a library symbol and not included by default; add it to your library.js __deps or to DEFAULT_LIBRARY_FUNCS_TO_INCLUDE on the command line`;
+    var librarySymbol = sym;
+    if (!librarySymbol.startsWith("_")) {
+     librarySymbol = "$" + sym;
+    }
+    msg += ` (e.g. -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE='${librarySymbol}')`;
+    if (isExportedByForceFilesystem(sym)) {
+     msg += ". Alternatively, forcing filesystem support (-sFORCE_FILESYSTEM) can export this for you";
+    }
+    warnOnce(msg);
+    return undefined;
+   }
+  });
+ }
+ unexportedRuntimeSymbol(sym);
+}
+
+function unexportedRuntimeSymbol(sym) {
+ if (!Object.getOwnPropertyDescriptor(Module, sym)) {
+  Object.defineProperty(Module, sym, {
+   configurable: true,
+   get() {
+    var msg = `'${sym}' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the Emscripten FAQ)`;
+    if (isExportedByForceFilesystem(sym)) {
+     msg += ". Alternatively, forcing filesystem support (-sFORCE_FILESYSTEM) can export this for you";
+    }
+    abort(msg);
+   }
+  });
+ }
+}
+
+/** @constructor */ function ExitStatus(status) {
+ this.name = "ExitStatus";
+ this.message = `Program terminated with exit(${status})`;
+ this.status = status;
+}
+
 var callRuntimeCallbacks = callbacks => {
  while (callbacks.length > 0) {
   callbacks.shift()(Module);
  }
 };
 
+var withStackSave = f => {
+ var stack = stackSave();
+ var ret = f();
+ stackRestore(stack);
+ return ret;
+};
+
+var UTF8Decoder = typeof TextDecoder != "undefined" ? new TextDecoder("utf8") : undefined;
+
+/**
+     * Given a pointer 'idx' to a null-terminated UTF8-encoded string in the given
+     * array that contains uint8 values, returns a copy of that string as a
+     * Javascript String object.
+     * heapOrArray is either a regular array, or a JavaScript typed array view.
+     * @param {number} idx
+     * @param {number=} maxBytesToRead
+     * @return {string}
+     */ var UTF8ArrayToString = (heapOrArray, idx, maxBytesToRead) => {
+ var endIdx = idx + maxBytesToRead;
+ var endPtr = idx;
+ while (heapOrArray[endPtr] && !(endPtr >= endIdx)) ++endPtr;
+ if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) {
+  return UTF8Decoder.decode(heapOrArray.subarray(idx, endPtr));
+ }
+ var str = "";
+ while (idx < endPtr) {
+  var u0 = heapOrArray[idx++];
+  if (!(u0 & 128)) {
+   str += String.fromCharCode(u0);
+   continue;
+  }
+  var u1 = heapOrArray[idx++] & 63;
+  if ((u0 & 224) == 192) {
+   str += String.fromCharCode(((u0 & 31) << 6) | u1);
+   continue;
+  }
+  var u2 = heapOrArray[idx++] & 63;
+  if ((u0 & 240) == 224) {
+   u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
+  } else {
+   if ((u0 & 248) != 240) warnOnce("Invalid UTF-8 leading byte " + ptrToString(u0) + " encountered when deserializing a UTF-8 string in wasm memory to a JS string!");
+   u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (heapOrArray[idx++] & 63);
+  }
+  if (u0 < 65536) {
+   str += String.fromCharCode(u0);
+  } else {
+   var ch = u0 - 65536;
+   str += String.fromCharCode(55296 | (ch >> 10), 56320 | (ch & 1023));
+  }
+ }
+ return str;
+};
+
+/**
+     * Given a pointer 'ptr' to a null-terminated UTF8-encoded string in the
+     * emscripten HEAP, returns a copy of that string as a Javascript String object.
+     *
+     * @param {number} ptr
+     * @param {number=} maxBytesToRead - An optional length that specifies the
+     *   maximum number of bytes to read. You can omit this parameter to scan the
+     *   string until the first 0 byte. If maxBytesToRead is passed, and the string
+     *   at [ptr, ptr+maxBytesToReadr[ contains a null byte in the middle, then the
+     *   string will cut short at that byte index (i.e. maxBytesToRead will not
+     *   produce a string of exact length [ptr, ptr+maxBytesToRead[) N.B. mixing
+     *   frequent uses of UTF8ToString() with and without maxBytesToRead may throw
+     *   JS JIT optimizations off, so it is worth to consider consistently using one
+     * @return {string}
+     */ var UTF8ToString = (ptr, maxBytesToRead) => {
+ assert(typeof ptr == "number", `UTF8ToString expects a number (got ${typeof ptr})`);
+ return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead) : "";
+};
+
+var getExceptionMessageCommon = ptr => withStackSave(() => {
+ var type_addr_addr = stackAlloc(4);
+ var message_addr_addr = stackAlloc(4);
+ ___get_exception_message(ptr, type_addr_addr, message_addr_addr);
+ var type_addr = HEAPU32[((type_addr_addr) >> 2)];
+ var message_addr = HEAPU32[((message_addr_addr) >> 2)];
+ var type = UTF8ToString(type_addr);
+ _free(type_addr);
+ var message;
+ if (message_addr) {
+  message = UTF8ToString(message_addr);
+  _free(message_addr);
+ }
+ return [ type, message ];
+});
+
+var getExceptionMessage = ptr => getExceptionMessageCommon(ptr);
+
+Module["getExceptionMessage"] = getExceptionMessage;
+
 var noExitRuntime = Module["noExitRuntime"] || true;
+
+var ptrToString = ptr => {
+ assert(typeof ptr === "number");
+ ptr >>>= 0;
+ return "0x" + ptr.toString(16).padStart(8, "0");
+};
+
+var warnOnce = text => {
+ warnOnce.shown ||= {};
+ if (!warnOnce.shown[text]) {
+  warnOnce.shown[text] = 1;
+  err(text);
+ }
+};
+
+var ___assert_fail = (condition, filename, line, func) => {
+ abort(`Assertion failed: ${UTF8ToString(condition)}, at: ` + [ filename ? UTF8ToString(filename) : "unknown filename", line, func ? UTF8ToString(func) : "unknown function" ]);
+};
 
 var exceptionCaught = [];
 
@@ -387,13 +855,13 @@ var exceptionLast = 0;
 
 var ___resumeException = ptr => {
  if (!exceptionLast) {
-  exceptionLast = ptr;
+  exceptionLast = new CppException(ptr);
  }
  throw exceptionLast;
 };
 
 var findMatchingCatch = args => {
- var thrown = exceptionLast;
+ var thrown = exceptionLast?.excPtr;
  if (!thrown) {
   setTempRet0(0);
   return 0;
@@ -427,7 +895,7 @@ var ___cxa_find_matching_catch_3 = arg0 => findMatchingCatch([ arg0 ]);
 var ___cxa_throw = (ptr, type, destructor) => {
  var info = new ExceptionInfo(ptr);
  info.init(type, destructor);
- exceptionLast = ptr;
+ exceptionLast = new CppException(ptr);
  uncaughtExceptionCount++;
  throw exceptionLast;
 };
@@ -827,6 +1295,7 @@ var attachFinalizer = handle => {
   return handle;
  }
  finalizationRegistry = new FinalizationRegistry(info => {
+  console.warn(info.leakWarning.stack.replace(/^Error: /, ""));
   releaseClassHandle(info.$$);
  });
  attachFinalizer = handle => {
@@ -836,6 +1305,11 @@ var attachFinalizer = handle => {
    var info = {
     $$: $$
    };
+   var cls = $$.ptrType.registeredClass;
+   info.leakWarning = new Error(`Embind found a leaked C++ instance ${cls.name} <${ptrToString($$.ptr)}>.\n` + "We'll free it automatically in this case, but this functionality is not reliable across various environments.\n" + "Make sure to invoke .delete() manually once you're done with the instance instead.\n" + "Originally allocated");
+   if ("captureStackTrace" in Error) {
+    Error.captureStackTrace(info.leakWarning, RegisteredPointer_fromWireType);
+   }
    finalizationRegistry.register(handle, info, handle);
   }
   return handle;
@@ -1132,7 +1606,7 @@ var init_RegisteredPointer = () => {
       @param {*=} rawConstructor,
       @param {*=} rawShare,
       @param {*=} rawDestructor,
-       */ function RegisteredPointer(name, registeredClass, isReference, isConst, isSmartPointer, pointeeType, sharingPolicy, rawGetPointee, rawConstructor, rawShare, rawDestructor) {
+       */ function RegisteredPointer(name, registeredClass, isReference, isConst,  isSmartPointer, pointeeType, sharingPolicy, rawGetPointee, rawConstructor, rawShare, rawDestructor) {
  this.name = name;
  this.registeredClass = registeredClass;
  this.isReference = isReference;
@@ -1170,6 +1644,12 @@ var init_RegisteredPointer = () => {
 };
 
 var dynCallLegacy = (sig, ptr, args) => {
+ assert(("dynCall_" + sig) in Module, `bad function pointer type - dynCall function not found for sig '${sig}'`);
+ if (args?.length) {
+  assert(args.length === sig.substring(1).replace(/j/g, "--").length);
+ } else {
+  assert(sig.length == 1);
+ }
  var f = Module["dynCall_" + sig];
  return args && args.length ? f.apply(null, [ ptr ].concat(args)) : f.call(null, ptr);
 };
@@ -1184,6 +1664,7 @@ var getWasmTableEntry = funcPtr => {
   if (funcPtr >= wasmTableMirror.length) wasmTableMirror.length = funcPtr + 1;
   wasmTableMirror[funcPtr] = func = wasmTable.get(funcPtr);
  }
+ assert(wasmTable.get(funcPtr) == func, "JavaScript-side Wasm function table mirror is out of date!");
  return func;
 };
 
@@ -1191,11 +1672,13 @@ var getWasmTableEntry = funcPtr => {
  if (sig.includes("j")) {
   return dynCallLegacy(sig, ptr, args);
  }
+ assert(getWasmTableEntry(ptr), `missing table entry in dynCall: ${ptr}`);
  var rtn = getWasmTableEntry(ptr).apply(null, args);
  return rtn;
 };
 
 var getDynCaller = (sig, ptr) => {
+ assert(sig.includes("j") || sig.includes("p"), "getDynCaller should only be called with i64 sigs");
  var argCache = [];
  return function() {
   argCache.length = 0;
@@ -1404,6 +1887,7 @@ function createJsInvoker(humanName, argTypes, isClassMethodFunc, returns, isAsyn
   invokerFnBody += "var ret = retType['fromWireType'](rv);\n" + "return ret;\n";
  } else {}
  invokerFnBody += "}\n";
+ invokerFnBody = `if (arguments.length !== ${args1.length}){ throw new Error("${humanName} Expected ${args1.length} closure arguments " + arguments.length + " given."); }\n${invokerFnBody}`;
  return [ args1, invokerFnBody ];
 }
 
@@ -1412,6 +1896,7 @@ function craftInvokerFunction(humanName, argTypes, classType, cppInvokerFunc, cp
  if (argCount < 2) {
   throwBindingError("argTypes array size mismatch! Must at least get return value and 'this' types!");
  }
+ assert(!isAsync, "Async bindings are only supported with JSPI.");
  var isClassMethodFunc = (argTypes[1] !== null && classType !== null);
  var needsDestructorStack = usesDestructorStack(argTypes);
  var returns = (argTypes[0].name !== "void");
@@ -1433,6 +1918,7 @@ function craftInvokerFunction(humanName, argTypes, classType, cppInvokerFunc, cp
 }
 
 var __embind_register_class_constructor = (rawClassType, argCount, rawArgTypesAddr, invokerSignature, invoker, rawConstructor) => {
+ assert(argCount > 0);
  var rawArgTypes = heap32VectorToArray(argCount, rawArgTypesAddr);
  invoker = embind__requireFunction(invokerSignature, invoker);
  whenDependentTypesAreResolved([], [ rawClassType ], function(classType) {
@@ -1460,6 +1946,7 @@ var getFunctionName = signature => {
  signature = signature.trim();
  const argsIndex = signature.indexOf("(");
  if (argsIndex !== -1) {
+  assert(signature[signature.length - 1] == ")", "Parentheses for argument names should match.");
   return signature.substr(0, argsIndex);
  } else {
   return signature;
@@ -1510,6 +1997,7 @@ var __embind_register_class_function = (rawClassType, methodName, argCount, rawA
 function handleAllocatorInit() {
  Object.assign(HandleAllocator.prototype, /** @lends {HandleAllocator.prototype} */ {
   get(id) {
+   assert(this.allocated[id] !== undefined, `invalid handle: ${id}`);
    return this.allocated[id];
   },
   has(id) {
@@ -1521,6 +2009,7 @@ function handleAllocatorInit() {
    return id;
   },
   free(id) {
+   assert(this.allocated[id] !== undefined);
    this.allocated[id] = undefined;
    this.freelist.push(id);
   }
@@ -1646,7 +2135,12 @@ var __embind_register_float = (rawType, name, size) => {
  registerType(rawType, {
   name: name,
   "fromWireType": value => value,
-  "toWireType": (destructors, value) => value,
+  "toWireType": (destructors, value) => {
+   if (typeof value != "number" && typeof value != "boolean") {
+    throw new TypeError(`Cannot convert ${embindRepr(value)} to ${this.name}`);
+   }
+   return value;
+  },
   "argPackAdvance": GenericWireTypeSize,
   "readValueFromPointer": floatReadValueFromPointer(name, size),
   destructorFunction: null
@@ -1695,7 +2189,14 @@ var integerReadValueFromPointer = (name, width, signed) => {
   fromWireType = value => (value << bitshift) >>> bitshift;
  }
  var isUnsignedType = (name.includes("unsigned"));
- var checkAssertions = (value, toTypeName) => {};
+ var checkAssertions = (value, toTypeName) => {
+  if (typeof value != "number" && typeof value != "boolean") {
+   throw new TypeError(`Cannot convert "${embindRepr(value)}" to ${toTypeName}`);
+  }
+  if (value < minRange || value > maxRange) {
+   throw new TypeError(`Passing a number "${embindRepr(value)}" from JS side to C/C++ side to an argument of type "${name}", which is outside the valid range [${minRange}, ${maxRange}]!`);
+  }
+ };
  var toWireType;
  if (isUnsignedType) {
   toWireType = function(destructors, value) {
@@ -1738,6 +2239,7 @@ var __embind_register_memory_view = (rawType, dataTypeIndex, name) => {
 };
 
 var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
+ assert(typeof str === "string", `stringToUTF8Array expects a string (got ${typeof str})`);
  if (!(maxBytesToWrite > 0)) return 0;
  var startIdx = outIdx;
  var endIdx = outIdx + maxBytesToWrite - 1;
@@ -1761,6 +2263,7 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
    heap[outIdx++] = 128 | (u & 63);
   } else {
    if (outIdx + 3 >= endIdx) break;
+   if (u > 1114111) warnOnce("Invalid Unicode code point " + ptrToString(u) + " encountered when serializing a JS string to a UTF-8 string in wasm memory! (Valid unicode code points should be in range 0-0x10FFFF).");
    heap[outIdx++] = 240 | (u >> 18);
    heap[outIdx++] = 128 | ((u >> 12) & 63);
    heap[outIdx++] = 128 | ((u >> 6) & 63);
@@ -1771,7 +2274,10 @@ var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
  return outIdx - startIdx;
 };
 
-var stringToUTF8 = (str, outPtr, maxBytesToWrite) => stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
+var stringToUTF8 = (str, outPtr, maxBytesToWrite) => {
+ assert(typeof maxBytesToWrite == "number", "stringToUTF8(str, outPtr, maxBytesToWrite) is missing the third parameter that specifies the length of the output buffer!");
+ return stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
+};
 
 var lengthBytesUTF8 = str => {
  var len = 0;
@@ -1791,70 +2297,9 @@ var lengthBytesUTF8 = str => {
  return len;
 };
 
-var UTF8Decoder = typeof TextDecoder != "undefined" ? new TextDecoder("utf8") : undefined;
-
-/**
-     * Given a pointer 'idx' to a null-terminated UTF8-encoded string in the given
-     * array that contains uint8 values, returns a copy of that string as a
-     * Javascript String object.
-     * heapOrArray is either a regular array, or a JavaScript typed array view.
-     * @param {number} idx
-     * @param {number=} maxBytesToRead
-     * @return {string}
-     */ var UTF8ArrayToString = (heapOrArray, idx, maxBytesToRead) => {
- var endIdx = idx + maxBytesToRead;
- var endPtr = idx;
- while (heapOrArray[endPtr] && !(endPtr >= endIdx)) ++endPtr;
- if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) {
-  return UTF8Decoder.decode(heapOrArray.subarray(idx, endPtr));
- }
- var str = "";
- while (idx < endPtr) {
-  var u0 = heapOrArray[idx++];
-  if (!(u0 & 128)) {
-   str += String.fromCharCode(u0);
-   continue;
-  }
-  var u1 = heapOrArray[idx++] & 63;
-  if ((u0 & 224) == 192) {
-   str += String.fromCharCode(((u0 & 31) << 6) | u1);
-   continue;
-  }
-  var u2 = heapOrArray[idx++] & 63;
-  if ((u0 & 240) == 224) {
-   u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
-  } else {
-   u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (heapOrArray[idx++] & 63);
-  }
-  if (u0 < 65536) {
-   str += String.fromCharCode(u0);
-  } else {
-   var ch = u0 - 65536;
-   str += String.fromCharCode(55296 | (ch >> 10), 56320 | (ch & 1023));
-  }
- }
- return str;
-};
-
-/**
-     * Given a pointer 'ptr' to a null-terminated UTF8-encoded string in the
-     * emscripten HEAP, returns a copy of that string as a Javascript String object.
-     *
-     * @param {number} ptr
-     * @param {number=} maxBytesToRead - An optional length that specifies the
-     *   maximum number of bytes to read. You can omit this parameter to scan the
-     *   string until the first 0 byte. If maxBytesToRead is passed, and the string
-     *   at [ptr, ptr+maxBytesToReadr[ contains a null byte in the middle, then the
-     *   string will cut short at that byte index (i.e. maxBytesToRead will not
-     *   produce a string of exact length [ptr, ptr+maxBytesToRead[) N.B. mixing
-     *   frequent uses of UTF8ToString() with and without maxBytesToRead may throw
-     *   JS JIT optimizations off, so it is worth to consider consistently using one
-     * @return {string}
-     */ var UTF8ToString = (ptr, maxBytesToRead) => ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead) : "";
-
 var __embind_register_std_string = (rawType, name) => {
  name = readLatin1String(name);
- var stdStringIsUTF8 = (name === "std::string");
+ var stdStringIsUTF8 =  (name === "std::string");
  registerType(rawType, {
   name: name,
   "fromWireType"(value) {
@@ -1938,6 +2383,7 @@ var __embind_register_std_string = (rawType, name) => {
 var UTF16Decoder = typeof TextDecoder != "undefined" ? new TextDecoder("utf-16le") : undefined;
 
 var UTF16ToString = (ptr, maxBytesToRead) => {
+ assert(ptr % 2 == 0, "Pointer passed to UTF16ToString must be aligned to two bytes!");
  var endPtr = ptr;
  var idx = endPtr >> 1;
  var maxIdx = idx + maxBytesToRead / 2;
@@ -1954,6 +2400,8 @@ var UTF16ToString = (ptr, maxBytesToRead) => {
 };
 
 var stringToUTF16 = (str, outPtr, maxBytesToWrite) => {
+ assert(outPtr % 2 == 0, "Pointer passed to stringToUTF16 must be aligned to two bytes!");
+ assert(typeof maxBytesToWrite == "number", "stringToUTF16(str, outPtr, maxBytesToWrite) is missing the third parameter that specifies the length of the output buffer!");
  maxBytesToWrite ??= 2147483647;
  if (maxBytesToWrite < 2) return 0;
  maxBytesToWrite -= 2;
@@ -1971,6 +2419,7 @@ var stringToUTF16 = (str, outPtr, maxBytesToWrite) => {
 var lengthBytesUTF16 = str => str.length * 2;
 
 var UTF32ToString = (ptr, maxBytesToRead) => {
+ assert(ptr % 4 == 0, "Pointer passed to UTF32ToString must be aligned to four bytes!");
  var i = 0;
  var str = "";
  while (!(i >= maxBytesToRead / 4)) {
@@ -1988,6 +2437,8 @@ var UTF32ToString = (ptr, maxBytesToRead) => {
 };
 
 var stringToUTF32 = (str, outPtr, maxBytesToWrite) => {
+ assert(outPtr % 4 == 0, "Pointer passed to stringToUTF32 must be aligned to four bytes!");
+ assert(typeof maxBytesToWrite == "number", "stringToUTF32(str, outPtr, maxBytesToWrite) is missing the third parameter that specifies the length of the output buffer!");
  maxBytesToWrite ??= 2147483647;
  if (maxBytesToWrite < 4) return 0;
  var startPtr = outPtr;
@@ -2130,13 +2581,13 @@ var __emval_take_value = (type, arg) => {
 };
 
 var _abort = () => {
- abort("");
+ abort("native code called abort()");
 };
 
 var _emscripten_memcpy_js = (dest, src, num) => HEAPU8.copyWithin(dest, src, src + num);
 
 var abortOnCannotGrowMemory = requestedSize => {
- abort("OOM");
+ abort(`Cannot enlarge memory arrays to size ${requestedSize} bytes (OOM). Either (1) compile with -sINITIAL_MEMORY=X with X higher than the current value ${HEAP8.length}, (2) compile with -sALLOW_MEMORY_GROWTH which allows increasing the size at runtime, or (3) if you want malloc to return NULL (0) instead of this abort, compile with -sABORTING_MALLOC=0`);
 };
 
 var _emscripten_resize_heap = requestedSize => {
@@ -2145,12 +2596,80 @@ var _emscripten_resize_heap = requestedSize => {
  abortOnCannotGrowMemory(requestedSize);
 };
 
+var SYSCALLS = {
+ varargs: undefined,
+ get() {
+  assert(SYSCALLS.varargs != undefined);
+  var ret = HEAP32[((+SYSCALLS.varargs) >> 2)];
+  SYSCALLS.varargs += 4;
+  return ret;
+ },
+ getp() {
+  return SYSCALLS.get();
+ },
+ getStr(ptr) {
+  var ret = UTF8ToString(ptr);
+  return ret;
+ }
+};
+
+var _fd_close = fd => {
+ abort("fd_close called without SYSCALLS_REQUIRE_FILESYSTEM");
+};
+
+var convertI32PairToI53Checked = (lo, hi) => {
+ assert(lo == (lo >>> 0) || lo == (lo | 0));
+ assert(hi === (hi | 0));
+ return ((hi + 2097152) >>> 0 < 4194305 - !!lo) ? (lo >>> 0) + hi * 4294967296 : NaN;
+};
+
+function _fd_seek(fd, offset_low, offset_high, whence, newOffset) {
+ var offset = convertI32PairToI53Checked(offset_low, offset_high);
+ return 70;
+}
+
+var printCharBuffers = [ null, [], [] ];
+
+var printChar = (stream, curr) => {
+ var buffer = printCharBuffers[stream];
+ assert(buffer);
+ if (curr === 0 || curr === 10) {
+  (stream === 1 ? out : err)(UTF8ArrayToString(buffer, 0));
+  buffer.length = 0;
+ } else {
+  buffer.push(curr);
+ }
+};
+
+var flush_NO_FILESYSTEM = () => {
+ _fflush(0);
+ if (printCharBuffers[1].length) printChar(1, 10);
+ if (printCharBuffers[2].length) printChar(2, 10);
+};
+
+var _fd_write = (fd, iov, iovcnt, pnum) => {
+ var num = 0;
+ for (var i = 0; i < iovcnt; i++) {
+  var ptr = HEAPU32[((iov) >> 2)];
+  var len = HEAPU32[(((iov) + (4)) >> 2)];
+  iov += 8;
+  for (var j = 0; j < len; j++) {
+   printChar(fd, HEAPU8[ptr + j]);
+  }
+  num += len;
+ }
+ HEAPU32[((pnum) >> 2)] = num;
+ return 0;
+};
+
 var getCFunc = ident => {
  var func = Module["_" + ident];
+ assert(func, "Cannot call unknown function " + ident + ", make sure it is exported");
  return func;
 };
 
 var writeArrayToMemory = (array, buffer) => {
+ assert(array.length >= 0, "writeArrayToMemory array must have a length (should be an array or typed array)");
  HEAP8.set(array, buffer);
 };
 
@@ -2191,6 +2710,7 @@ var stringToUTF8OnStack = str => {
  var func = getCFunc(ident);
  var cArgs = [];
  var stack = 0;
+ assert(returnType !== "array", 'Return type should not be "array".');
  if (args) {
   for (var i = 0; i < args.length; i++) {
    var converter = toC[argTypes[i]];
@@ -2215,15 +2735,8 @@ var stringToUTF8OnStack = str => {
      * @param {string=} returnType
      * @param {Array=} argTypes
      * @param {Object=} opts
-     */ var cwrap = (ident, returnType, argTypes, opts) => {
- var numericArgs = !argTypes || argTypes.every(type => type === "number" || type === "boolean");
- var numericRet = returnType !== "string";
- if (numericRet && numericArgs && !opts) {
-  return getCFunc(ident);
- }
- return function() {
-  return ccall(ident, returnType, argTypes, arguments, opts);
- };
+     */ var cwrap = (ident, returnType, argTypes, opts) => function() {
+ return ccall(ident, returnType, argTypes, arguments, opts);
 };
 
 InternalError = Module["InternalError"] = class InternalError extends Error {
@@ -2254,82 +2767,107 @@ handleAllocatorInit();
 
 init_emval();
 
+function checkIncomingModuleAPI() {
+ ignoredModuleProp("fetchSettings");
+}
+
 var wasmImports = {
- /** @export */ N: ___cxa_begin_catch,
- /** @export */ a: ___cxa_find_matching_catch_2,
- /** @export */ k: ___cxa_find_matching_catch_3,
- /** @export */ q: ___cxa_throw,
- /** @export */ d: ___resumeException,
- /** @export */ M: __embind_finalize_value_object,
- /** @export */ x: __embind_register_bigint,
- /** @export */ L: __embind_register_bool,
- /** @export */ p: __embind_register_class,
- /** @export */ o: __embind_register_class_constructor,
- /** @export */ g: __embind_register_class_function,
- /** @export */ K: __embind_register_emval,
- /** @export */ w: __embind_register_float,
- /** @export */ J: __embind_register_function,
- /** @export */ j: __embind_register_integer,
- /** @export */ e: __embind_register_memory_view,
- /** @export */ v: __embind_register_std_string,
- /** @export */ n: __embind_register_std_wstring,
- /** @export */ u: __embind_register_value_object,
- /** @export */ I: __embind_register_value_object_field,
- /** @export */ H: __embind_register_void,
- /** @export */ G: __emval_decref,
- /** @export */ F: __emval_incref,
- /** @export */ m: __emval_take_value,
- /** @export */ t: _abort,
- /** @export */ E: _emscripten_memcpy_js,
- /** @export */ D: _emscripten_resize_heap,
- /** @export */ b: invoke_ii,
- /** @export */ f: invoke_iii,
- /** @export */ C: invoke_iiii,
- /** @export */ B: invoke_iiiiii,
- /** @export */ s: invoke_iiiiiii,
- /** @export */ i: invoke_v,
- /** @export */ c: invoke_vi,
- /** @export */ l: invoke_vii,
- /** @export */ A: invoke_viidii,
- /** @export */ r: invoke_viiii,
- /** @export */ z: invoke_viiiii,
- /** @export */ y: invoke_viiiiii,
- /** @export */ h: invoke_viiiiiiiiii
+ /** @export */ __assert_fail: ___assert_fail,
+ /** @export */ __cxa_begin_catch: ___cxa_begin_catch,
+ /** @export */ __cxa_find_matching_catch_2: ___cxa_find_matching_catch_2,
+ /** @export */ __cxa_find_matching_catch_3: ___cxa_find_matching_catch_3,
+ /** @export */ __cxa_throw: ___cxa_throw,
+ /** @export */ __resumeException: ___resumeException,
+ /** @export */ _embind_finalize_value_object: __embind_finalize_value_object,
+ /** @export */ _embind_register_bigint: __embind_register_bigint,
+ /** @export */ _embind_register_bool: __embind_register_bool,
+ /** @export */ _embind_register_class: __embind_register_class,
+ /** @export */ _embind_register_class_constructor: __embind_register_class_constructor,
+ /** @export */ _embind_register_class_function: __embind_register_class_function,
+ /** @export */ _embind_register_emval: __embind_register_emval,
+ /** @export */ _embind_register_float: __embind_register_float,
+ /** @export */ _embind_register_function: __embind_register_function,
+ /** @export */ _embind_register_integer: __embind_register_integer,
+ /** @export */ _embind_register_memory_view: __embind_register_memory_view,
+ /** @export */ _embind_register_std_string: __embind_register_std_string,
+ /** @export */ _embind_register_std_wstring: __embind_register_std_wstring,
+ /** @export */ _embind_register_value_object: __embind_register_value_object,
+ /** @export */ _embind_register_value_object_field: __embind_register_value_object_field,
+ /** @export */ _embind_register_void: __embind_register_void,
+ /** @export */ _emval_decref: __emval_decref,
+ /** @export */ _emval_incref: __emval_incref,
+ /** @export */ _emval_take_value: __emval_take_value,
+ /** @export */ abort: _abort,
+ /** @export */ emscripten_memcpy_js: _emscripten_memcpy_js,
+ /** @export */ emscripten_resize_heap: _emscripten_resize_heap,
+ /** @export */ fd_close: _fd_close,
+ /** @export */ fd_seek: _fd_seek,
+ /** @export */ fd_write: _fd_write,
+ /** @export */ invoke_ii: invoke_ii,
+ /** @export */ invoke_iii: invoke_iii,
+ /** @export */ invoke_iiii: invoke_iiii,
+ /** @export */ invoke_iiiiii: invoke_iiiiii,
+ /** @export */ invoke_iiiiiii: invoke_iiiiiii,
+ /** @export */ invoke_v: invoke_v,
+ /** @export */ invoke_vi: invoke_vi,
+ /** @export */ invoke_vii: invoke_vii,
+ /** @export */ invoke_viidii: invoke_viidii,
+ /** @export */ invoke_viii: invoke_viii,
+ /** @export */ invoke_viiii: invoke_viiii,
+ /** @export */ invoke_viiiii: invoke_viiiii,
+ /** @export */ invoke_viiiiii: invoke_viiiiii,
+ /** @export */ invoke_viiiiiiiiii: invoke_viiiiiiiiii
 };
 
 var wasmExports = createWasm();
 
-var ___wasm_call_ctors = () => (___wasm_call_ctors = wasmExports["P"])();
+var ___wasm_call_ctors = createExportWrapper("__wasm_call_ctors");
 
-var __Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_ = Module["__Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_"] = (a0, a1, a2, a3) => (__Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_ = Module["__Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_"] = wasmExports["Q"])(a0, a1, a2, a3);
+var __Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_ = Module["__Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_"] = createExportWrapper("_Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_");
 
-var ___cxa_free_exception = a0 => (___cxa_free_exception = wasmExports["__cxa_free_exception"])(a0);
+var ___cxa_free_exception = createExportWrapper("__cxa_free_exception");
 
-var ___getTypeName = a0 => (___getTypeName = wasmExports["S"])(a0);
+var ___getTypeName = createExportWrapper("__getTypeName");
 
-var ___errno_location = () => (___errno_location = wasmExports["__errno_location"])();
+var ___errno_location = createExportWrapper("__errno_location");
 
-var _malloc = a0 => (_malloc = wasmExports["T"])(a0);
+var _fflush = Module["_fflush"] = createExportWrapper("fflush");
 
-var _free = a0 => (_free = wasmExports["U"])(a0);
+var _malloc = createExportWrapper("malloc");
 
-var _setThrew = (a0, a1) => (_setThrew = wasmExports["V"])(a0, a1);
+var _free = Module["_free"] = createExportWrapper("free");
 
-var setTempRet0 = a0 => (setTempRet0 = wasmExports["W"])(a0);
+var _setThrew = createExportWrapper("setThrew");
 
-var stackSave = () => (stackSave = wasmExports["X"])();
+var setTempRet0 = createExportWrapper("setTempRet0");
 
-var stackRestore = a0 => (stackRestore = wasmExports["Y"])(a0);
+var _emscripten_stack_init = () => (_emscripten_stack_init = wasmExports["emscripten_stack_init"])();
 
-var stackAlloc = a0 => (stackAlloc = wasmExports["Z"])(a0);
+var _emscripten_stack_get_free = () => (_emscripten_stack_get_free = wasmExports["emscripten_stack_get_free"])();
 
-var ___cxa_increment_exception_refcount = a0 => (___cxa_increment_exception_refcount = wasmExports["_"])(a0);
+var _emscripten_stack_get_base = () => (_emscripten_stack_get_base = wasmExports["emscripten_stack_get_base"])();
 
-var ___cxa_decrement_exception_refcount = a0 => (___cxa_decrement_exception_refcount = wasmExports["__cxa_decrement_exception_refcount"])(a0);
+var _emscripten_stack_get_end = () => (_emscripten_stack_get_end = wasmExports["emscripten_stack_get_end"])();
 
-var ___cxa_can_catch = (a0, a1, a2) => (___cxa_can_catch = wasmExports["$"])(a0, a1, a2);
+var stackSave = createExportWrapper("stackSave");
 
-var ___cxa_is_pointer_type = a0 => (___cxa_is_pointer_type = wasmExports["aa"])(a0);
+var stackRestore = createExportWrapper("stackRestore");
+
+var stackAlloc = createExportWrapper("stackAlloc");
+
+var _emscripten_stack_get_current = () => (_emscripten_stack_get_current = wasmExports["emscripten_stack_get_current"])();
+
+var ___cxa_increment_exception_refcount = createExportWrapper("__cxa_increment_exception_refcount");
+
+var ___cxa_decrement_exception_refcount = createExportWrapper("__cxa_decrement_exception_refcount");
+
+var ___get_exception_message = Module["___get_exception_message"] = createExportWrapper("__get_exception_message");
+
+var ___cxa_can_catch = createExportWrapper("__cxa_can_catch");
+
+var ___cxa_is_pointer_type = createExportWrapper("__cxa_is_pointer_type");
+
+var dynCall_jiji = Module["dynCall_jiji"] = createExportWrapper("dynCall_jiji");
 
 function invoke_vi(index, a1) {
  var sp = stackSave();
@@ -2337,7 +2875,7 @@ function invoke_vi(index, a1) {
   getWasmTableEntry(index)(a1);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2348,7 +2886,7 @@ function invoke_ii(index, a1) {
   return getWasmTableEntry(index)(a1);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2359,7 +2897,7 @@ function invoke_viidii(index, a1, a2, a3, a4, a5) {
   getWasmTableEntry(index)(a1, a2, a3, a4, a5);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2370,7 +2908,7 @@ function invoke_v(index) {
   getWasmTableEntry(index)();
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2381,7 +2919,7 @@ function invoke_viiiiii(index, a1, a2, a3, a4, a5, a6) {
   getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2392,7 +2930,7 @@ function invoke_iii(index, a1, a2) {
   return getWasmTableEntry(index)(a1, a2);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2403,7 +2941,7 @@ function invoke_vii(index, a1, a2) {
   getWasmTableEntry(index)(a1, a2);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2414,7 +2952,7 @@ function invoke_viiiii(index, a1, a2, a3, a4, a5) {
   getWasmTableEntry(index)(a1, a2, a3, a4, a5);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2425,7 +2963,7 @@ function invoke_iiiiiii(index, a1, a2, a3, a4, a5, a6) {
   return getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2436,7 +2974,7 @@ function invoke_iiii(index, a1, a2, a3) {
   return getWasmTableEntry(index)(a1, a2, a3);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2447,7 +2985,7 @@ function invoke_iiiiii(index, a1, a2, a3, a4, a5) {
   return getWasmTableEntry(index)(a1, a2, a3, a4, a5);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2458,7 +2996,7 @@ function invoke_viiiiiiiiii(index, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) {
   getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2469,7 +3007,18 @@ function invoke_viiii(index, a1, a2, a3, a4) {
   getWasmTableEntry(index)(a1, a2, a3, a4);
  } catch (e) {
   stackRestore(sp);
-  if (e !== e + 0) throw e;
+  if (!(e instanceof EmscriptenEH)) throw e;
+  _setThrew(1, 0);
+ }
+}
+
+function invoke_viii(index, a1, a2, a3) {
+ var sp = stackSave();
+ try {
+  getWasmTableEntry(index)(a1, a2, a3);
+ } catch (e) {
+  stackRestore(sp);
+  if (!(e instanceof EmscriptenEH)) throw e;
   _setThrew(1, 0);
  }
 }
@@ -2478,6 +3027,14 @@ Module["ccall"] = ccall;
 
 Module["cwrap"] = cwrap;
 
+var missingLibrarySymbols = [ "writeI53ToI64", "writeI53ToI64Clamped", "writeI53ToI64Signaling", "writeI53ToU64Clamped", "writeI53ToU64Signaling", "readI53FromI64", "readI53FromU64", "convertI32PairToI53", "convertU32PairToI53", "zeroMemory", "exitJS", "growMemory", "isLeapYear", "ydayFromDate", "arraySum", "addDays", "setErrNo", "inetPton4", "inetNtop4", "inetPton6", "inetNtop6", "readSockaddr", "writeSockaddr", "getHostByName", "initRandomFill", "randomFill", "getCallstack", "emscriptenLog", "convertPCtoSourceLocation", "readEmAsmArgs", "jstoi_q", "jstoi_s", "getExecutableName", "listenOnce", "autoResumeAudioContext", "handleException", "keepRuntimeAlive", "runtimeKeepalivePush", "runtimeKeepalivePop", "callUserCallback", "maybeExit", "asmjsMangle", "asyncLoad", "alignMemory", "mmapAlloc", "getNativeTypeSize", "STACK_SIZE", "STACK_ALIGN", "POINTER_SIZE", "ASSERTIONS", "uleb128Encode", "sigToWasmTypes", "generateFuncType", "convertJsFunctionToWasm", "getEmptyTableSlot", "updateTableMap", "getFunctionAddress", "addFunction", "removeFunction", "reallyNegative", "unSign", "strLen", "reSign", "formatString", "intArrayFromString", "intArrayToString", "AsciiToString", "stringToAscii", "stringToNewUTF8", "registerKeyEventCallback", "maybeCStringToJsString", "findEventTarget", "findCanvasEventTarget", "getBoundingClientRect", "fillMouseEventData", "registerMouseEventCallback", "registerWheelEventCallback", "registerUiEventCallback", "registerFocusEventCallback", "fillDeviceOrientationEventData", "registerDeviceOrientationEventCallback", "fillDeviceMotionEventData", "registerDeviceMotionEventCallback", "screenOrientation", "fillOrientationChangeEventData", "registerOrientationChangeEventCallback", "fillFullscreenChangeEventData", "registerFullscreenChangeEventCallback", "JSEvents_requestFullscreen", "JSEvents_resizeCanvasForFullscreen", "registerRestoreOldStyle", "hideEverythingExceptGivenElement", "restoreHiddenElements", "setLetterbox", "softFullscreenResizeWebGLRenderTarget", "doRequestFullscreen", "fillPointerlockChangeEventData", "registerPointerlockChangeEventCallback", "registerPointerlockErrorEventCallback", "requestPointerLock", "fillVisibilityChangeEventData", "registerVisibilityChangeEventCallback", "registerTouchEventCallback", "fillGamepadEventData", "registerGamepadEventCallback", "disableGamepadApiIfItThrows", "registerBeforeUnloadEventCallback", "fillBatteryEventData", "battery", "registerBatteryEventCallback", "setCanvasElementSize", "getCanvasElementSize", "demangle", "demangleAll", "jsStackTrace", "stackTrace", "getEnvStrings", "checkWasiClock", "wasiRightsToMuslOFlags", "wasiOFlagsToMuslOFlags", "createDyncallWrapper", "safeSetTimeout", "setImmediateWrapped", "clearImmediateWrapped", "polyfillSetImmediate", "getPromise", "makePromise", "idsToPromises", "makePromiseCallback", "Browser_asyncPrepareDataCounter", "setMainLoop", "getSocketFromFD", "getSocketAddress", "FS_createPreloadedFile", "FS_modeStringToFlags", "FS_getMode", "FS_stdin_getChar", "FS_createDataFile", "FS_unlink", "FS_mkdirTree", "_setNetworkCallback", "heapObjectForWebGLType", "heapAccessShiftForWebGLHeap", "webgl_enable_ANGLE_instanced_arrays", "webgl_enable_OES_vertex_array_object", "webgl_enable_WEBGL_draw_buffers", "webgl_enable_WEBGL_multi_draw", "emscriptenWebGLGet", "computeUnpackAlignedImageSize", "colorChannelsInGlTextureFormat", "emscriptenWebGLGetTexPixelData", "__glGenObject", "emscriptenWebGLGetUniform", "webglGetUniformLocation", "webglPrepareUniformLocationsBeforeFirstUse", "webglGetLeftBracePos", "emscriptenWebGLGetVertexAttrib", "__glGetActiveAttribOrUniform", "writeGLArray", "registerWebGlEventCallback", "runAndAbortIfError", "SDL_unicode", "SDL_ttfContext", "SDL_audio", "ALLOC_NORMAL", "ALLOC_STACK", "allocate", "writeStringToMemory", "writeAsciiToMemory", "getFunctionArgsName", "registerInheritedInstance", "unregisterInheritedInstance", "enumReadValueFromPointer", "validateThis", "getStringOrSymbol", "emval_get_global", "emval_returnValue", "emval_lookupTypes", "emval_addMethodCaller" ];
+
+missingLibrarySymbols.forEach(missingLibrarySymbol);
+
+var unexportedSymbols = [ "run", "addOnPreRun", "addOnInit", "addOnPreMain", "addOnExit", "addOnPostRun", "addRunDependency", "removeRunDependency", "FS_createFolder", "FS_createPath", "FS_createLazyFile", "FS_createLink", "FS_createDevice", "FS_readFile", "out", "err", "callMain", "abort", "wasmMemory", "wasmExports", "stackAlloc", "stackSave", "stackRestore", "getTempRet0", "setTempRet0", "writeStackCookie", "checkStackCookie", "convertI32PairToI53Checked", "ptrToString", "getHeapMax", "abortOnCannotGrowMemory", "ENV", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "ERRNO_CODES", "ERRNO_MESSAGES", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "UNWIND_CACHE", "readEmAsmArgsArray", "dynCallLegacy", "getDynCaller", "dynCall", "handleAllocatorInit", "HandleAllocator", "wasmTable", "noExitRuntime", "getCFunc", "freeTableIndexes", "functionsInTableMap", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "UTF16Decoder", "UTF16ToString", "stringToUTF16", "lengthBytesUTF16", "UTF32ToString", "stringToUTF32", "lengthBytesUTF32", "stringToUTF8OnStack", "writeArrayToMemory", "JSEvents", "specialHTMLTargets", "currentFullscreenStrategy", "restoreOldWindowedStyle", "ExitStatus", "flush_NO_FILESYSTEM", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "ExceptionInfo", "findMatchingCatch", "getExceptionMessageCommon", "incrementExceptionRefcount", "decrementExceptionRefcount", "getExceptionMessage", "Browser", "wget", "SYSCALLS", "preloadPlugins", "FS_stdin_getChar_buffer", "FS", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "GL", "emscripten_webgl_power_preferences", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "SDL", "SDL_gfx", "allocateUTF8", "allocateUTF8OnStack", "InternalError", "BindingError", "throwInternalError", "throwBindingError", "registeredTypes", "awaitingDependencies", "typeDependencies", "tupleRegistrations", "structRegistrations", "sharedRegisterType", "whenDependentTypesAreResolved", "embind_charCodes", "embind_init_charCodes", "readLatin1String", "getTypeName", "getFunctionName", "heap32VectorToArray", "requireRegisteredType", "usesDestructorStack", "createJsInvoker", "UnboundTypeError", "PureVirtualError", "GenericWireTypeSize", "init_embind", "throwUnboundTypeError", "ensureOverloadTable", "exposePublicSymbol", "replacePublicSymbol", "extendError", "createNamedFunction", "embindRepr", "registeredInstances", "getBasestPointer", "getInheritedInstance", "getInheritedInstanceCount", "getLiveInheritedInstances", "registeredPointers", "registerType", "integerReadValueFromPointer", "floatReadValueFromPointer", "simpleReadValueFromPointer", "readPointer", "runDestructors", "newFunc", "craftInvokerFunction", "embind__requireFunction", "genericPointerToWireType", "constNoSmartPtrRawPointerToWireType", "nonConstNoSmartPtrRawPointerToWireType", "init_RegisteredPointer", "RegisteredPointer", "RegisteredPointer_fromWireType", "runDestructor", "releaseClassHandle", "finalizationRegistry", "detachFinalizer_deps", "detachFinalizer", "attachFinalizer", "makeClassHandle", "init_ClassHandle", "ClassHandle", "throwInstanceAlreadyDeleted", "deletionQueue", "flushPendingDeletes", "delayFunction", "setDelayFunction", "RegisteredClass", "shallowCopyInternalPointer", "downcastPointer", "upcastPointer", "char_0", "char_9", "makeLegalFunctionName", "emval_handles", "emval_symbols", "init_emval", "count_emval_handles", "Emval", "emval_methodCallers", "reflectConstruct" ];
+
+unexportedSymbols.forEach(unexportedRuntimeSymbol);
+
 var calledRun;
 
 dependenciesFulfilled = function runCaller() {
@@ -2485,10 +3042,16 @@ dependenciesFulfilled = function runCaller() {
  if (!calledRun) dependenciesFulfilled = runCaller;
 };
 
+function stackCheckInit() {
+ _emscripten_stack_init();
+ writeStackCookie();
+}
+
 function run() {
  if (runDependencies > 0) {
   return;
  }
+ stackCheckInit();
  preRun();
  if (runDependencies > 0) {
   return;
@@ -2501,6 +3064,7 @@ function run() {
   initRuntime();
   readyPromiseResolve(Module);
   if (Module["onRuntimeInitialized"]) Module["onRuntimeInitialized"]();
+  assert(!Module["_main"], 'compiled without a main, but one is present. if you added it from JS, use Module["onRuntimeInitialized"]');
   postRun();
  }
  if (Module["setStatus"]) {
@@ -2514,6 +3078,7 @@ function run() {
  } else {
   doRun();
  }
+ checkStackCookie();
 }
 
 if (Module["preInit"]) {

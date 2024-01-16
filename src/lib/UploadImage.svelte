@@ -1,15 +1,14 @@
-<script lang="ts">
+<script lang='ts'>
     import { type Writable } from 'svelte/store';
-    import Range from "./Range.svelte"	
+    import Range from './Range.svelte'	
     import TraceSkeleton from './trace_skeleton.vanilla';
     import TraceSkeleton2  from './wasmSkelleton/index'
-    import { onMount } from "svelte";
-    import { SitePoint, SiteSegment, Sites } from "./voronoiDataStructures";
+    import { onMount } from 'svelte';
+    import { SitePoint, SiteSegment, Sites } from './voronoiDataStructures';
 
     export let siteStore: Writable<Sites>;
-
         
-        let tracer: any;
+    let tracer: any;
 
     let inputImage: any, fileinput: any;
 
@@ -24,9 +23,9 @@
     let imgX = 0;
     let imgY = 0;
     
-    let resolution: number = 25;
+    let deviation: number = 2;
     
-    let svgStr: string = "";
+    let svgStr: string = '';
     
     let siteSegments: Array<SiteSegment> = []; // local copy of Segments for visualization as svg
     const baseSiteSegments = [
@@ -50,7 +49,8 @@
             image.onload = () => Promise.resolve().then(() => {
                 ctx = canvas.getContext('2d', {
                     willReadFrequently: true,
-                });                
+                });    
+                ctx?.clearRect(0,0,canvasWidth,canvasHeight);            
                 drawImageScaled(image);
                 // ctx.fillStyle = ctx.createPattern(image, 'repeat'); 
                 // ctx.fillRect(0, 0, width, height);
@@ -105,7 +105,7 @@
     }
 
     const onResolutionChanged = (newRes: number) => {
-        resolution = newRes;
+        deviation = newRes;
         Promise.resolve().then(updateSkelleton); // Run Async
     
     };
@@ -161,7 +161,7 @@
         if(ctx == null) return;
 
         let imageData: ImageData = ctx.getImageData(imgX, imgY, width, height);
-        // console.log("w " + width + " h " +  height + " imgX " + imgX + " imgY " + imgY);
+        // console.log('w ' + width + ' h ' +  height + ' imgX ' + imgX + ' imgY ' + imgY);
         // console.log(imageData);
         // let { polylines, rects, thinImag } = TraceSkeleton.fromImageData(imageData, resolution);
         let thinImag = TraceSkeleton.thinningZS(TraceSkeleton.imageDataToBinary(imageData), width, height);
@@ -237,24 +237,24 @@
                     || ((H) && (!A && !B && !C && !D && !E && !F && !G));
             
             // if(x == 205 - imgX && y == 113 - imgY)
-            //     console.log("neighbourCnt " + neighbourCnt8 + " "
-            //     + "e " + thinImag[fromXY(x,y)] + " "
-            //     + "A " + A + " "
-            //     + "B " + B + " "
-            //     + "C " + C + " "
-            //     + "D " + D + " "
-            //     + "E " + E + " "
-            //     + "F " + F + " "
-            //     + "G " + G + " "
-            //     + "H " + H + " "
-            //     + thinImag[fromXY(x-1, y-1)] + " " //
-            //     + thinImag[fromXY(x  , y-1)] + " " // 
-            //     + thinImag[fromXY(x+1, y-1)] + " " // 
-            //     + thinImag[fromXY(x+1, y  )] + " " // 
-            //     + thinImag[fromXY(x+1, y+1)] + " " // 
-            //     + thinImag[fromXY(x  , y+1)] + " " // 
-            //     + thinImag[fromXY(x-1, y+1)] + " " // 
-            //     + thinImag[fromXY(x-1, y  )] + " " // 
+            //     console.log('neighbourCnt ' + neighbourCnt8 + ' '
+            //     + 'e ' + thinImag[fromXY(x,y)] + ' '
+            //     + 'A ' + A + ' '
+            //     + 'B ' + B + ' '
+            //     + 'C ' + C + ' '
+            //     + 'D ' + D + ' '
+            //     + 'E ' + E + ' '
+            //     + 'F ' + F + ' '
+            //     + 'G ' + G + ' '
+            //     + 'H ' + H + ' '
+            //     + thinImag[fromXY(x-1, y-1)] + ' ' //
+            //     + thinImag[fromXY(x  , y-1)] + ' ' // 
+            //     + thinImag[fromXY(x+1, y-1)] + ' ' // 
+            //     + thinImag[fromXY(x+1, y  )] + ' ' // 
+            //     + thinImag[fromXY(x+1, y+1)] + ' ' // 
+            //     + thinImag[fromXY(x  , y+1)] + ' ' // 
+            //     + thinImag[fromXY(x-1, y+1)] + ' ' // 
+            //     + thinImag[fromXY(x-1, y  )] + ' ' // 
             // );
 
             if(C1 || C2 || C3 || C4){
@@ -317,7 +317,7 @@
         parent: Node | null = null;
         children: Array<Node> = [];
         pixel: Array<SitePoint> = [];
-        loops: Array<SitePoint> = [];
+        loops: Array<Node> = [];
     }
 
     function vectorize(thinImag:number[], crossings: Array<SitePoint>, ends: Array<SitePoint>): Node{
@@ -344,14 +344,28 @@
         pixel.push(currPos);    
         if(thinImag[fromXY(currPos.x, currPos.y)] == 2){ // Crossing
             thinImag[fromXY(currPos.x, currPos.y)] = 5; // Set Visited
-            node = new Node(currPos, currNode);
-            node.pixel = pixel;
-            let neigh: Array<SitePoint> = neighbourIdxs(thinImag, currPos.x, currPos.y);
-            neigh.forEach((n: SitePoint) => {
-                if(thinImag[fromXY(n.x, n.y)] < 4){ // Skip already Visited
-                    vectorizeRec(node, n, [], thinImag, crossings, ends);
-                }
-            });
+
+            let squareDist = (currPos.x-currNode.sitePoint!.x)*(currPos.x-currNode.sitePoint!.x) + (currPos.y-currNode.sitePoint!.y)*(currPos.y-currNode.sitePoint!.y);
+            if(squareDist > 4){
+                node = new Node(currPos, currNode);
+                node.pixel = pixel;
+                let neigh: Array<SitePoint> = neighbourIdxs(thinImag, currPos.x, currPos.y);
+                neigh.forEach((n: SitePoint) => {
+                    if(thinImag[fromXY(n.x, n.y)] < 4){ // Skip already Visited
+                        vectorizeRec(node, n, [], thinImag, crossings, ends);
+                    }
+                });
+            }else{
+                currNode.pixel.push(currPos);
+                thinImag[fromXY(currNode.sitePoint!.x, currNode.sitePoint!.y)] = 4; // Old Point is not a Node anymore
+                currNode.sitePoint = currPos;
+                let neigh: Array<SitePoint> = neighbourIdxs(thinImag, currPos.x, currPos.y);
+                neigh.forEach((n: SitePoint) => {
+                    if(thinImag[fromXY(n.x, n.y)] < 4){ // Skip already Visited
+                        vectorizeRec(currNode, n, [], thinImag, crossings, ends);
+                    }
+                });
+            }
         }else if(thinImag[fromXY(currPos.x, currPos.y)] == 3){ // End
             thinImag[fromXY(currPos.x, currPos.y)] = 4; // Set Visited
             node = new Node(currPos, currNode);
@@ -365,8 +379,10 @@
                 if(thinImag[fromXY(n.x, n.y)] < 4){ // Skip already Visited
                     vectorizeRec(node, n, pixel, thinImag, crossings, ends);
                 }
-                else if(thinImag[fromXY(n.x, n.y)] == 5){
-                    currNode.loops.push(currPos);
+                else if(thinImag[fromXY(n.x, n.y)] == 5 && pixel.length > 1){ // detect loops but not if we just started the run and are still next to our parent node
+                    node = new Node(n, currNode);
+                    node.pixel = pixel;
+                    currNode.loops.push(node);
                 }
             });
         }
@@ -391,9 +407,10 @@
             segments.push(new SiteSegment(n.sitePoint!.x, n.sitePoint!.y, c.sitePoint!.x, c.sitePoint!.y));
             segemntsFromTreeRec(c, segments);
         });
-        n.loops.forEach(l => {
-            segments.push(new SiteSegment(n.sitePoint!.x, n.sitePoint!.y, l.x, l.y));
-        });
+        // n.loops.forEach(l => {
+        //     segments.push(new SiteSegment(n.sitePoint!.x, n.sitePoint!.y, l.sitePoint!.x, l.sitePoint!.y));
+        //     segemntsFromTreeRec(l, segments);
+        // });
 
         return segments;
     }
@@ -406,21 +423,21 @@
             thinImagRGB[fromXY(p.x, p.y) * 4 + 2] = col[2];
         });
 
-        thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4    ] = col[0];
-        thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4 + 1] = col[1];
-        thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4 + 2] = col[2];
+        // thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4    ] = col[0];
+        // thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4 + 1] = col[1];
+        // thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4 + 2] = col[2];
 
-        thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4    ] = col[0];
-        thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4 + 1] = col[1];
-        thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4 + 2] = col[2];
+        // thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4    ] = col[0];
+        // thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4 + 1] = col[1];
+        // thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4 + 2] = col[2];
 
-        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4    ] = col[0];
-        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4 + 1] = col[1];
-        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4 + 2] = col[2];
+        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4    ] = col[0];
+        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4 + 1] = col[1];
+        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4 + 2] = col[2];
 
-        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4    ] = col[0];
-        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4 + 1] = col[1];
-        thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4 + 2] = col[2];
+        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4    ] = col[0];
+        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4 + 1] = col[1];
+        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4 + 2] = col[2];
 
 
         n.children.forEach(c => {
@@ -429,9 +446,9 @@
     }
 
     function subdivideTreeRec(n: Node){
-        if(n.sitePoint!.x == 86 && n.sitePoint!.y == 230)
-            console.log(n.children);
         n.children.forEach(c => {
+            // if(c.sitePoint!.x == 186 && c.sitePoint!.y == 104)
+            //     console.log(n.children);
             if(c.pixel.length > 10){
                 let idx = Math.floor(c.pixel.length / 2);
                 let halfPoint = c.pixel[idx];
@@ -453,26 +470,30 @@
                     dist = ((y2-y1) * x - (x2-x1) * y + x2 * y1 - y2 * x1) / Math.sqrt((y2-y1)*(y2-y1) + (x2-x1)*(x2-x1));
                 }
                 dist = Math.abs(dist);
-                if(dist > 2){
-                    console.log("dividing " + halfPoint.x + " " + halfPoint.y);
+                if(dist > deviation){
+                    // console.log('dividing (' + n.sitePoint!.x + ',' + n.sitePoint!.y + ') (' + c.sitePoint!.x + ',' + c.sitePoint!.y + ') -> (' + halfPoint.x + ' ' + halfPoint.y + ')');
                     let center = new Node(halfPoint, null);
                     
                     center.parent = n;
                     center.children = [c];
                     
-                    center.pixel = c.pixel.slice(0,idx);
-                    c.pixel = c.pixel.slice(idx,c.pixel.length);
+                    center.pixel = c.pixel.slice(0,idx+1);
+                    c.pixel = c.pixel.slice(idx+1,c.pixel.length);
                     
-                    n.children = [center, ...n.children.filter(ch => ch != c)];
+                    // Replace Child with new one
+                    for (let index = 0; index < n.children.length; index++) { // use for instead of other syntax to not confuse the outer foreach loop
+                        if(n.children[index] == c)
+                            n.children[index] = center;
+                    }
                     c.parent = center;
                     
                     subdivideTreeRec(n);
                 }
             }
-        });
-
-        n.children.forEach(c => {
             subdivideTreeRec(c);
+        });
+        n.loops.forEach(l => {
+            subdivideTreeRec(l);
         });
     }
 
@@ -491,72 +512,89 @@
         link.click();
     }
 
+    function downloadSVG(){
+        const svg = document.getElementById('previewSvg');
+        if(svg != null){
+            const blob = new Blob([svg.outerHTML], {type: 'image/svg+xml'});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'preview.svg';
+            link.click();
+        }
+    }
+
     onMount(async () => {
         tracer = await TraceSkeleton2.load();
     });
 
 </script>
 
-<div id="app">
-    <div class="drawingContainer">
+<div id='app'>
+    <div class='drawingContainer'>
         <canvas
-            class="uploadCanvas"
+            class='uploadCanvas'
             bind:this={canvas}
             width={canvasWidth}
             height={canvasHeight}
-            style="width: {canvasWidth}px; height: {canvasHeight}px"
+            style='width: {canvasWidth}px; height: {canvasHeight}px'
         ></canvas>
         <div
-            class="overdrawSvg"
+            class='overdrawSvg'
             bind:this={svgContainer}
-            style="left: {imgX}px; top: {imgY}px; width: {width}px; height: {height}px;"
+            style='left: {imgX}px; top: {imgY}px; width: {width}px; height: {height}px;'
         >
-            <svg
+            <svg id='previewSvg'
                 {width}
                 {height}
-                viewBox="0 0 {width} {height}"
-                xmlns="http://www.w3.org/2000/svg"
+                viewBox='0 0 {width} {height}'
+                xmlns='http://www.w3.org/2000/svg'
             >
                 {#each siteSegments as siteS}
                     <path
-                        d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-                        stroke="red"
-                        stroke-width="1"
-                        fill="none"
+                        d='M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}'
+                        stroke='red'
+                        stroke-width='1'
+                        fill='none'
                     ></path>
-                    <circle cx={siteS.x1} cy={siteS.y1} r="2" fill="red"
+                    <circle cx={siteS.x1} cy={siteS.y1} r='2' fill='red'
                     ></circle>
-                    <circle cx={siteS.x2} cy={siteS.y2} r="2" fill="red"
+                    <circle cx={siteS.x2} cy={siteS.y2} r='2' fill='red'
                     ></circle>
                 {/each}
             </svg>
         </div>
     </div>
-    <div class:purple-theme={false} class="resolution-slider">
-        <label for="basic-range">Resolution</label>
+    <div class:purple-theme={false} class='resolution-slider'>
+        <label for='basic-range'>Deviation Tolerance</label>
         <Range
-            min={5}
-            max={100}
-            initialValue={resolution}
+            min={1}
+            max={50}
+            initialValue={deviation}
             on:change={(e) => onResolutionChanged(e.detail.value)}
         />
     </div>
     <button
-        class="upload"
+        class='upload'
         on:click={() => {
             fileinput.click();
         }}>Upload Image</button
     >
     <button
-        class="upload"
+        class='upload'
         on:click={() => {
             downloadCanvasImage();
-        }}>Download</button
+        }}>Download Image</button
+    >
+    <button
+        class='upload'
+        on:click={() => {
+            downloadSVG();
+        }}>Download SVG</button
     >
     <input
-        style="display:none"
-        type="file"
-        accept=".jpg, .jpeg, .png"
+        style='display:none'
+        type='file'
+        accept='.jpg, .jpeg, .png'
         on:change={(e) => onFileSelected(e)}
         bind:this={fileinput}
     />
@@ -571,10 +609,10 @@
     }
     .upload {
         height: 50px;
-        width: 150px;
+        width: 200px;
         cursor: pointer;
         background-color: #9af4fa;
-        margin: 20px;
+        margin: 5px;
     }
     .drawingContainer {
         position: relative;

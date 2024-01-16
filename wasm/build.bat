@@ -16,6 +16,8 @@ voronoi.cpp ^
 -s NO_DISABLE_EXCEPTION_CATCHING ^
 -s USE_BOOST_HEADERS=1 ^
 --embind-emit-tsd wasmVoronoi.d.ts ^
+-s ASSERTIONS ^
+-sINITIAL_MEMORY=65536000 ^
 -s EXPORTED_RUNTIME_METHODS=['cwrap','ccall']
 @REM --post-js voronoi.post.js ^
 

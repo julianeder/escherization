@@ -580,6 +580,8 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
   std::vector<point_type> pointSites;
   std::vector<segment_type> lineSites;
 
+  printf("A");
+
   // printf("size %zu \n",
   //         points.size());
   for (size_t i = 0; i < points.size(); i += 2)
@@ -590,12 +592,14 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
       //     pointSites[i/2].x(),
       //     pointSites[i/2].y());
   }
+  printf("B");
 
   for (size_t i = 0; i < segments.size(); i += 4)
   {
       lineSites.push_back(segment_type(point_type(segments[i], segments[i+1]), point_type(segments[i+2], segments[i+3])));
   }
 
+  printf("C");
 
   // Construction of the Voronoi Diagram.
   voronoi_diagram<double> vd;
@@ -606,6 +610,8 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
   DiagrammResult result;
 
   std::vector<const voronoi_diagram<double>::edge_type*> processed; // to Avoid Duplicates 
+
+  printf("D");
 
   for (voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin(); it != vd.edges().end(); ++it) {
     const voronoi_diagram<double>::edge_type* edge = &(*it);
@@ -639,6 +645,7 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
     }
 
   }
+  printf("E");
 
   result.numVerticies = vd.num_vertices();
   for (voronoi_diagram<double>::const_vertex_iterator it = vd.vertices().begin(); it != vd.vertices().end(); ++it) {
@@ -646,6 +653,7 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
     result.vertices.push_back(vertex.x());
     result.vertices.push_back(vertex.y());
   }
+  printf("F");
 
   return result;
 }
