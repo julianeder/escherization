@@ -8,7 +8,7 @@
   import { Sites } from "./lib/voronoiDataStructures";
 
 
-  let siteStore: Writable<Sites> = writable({sitePoints: [], siteSegments: []});
+  let siteStore: Writable<Sites> = writable({sitePoints: [], siteSegments: [], tileWidth: 300, tileHeight: 300});
 
 </script>
 

@@ -1,3 +1,5 @@
+import { Point } from "./tactile/tactile";
+
 export class BBox {
     xl: number;
     xh: number;
@@ -18,16 +20,18 @@ export class BBox {
 export class Sites{
     sitePoints: SitePoint[] = [];
     siteSegments: SiteSegment[] = [];
+    tileWidth: number = 300;
+    tileHeight: number = 300;
 }
 
-export class SitePoint {
-    x: number = 0;
-    y: number = 0;
+export class SitePoint extends Point {
+
     // voronoiId: number = -1;
 
     constructor(x: number, y: number) {
-        this.x = x;
-        this.y = y;
+        super(x, y);
+        // this.x = x;
+        // this.y = y;
     }
 }
 

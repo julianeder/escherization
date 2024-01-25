@@ -18,8 +18,8 @@
 
     const canvasWidth=300;
     const canvasHeight=300;
-    let width = 300;
-    let height = 300;
+    let tileWidth = 300;
+    let tileHeight = 300;
     let imgX = 0;
     let imgY = 0;
     
@@ -73,8 +73,8 @@
         let centerShift_x = ( canvas.width - img.width*ratio ) / 2;
         let centerShift_y = ( canvas.height - img.height*ratio ) / 2;  
         
-        width = Math.floor(img.width*ratio);
-        height = Math.floor(img.height*ratio);
+        tileWidth = Math.floor(img.width*ratio);
+        tileHeight = Math.floor(img.height*ratio);
         imgX = Math.floor(centerShift_x);
         imgY = Math.floor(centerShift_y);
 
@@ -90,8 +90,8 @@
         let imgageData = context!.getImageData(0, 0, img.width, img.height);
         // Nearest Neighbour Resampling
         let imagRGBA: number[] = [];
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
+        for (let y = 0; y < tileHeight; y++) {
+            for (let x = 0; x < tileWidth; x++) {
                 let i = (Math.round(y / ratio) * img.width + Math.round(x / ratio)) * 4;
                 imagRGBA.push(imgageData.data[i]);
                 imagRGBA.push(imgageData.data[i+1]);
@@ -99,7 +99,7 @@
                 imagRGBA.push(imgageData.data[i+3]);
             }            
         }
-        let newImgageData = new ImageData(new Uint8ClampedArray(imagRGBA), width, height);
+        let newImgageData = new ImageData(new Uint8ClampedArray(imagRGBA), tileWidth, tileHeight);
         ctx.putImageData(newImgageData, imgX,imgY);
 
     }
@@ -153,18 +153,18 @@
         if(thinImag[fromXY(x-1, y  )]) neighbourCnt ++;
         return neighbourCnt;
     }
-    const fromI = (i: number) => { return {x: i % width, y: Math.floor(i / width)}} 
+    const fromI = (i: number) => { return {x: i % tileWidth, y: Math.floor(i / tileWidth)}} 
     
-    const fromXY = (x: number, y: number) => { return y * width + x; }
+    const fromXY = (x: number, y: number) => { return y * tileWidth + x; }
     
     const updateSkelleton = () => {
         if(ctx == null) return;
 
-        let imageData: ImageData = ctx.getImageData(imgX, imgY, width, height);
+        let imageData: ImageData = ctx.getImageData(imgX, imgY, tileWidth, tileHeight);
         // console.log('w ' + width + ' h ' +  height + ' imgX ' + imgX + ' imgY ' + imgY);
         // console.log(imageData);
         // let { polylines, rects, thinImag } = TraceSkeleton.fromImageData(imageData, resolution);
-        let thinImag = TraceSkeleton.thinningZS(TraceSkeleton.imageDataToBinary(imageData), width, height);
+        let thinImag = TraceSkeleton.thinningZS(TraceSkeleton.imageDataToBinary(imageData), tileWidth, tileHeight);
         let thinImagRGB: number[] = [];
         let i = 0;
         let j = 0;
@@ -292,7 +292,7 @@
         let n: Node = vectorize(thinImag, crossings, ends);
 
         visualizeTreeRec(n, thinImagRGB);
-        var thinImgageData = new ImageData(new Uint8ClampedArray(thinImagRGB), width, height);
+        var thinImgageData = new ImageData(new Uint8ClampedArray(thinImagRGB), tileWidth, tileHeight);
         ctx.putImageData(thinImgageData, imgX,imgY);  
 
 
@@ -301,7 +301,7 @@
         let ss: Array<SiteSegment> = [];
         segemntsFromTreeRec(n, ss);
         siteSegments = ss; // Trigger Reactive Update 
-        siteStore.set({sitePoints: [], siteSegments: [...baseSiteSegments, ...ss]})
+        siteStore.set({sitePoints: [], siteSegments: [...baseSiteSegments, ...ss], tileWidth: tileWidth, tileHeight: tileHeight})
         
     };
 
@@ -540,12 +540,12 @@
         <div
             class='overdrawSvg'
             bind:this={svgContainer}
-            style='left: {imgX}px; top: {imgY}px; width: {width}px; height: {height}px;'
+            style='left: {imgX}px; top: {imgY}px; width: {tileWidth}px; height: {tileHeight}px;'
         >
             <svg id='previewSvg'
-                {width}
-                {height}
-                viewBox='0 0 {width} {height}'
+                width={tileWidth}
+                height={tileHeight}
+                viewBox='0 0 {tileWidth} {tileHeight}'
                 xmlns='http://www.w3.org/2000/svg'
             >
                 {#each siteSegments as siteS}

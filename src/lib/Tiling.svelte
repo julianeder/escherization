@@ -16,27 +16,98 @@
     type DiagrammResult,
     type CellResult,
   } from "../lib/wasm/wasmVoronoi";
+    import { IsohedralTiling, Point, mulPoint } from "./tactile/tactile";
 
   export let siteStore: Writable<Sites>;
 
   let wasmVoronoi: VoronoiWasmModule;
-  let bbox: BBox = { xl: 0, xh: 500, yl: 0, yh: 300 };
+  let bbox: BBox = { xl: 0, xh: 500, yl: 0, yh: 500 };
 
-  let tiles: any[] = [];
+  let tiles: Point[] = [];
   let sitePoints: SitePoint[] = [];
   let siteSegments: SiteSegment[] = [];
+  let tileWidth: number = 300;
+  let tileHeight: number = 300;
   let voronoiVertices: Vertex[] = [];
   let voronoiEdges: Edge[] = [];
   let voronoiCells: Cell[] = [];
 
-  let showSecondary: boolean = true;
+  let showSecondary: boolean = false;
 
   let lastError: any = "";
 
+
+
   function updateTiling(newSitePoints: SitePoint[], newSiteSegments: SiteSegment[]) {
-    sitePoints = newSitePoints;
-    siteSegments = newSiteSegments;
+    console.log("updateTiling " + tileWidth + "x" + tileHeight + " l " + newSitePoints.length + " / " + newSiteSegments.length);
+
+    let tileScale: number = 100;
+    // for (var i = 0; i < newSitePoints.length; i ++) {
+    //   newSitePoints[i] = scale(newSitePoints[i], tileScale/tileWidth,  tileScale/tileHeight);
+    // }
+    // for (var i = 0; i < newSiteSegments.length; i ++) {
+    //   newSiteSegments[i] = scaleSegment(newSiteSegments[i], tileScale/tileWidth,  tileScale/tileHeight);
+    // }
+
+    tiles = [];
+    sitePoints = [];
+    siteSegments = [];
+    let tiling: IsohedralTiling = new IsohedralTiling(76);
+    for(let i of tiling.fillRegionBounds(bbox.xl / tileScale, bbox.yl / tileScale, bbox.xh / tileScale, bbox.yh / tileScale)){
+      // Get the 3x3 matrix corresponding to one of the transformed
+      // tiles in the filled region.
+      const T = i.T;
+
+      let origin = scale(mulPoint(T, new Point(0,0)), tileScale, tileScale);
+      tiles.push(origin);
+
+      for (var j = 0; j < newSitePoints.length; j++) {
+        sitePoints.push(
+          translatePoint(
+            scale(newSitePoints[j], 
+            tileScale/tileWidth,  
+            tileScale/tileHeight),
+            origin)
+        );
+      }
+
+      for (var j = 0; j < newSiteSegments.length; j++) {
+        siteSegments.push(
+          translateSegment(
+            scaleSegment(
+              newSiteSegments[j], 
+              tileScale/tileWidth,  
+              tileScale/tileHeight), 
+            origin)
+        );
+      }
+
+      // Use a simple colouring algorithm to pick a colour for this tile
+      // so that adjacent tiles aren't the same colour.  The resulting
+      // value col will be 0, 1, or 2, which you should map to your
+      // three favourite colours.
+      const col = tiling.getColour( i.t1, i.t2, i.aspect );
+    }
+
   }
+
+  function scale(p: Point, sX: number, sY: number){
+    return new Point(p.x * sX, p.y * sY);
+  }
+
+  function scaleSegment(s: SiteSegment, sX: number, sY: number){
+    return new SiteSegment(s.x1 * sX, s.y1 * sY, s.x2 * sX, s.y2 * sY);
+  }
+  
+  function translateSegment(s: SiteSegment, offset: Point): SiteSegment {
+    return new SiteSegment(s.x1 + offset.x, s.y1 + offset.y, s.x2 + offset.x, s.y2 + offset.y);
+  }
+  
+  function translatePoint(p: SitePoint, offset: Point): SitePoint {
+    return new SitePoint(p.x + offset.x, p.y + offset.y);
+  }
+
+  
 
   function updateVoronoi() {
     try {
@@ -165,7 +236,7 @@
 
   function addPoint(event: MouseEvent) {
     sitePoints = [...sitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
-    siteStore.set({ sitePoints: sitePoints, siteSegments: siteSegments });
+    siteStore.set({ sitePoints: sitePoints, siteSegments: siteSegments, tileWidth: tileWidth, tileHeight: tileHeight });
   }
 
   function downloadSVG() {
@@ -328,6 +399,8 @@
   onMount(async () => {
     wasmVoronoi = await instantiate_wasmVoronoi();
     siteStore.subscribe((value: Sites) => {
+      tileWidth = value.tileWidth;
+      tileHeight = value.tileHeight;
       updateTiling(value.sitePoints, value.siteSegments);
       updateVoronoi();
     });
@@ -346,16 +419,17 @@
       // new SiteSegment(100, 100, 100, 200),
       // new SiteSegment(200, 100, 200, 200),
     ];
-    siteStore.set({ sitePoints: sitePoints, siteSegments: siteSegments });
+    siteStore.set({ sitePoints: sitePoints, siteSegments: siteSegments, tileWidth: tileWidth, tileHeight: tileHeight });
   });
+
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <svg
   id="voronoiSvg"
-  width="500"
-  height="300"
+  width="{bbox.xh}"
+  height="{bbox.yh}"
   viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
   xmlns="http://www.w3.org/2000/svg"
   on:click={addPoint}
@@ -363,12 +437,16 @@
   <rect
     x="0"
     y="0"
-    width="500"
-    height="300"
+    width="{bbox.xh}"
+    height="{bbox.yh}"
     stroke="black"
     stroke-width="3"
     fill="rgb(240, 238, 231)"
   />
+  {#each tiles as origin, idx}
+    <circle id="origin {idx}" cx={origin.x} cy={origin.y} r="5" fill="pink"
+    ></circle>
+  {/each}
   {#each voronoiCells as c}
     {#if isCellPathConsistant(c)}
       <path
