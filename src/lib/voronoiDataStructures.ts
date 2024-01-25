@@ -48,7 +48,7 @@ export class SiteSegment {
 export interface Vertex {
     x: number;
     y: number;
-
+    isValid: boolean;
 }
 
 export interface Edge {
@@ -58,6 +58,7 @@ export interface Edge {
     controlPoints: Vertex[];
     isPrimary: boolean;
     isCurved: boolean;
+    isValid: boolean;
 }
 
 export interface Cell {

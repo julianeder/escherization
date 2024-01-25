@@ -22,6 +22,7 @@
   let wasmVoronoi: VoronoiWasmModule;
   let bbox: BBox = { xl: 0, xh: 500, yl: 0, yh: 300 };
 
+  let tiles: any[] = [];
   let sitePoints: SitePoint[] = [];
   let siteSegments: SiteSegment[] = [];
   let voronoiVertices: Vertex[] = [];
@@ -31,6 +32,11 @@
   let showSecondary: boolean = true;
 
   let lastError: any = "";
+
+  function updateTiling(newSitePoints: SitePoint[], newSiteSegments: SiteSegment[]) {
+    sitePoints = newSitePoints;
+    siteSegments = newSiteSegments;
+  }
 
   function updateVoronoi() {
     try {
@@ -61,42 +67,59 @@
       let newVoronoiVertices: Vertex[] = [];
       for (var i = 0; i < result.vertices.size(); i += 2) {
         // console.log("Vert: ", result.vertices.get(i));
+        let valid = true;
+        if (
+          Number.isNaN(result.vertices.get(i)) ||
+          Number.isNaN(result.vertices.get(i + 1))
+        ) {
+          console.log("Vertex NaN " + i);
+          valid = false;
+        }
         newVoronoiVertices.push({
           x: result.vertices.get(i),
           y: result.vertices.get(i + 1),
+          isValid: valid,
         });
       }
 
       let newVoronoiEdges: Edge[] = [];
       for (var i = 0; i < result.edges.size(); i++) {
         let e: EdgeResult = result.edges.get(i);
-        // let samples: Vertex[] = [];
-        // for (var j = 0; j < e.samples.size(); j+=2) {
-        //   samples.push({x: e.samples.get(j), y: e.samples.get(j+1)})
-        // }
         let controlPoints: Vertex[] = [];
-        let valid = true;
         for (var j = 0; j < e.controll_points.size(); j += 2) {
+          let valid = true;
+          if (
+            Number.isNaN(e.controll_points.get(j)) ||
+            Number.isNaN(e.controll_points.get(j + 1))
+          ) {
+            console.log("CP NaN " + i);
+            valid = false;
+          }
           const v: Vertex = {
             x: e.controll_points.get(j),
             y: e.controll_points.get(j + 1),
+            isValid: valid,
           };
-          if (Number.isNaN(v.x) || Number.isNaN(v.y)) {
-            // Sometimes Calculation failes for very short paths -> ignore
-            valid = false;
-            console.warn("Invalid Parabolar (NaN): " + e);
-          }
           controlPoints.push(v);
         }
-        if (!valid) continue;
+
+        let valid = true;
+        if (
+          Number.isNaN(e.x1) || Number.isNaN(e.y1)
+       || Number.isNaN(e.x2) || Number.isNaN(e.y2)
+          ) {
+            console.log("Edge NaN " + i);
+            valid = false;
+          }
 
         newVoronoiEdges.push({
-          va: { x: e.x1, y: e.y1 },
-          vb: { x: e.x2, y: e.y2 },
+          va: { x: e.x1, y: e.y1, isValid: valid },
+          vb: { x: e.x2, y: e.y2, isValid: valid },
           // samples: samples,
           isCurved: e.isCurved,
           controlPoints: controlPoints,
           isPrimary: e.isPrimary,
+          isValid: valid,
         });
       }
 
@@ -104,66 +127,41 @@
       for (var i = 0; i < result.cells.size(); i++) {
         let c: CellResult = result.cells.get(i);
         let newCell: Cell = {
-          sourceIndex: c.sourceIndex, 
-          sourceCategory: c.sourceCategory, 
-          isDegenerate: c.isDegenerate, 
-          containsPoint: c.containsPoint, 
-          containsSegment: c.containsSegment, 
-          edgeIndices: [],           
+          sourceIndex: c.sourceIndex,
+          sourceCategory: c.sourceCategory,
+          isDegenerate: c.isDegenerate,
+          containsPoint: c.containsPoint,
+          containsSegment: c.containsSegment,
+          edgeIndices: [],
         };
         newVoronoiCells.push(newCell);
         for (var j = 0; j < c.edgeIndices.size(); j++) {
           let newIndex: number = c.edgeIndices.get(j);
-          if(newIndex >= newVoronoiEdges.length)
-            console.warn("Index too high " + newIndex + " for cell " + c.sourceIndex);
-          else
-            newCell.edgeIndices.push(newIndex);
+          if (newIndex >= newVoronoiEdges.length)
+            console.warn(
+              "Index too high " +
+                newIndex +
+                " for cell " +
+                c.sourceIndex +
+                " isDegenerate " +
+                c.isDegenerate,
+            );
+          else newCell.edgeIndices.push(newIndex);
         }
         // console.log(newVoronoiCells[newVoronoiCells.length-1]);
       }
 
-      // console.log(newVoronoiEdges)
       voronoiVertices = newVoronoiVertices;
       voronoiEdges = newVoronoiEdges;
       voronoiCells = newVoronoiCells;
 
-      checks();
-
+      // checks();
     } catch (e) {
       lastError = e;
       throw e;
     }
   }
 
-  function checks(){
-    for (var i = voronoiVertices.length-1; i >= 0; i--) {
-      if(Number.isNaN(voronoiVertices[i].x) ||Number.isNaN(voronoiVertices[i].y)){
-        console.log("V NaN " + i);
-        console.log(voronoiVertices[i]);
-        voronoiVertices.splice(i, 1);
-      }
-    }
-
-    for (var i = voronoiEdges.length-1; i >= 0; i--) {
-      if(Number.isNaN(voronoiEdges[i].va.x) ||Number.isNaN(voronoiEdges[i].va.y)){
-        console.log("E NaN " + i);
-        console.log(voronoiEdges[i]);
-        voronoiEdges[i].va.x = 0;
-        voronoiEdges[i].va.y = 0;
-
-      }
-      if(Number.isNaN(voronoiEdges[i].vb.x) ||Number.isNaN(voronoiEdges[i].vb.y)
-      ){
-        console.log("E NaN " + i);
-        console.log(voronoiEdges[i]);
-        voronoiEdges[i].vb.x = 0;
-        voronoiEdges[i].vb.y = 0;
-      }
-    }
-
-    
-    
-  }
 
   function addPoint(event: MouseEvent) {
     sitePoints = [...sitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
@@ -181,82 +179,148 @@
     }
   }
 
-  function isCellPathConsistant(c: Cell): boolean{
-    if(c.edgeIndices.length <= 1)
-      return false;
+  function isCellPathConsistant(c: Cell): boolean {
+    if (c.edgeIndices.length <= 1) return false;
 
-    for(let i: number = 1; i < c.edgeIndices.length - 1; i++){
-      if((voronoiEdges[c.edgeIndices[i-1]].vb.x != voronoiEdges[c.edgeIndices[i]].va.x)
-      || (voronoiEdges[c.edgeIndices[i-1]].vb.y != voronoiEdges[c.edgeIndices[i]].va.y))
+    for (let i: number = 1; i < c.edgeIndices.length - 1; i++) {
+      if (
+        voronoiEdges[c.edgeIndices[i - 1]].vb.x !=
+          voronoiEdges[c.edgeIndices[i]].va.x ||
+        voronoiEdges[c.edgeIndices[i - 1]].vb.y !=
+          voronoiEdges[c.edgeIndices[i]].va.y
+      )
         return false;
     }
 
-    let i = c.edgeIndices.length-1;
-    if((voronoiEdges[c.edgeIndices[i-1]].vb.x != voronoiEdges[c.edgeIndices[i]].va.x)
-      || (voronoiEdges[c.edgeIndices[i-1]].vb.y != voronoiEdges[c.edgeIndices[i]].va.y))
+    let i = c.edgeIndices.length - 1;
+    if (
+      voronoiEdges[c.edgeIndices[i - 1]].vb.x !=
+        voronoiEdges[c.edgeIndices[i]].va.x ||
+      voronoiEdges[c.edgeIndices[i - 1]].vb.y !=
+        voronoiEdges[c.edgeIndices[i]].va.y
+    )
       return false;
 
     // close loop
-    if((voronoiEdges[c.edgeIndices[i]].vb.x != voronoiEdges[c.edgeIndices[0]].va.x)
-      || (voronoiEdges[c.edgeIndices[i]].vb.y != voronoiEdges[c.edgeIndices[0]].va.y))
+    if (
+      voronoiEdges[c.edgeIndices[i]].vb.x !=
+        voronoiEdges[c.edgeIndices[0]].va.x ||
+      voronoiEdges[c.edgeIndices[i]].vb.y != voronoiEdges[c.edgeIndices[0]].va.y
+    )
       return false;
 
-      return true;
+    return true;
   }
 
-  function getCellPath(c: Cell): string{
+  function getCellPath(c: Cell): string {
     // console.log("Cell " + c.sourceIndex);
     let e: Edge = voronoiEdges[c.edgeIndices[0]];
 
     let d: string;
-    if(e.isCurved){
-      d = "M " + e.controlPoints[0].x + " " + e.controlPoints[0].y 
-        + "Q " + e.controlPoints[1].x + " " + e.controlPoints[1].y + " " + e.controlPoints[2].x + " " + e.controlPoints[2].y + " ";
-    }else{
-      d = "M " + voronoiEdges[c.edgeIndices[0]].va.x + ' ' + voronoiEdges[c.edgeIndices[0]].va.y + " ";
+    if (e.isCurved) {
+      d =
+        "M " +
+        e.controlPoints[0].x +
+        " " +
+        e.controlPoints[0].y +
+        "Q " +
+        e.controlPoints[1].x +
+        " " +
+        e.controlPoints[1].y +
+        " " +
+        e.controlPoints[2].x +
+        " " +
+        e.controlPoints[2].y +
+        " ";
+    } else {
+      d =
+        "M " +
+        voronoiEdges[c.edgeIndices[0]].va.x +
+        " " +
+        voronoiEdges[c.edgeIndices[0]].va.y +
+        " ";
     }
-    
-    // console.log("(" + voronoiEdges[c.edgeIndices[0]].va.x + ' ' + voronoiEdges[c.edgeIndices[0]].va.y + ") (" 
+
+    // console.log("(" + voronoiEdges[c.edgeIndices[0]].va.x + ' ' + voronoiEdges[c.edgeIndices[0]].va.y + ") ("
     //                 + voronoiEdges[c.edgeIndices[0]].vb.x + ' ' + voronoiEdges[c.edgeIndices[0]].vb.y + ")");
 
-    for(let i: number = 1; i < c.edgeIndices.length; i++){
+    for (let i: number = 1; i < c.edgeIndices.length; i++) {
       let e: Edge = voronoiEdges[c.edgeIndices[i]];
-      let eprev: Edge = voronoiEdges[c.edgeIndices[i-1]];
+      let eprev: Edge = voronoiEdges[c.edgeIndices[i - 1]];
 
-      if(e.isCurved){
-        d = d + "L " + e.controlPoints[0].x + " " + e.controlPoints[0].y 
-              + "Q " + e.controlPoints[1].x + " " + e.controlPoints[1].y + " " + e.controlPoints[2].x + " " + e.controlPoints[2].y + " ";
-      }else{
+      if (e.isCurved) {
+        d =
+          d +
+          "L " +
+          e.controlPoints[0].x +
+          " " +
+          e.controlPoints[0].y +
+          "Q " +
+          e.controlPoints[1].x +
+          " " +
+          e.controlPoints[1].y +
+          " " +
+          e.controlPoints[2].x +
+          " " +
+          e.controlPoints[2].y +
+          " ";
+      } else {
         d = d + "L " + e.va.x + " " + e.va.y + " ";
-        // console.log("(" + e.va.x + ' ' + e.va.y + ") (" 
+        // console.log("(" + e.va.x + ' ' + e.va.y + ") ("
         //               + e.vb.x + ' ' + e.vb.y + ")");
       }
-      
 
-      if((eprev.vb.x != e.va.x)
-      || (eprev.vb.y != e.va.y))
-        console.log("Inconsistent: (" + eprev.vb.x + " " + eprev.vb.y + ") (" + e.va.x + " " + e.va.y + ")");
+      if (eprev.vb.x != e.va.x || eprev.vb.y != e.va.y)
+        console.log(
+          "Inconsistent: (" +
+            eprev.vb.x +
+            " " +
+            eprev.vb.y +
+            ") (" +
+            e.va.x +
+            " " +
+            e.va.y +
+            ")",
+        );
     }
-    let i = c.edgeIndices.length-1;
+    let i = c.edgeIndices.length - 1;
     e = voronoiEdges[c.edgeIndices[i]];
-    let eprev: Edge = voronoiEdges[c.edgeIndices[i-1]];
+    let eprev: Edge = voronoiEdges[c.edgeIndices[i - 1]];
 
-    if(!eprev.isCurved){
+    if (!eprev.isCurved) {
       d = d + "L " + e.vb.x + " " + e.vb.y + " ";
-      // console.log("(" + e.va.x + ' ' + e.va.y + ") (" 
+      // console.log("(" + e.va.x + ' ' + e.va.y + ") ("
       //                 + e.vb.x + ' ' + e.vb.y + ")");
-
     }
 
-    if((eprev.vb.x != e.va.x)
-      || (eprev.vb.y != e.va.y))
-        console.log("Inconsistent: (" + eprev.vb.x + " " + eprev.vb.y + ") (" + e.va.x + " " + e.va.y + ")");
+    if (eprev.vb.x != e.va.x || eprev.vb.y != e.va.y)
+      console.log(
+        "Inconsistent: (" +
+          eprev.vb.x +
+          " " +
+          eprev.vb.y +
+          ") (" +
+          e.va.x +
+          " " +
+          e.va.y +
+          ")",
+      );
 
-    if((e.vb.x != voronoiEdges[c.edgeIndices[0]].va.x)
-      || (e.vb.y != voronoiEdges[c.edgeIndices[0]].va.y))
-        console.log("Inconsistent: (" + e.vb.x + " " + e.vb.y + ") (" + voronoiEdges[c.edgeIndices[0]].va.x + " " + voronoiEdges[c.edgeIndices[0]].va.y + ")");
-
-
+    if (
+      e.vb.x != voronoiEdges[c.edgeIndices[0]].va.x ||
+      e.vb.y != voronoiEdges[c.edgeIndices[0]].va.y
+    )
+      console.log(
+        "Inconsistent: (" +
+          e.vb.x +
+          " " +
+          e.vb.y +
+          ") (" +
+          voronoiEdges[c.edgeIndices[0]].va.x +
+          " " +
+          voronoiEdges[c.edgeIndices[0]].va.y +
+          ")",
+      );
 
     return d;
   }
@@ -264,18 +328,16 @@
   onMount(async () => {
     wasmVoronoi = await instantiate_wasmVoronoi();
     siteStore.subscribe((value: Sites) => {
-      sitePoints = value.sitePoints;
-      siteSegments = value.siteSegments;
+      updateTiling(value.sitePoints, value.siteSegments);
       updateVoronoi();
     });
     sitePoints = [
       new SitePoint(100, 50),
-      new SitePoint(300, 50), 
-      new SitePoint(100, 250), 
-      new SitePoint(300, 250), 
-      new SitePoint(200, 150), 
-
-    ]; 
+      new SitePoint(300, 50),
+      new SitePoint(100, 250),
+      new SitePoint(300, 250),
+      new SitePoint(200, 150),
+    ];
     siteSegments = [
       // new SiteSegment(2, 2, 498, 2),
       // new SiteSegment(498, 2, 498, 298),
@@ -310,22 +372,17 @@
   {#each voronoiCells as c}
     {#if isCellPathConsistant(c)}
       <path
-      id="cell {c.sourceIndex}"
-      d={getCellPath(c)}
-      stroke="black"
-      stroke-width="0"
-      fill="red"
-    ></path>
+        id="cell {c.sourceIndex}"
+        d={getCellPath(c)}
+        stroke="black"
+        stroke-width="0"
+        fill="red"
+      ></path>
     {/if}
   {/each}
   {#each sitePoints as siteP, idx}
-    <circle 
-      id="point {idx}"
-      cx={siteP.x} 
-      cy={siteP.y} 
-      r="2" 
-      fill="black"></circle
-    >
+    <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="black"
+    ></circle>
   {/each}
   {#each siteSegments as siteS, idx}
     <path
@@ -335,45 +392,51 @@
       stroke-width="1"
       fill="none"
     ></path>
-    <circle 
+    <circle
       id="segment {idx + sitePoints.length}"
-      cx={siteS.x1} cy={siteS.y1} r="2" fill="black"></circle
-    >
-    <circle 
+      cx={siteS.x1}
+      cy={siteS.y1}
+      r="2"
+      fill="black"
+    ></circle>
+    <circle
       id="segment {idx + sitePoints.length}"
-      cx={siteS.x2} cy={siteS.y2} r="2" fill="black"></circle
-    >
+      cx={siteS.x2}
+      cy={siteS.y2}
+      r="2"
+      fill="black"
+    ></circle>
   {/each}
   {#each voronoiEdges as e, idx}
-    <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
-    <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
-    {#if e.isCurved}
-      <path
-        d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e.controlPoints[1]
-          .x} {e.controlPoints[1].y} {e.controlPoints[2].x} {e.controlPoints[2]
-          .y}"
-        stroke="blue"
-        stroke-width="1"
-        fill="none"
-      ></path>
-    {:else if e.isPrimary}
-      <path
-        d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-        stroke="blue"
-        stroke-width="1"
-        fill="none"
-      ></path>
-    {:else if showSecondary}
-      <path
-        d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-        stroke="green"
-        stroke-width="1"
-        fill="none"
-      ></path>
+    {#if e.isValid}
+      <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
+      <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
+      {#if e.isCurved}
+        <path
+          d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
+            .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
+            .x} {e.controlPoints[2].y}"
+          stroke="blue"
+          stroke-width="1"
+          fill="none"
+        ></path>
+      {:else if e.isPrimary}
+        <path
+          d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+          stroke="blue"
+          stroke-width="1"
+          fill="none"
+        ></path>
+      {:else if showSecondary}
+        <path
+          d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+          stroke="green"
+          stroke-width="1"
+          fill="none"
+        ></path>
+      {/if}
     {/if}
   {/each}
-
-
 </svg>
 <button
   class="fileButton"

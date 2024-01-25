@@ -257,7 +257,7 @@
             //     + thinImag[fromXY(x-1, y  )] + ' ' // 
             // );
 
-            if(C1 || C2 || C3 || C4){
+            if(C1 || C2 || C3 || C4){ //Crossing
                 thinImagRGB.push(255);
                 thinImagRGB.push(0);
                 thinImagRGB.push(255);
@@ -265,7 +265,7 @@
                 thinImag[i] = 2;
                 crossings.push(new SitePoint(x,y));
             }
-            else if(e && END){
+            else if(e && END){ //End
                 thinImagRGB.push(255);
                 thinImagRGB.push(255);
                 thinImagRGB.push(0);
@@ -273,13 +273,13 @@
                 thinImag[i] = 3;
                 ends.push(new SitePoint(x,y));
             }
-            else if(e){
+            else if(e){ //Line
                 thinImagRGB.push(0);
                 thinImagRGB.push(0);
                 thinImagRGB.push(255);
                 thinImagRGB.push(255);
             }
-            else{
+            else{ //Background
                 thinImagRGB.push(imageData.data[j]);
                 thinImagRGB.push(imageData.data[j+1]);
                 thinImagRGB.push(imageData.data[j+2]);
@@ -302,7 +302,6 @@
         segemntsFromTreeRec(n, ss);
         siteSegments = ss; // Trigger Reactive Update 
         siteStore.set({sitePoints: [], siteSegments: [...baseSiteSegments, ...ss]})
-        
         
     };
 
