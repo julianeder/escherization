@@ -65,6 +65,14 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+.fileButton {
+  height: 50px;
+  width: 200px;
+  cursor: pointer;
+  background-color: #9af4fa;
+  margin: 5px;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

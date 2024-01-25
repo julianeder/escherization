@@ -28,11 +28,11 @@
     let svgStr: string = '';
     
     let siteSegments: Array<SiteSegment> = []; // local copy of Segments for visualization as svg
-    const baseSiteSegments = [
-      new SiteSegment(10, 10, 490, 10), 
-      new SiteSegment(490, 10, 490, 290),
-      new SiteSegment(490, 290, 10, 290),
-      new SiteSegment(10, 290, 10, 10),
+    const baseSiteSegments: SiteSegment[] = [
+    //   new SiteSegment(2, 2, 498, 2),
+    //   new SiteSegment(498, 2, 498, 298),
+    //   new SiteSegment(498, 298, 2, 298),
+    //   new SiteSegment(2, 298, 2, 2),
     ];
 
     const onFileSelected = (e: any) => {
@@ -574,19 +574,19 @@
         />
     </div>
     <button
-        class='upload'
+        class='fileButton'
         on:click={() => {
             fileinput.click();
         }}>Upload Image</button
     >
     <button
-        class='upload'
+        class='fileButton'
         on:click={() => {
             downloadCanvasImage();
         }}>Download Image</button
     >
     <button
-        class='upload'
+        class='fileButton'
         on:click={() => {
             downloadSVG();
         }}>Download SVG</button
@@ -606,13 +606,6 @@
         align-items: center;
         justify-content: center;
         flex-flow: column;
-    }
-    .upload {
-        height: 50px;
-        width: 200px;
-        cursor: pointer;
-        background-color: #9af4fa;
-        margin: 5px;
     }
     .drawingContainer {
         position: relative;

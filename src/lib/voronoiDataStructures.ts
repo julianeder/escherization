@@ -54,8 +54,18 @@ export interface Vertex {
 export interface Edge {
     va: Vertex;
     vb: Vertex;
-    samples: Vertex[];
+    // samples: Vertex[];
     controlPoints: Vertex[];
     isPrimary: boolean;
+    isCurved: boolean;
+}
+
+export interface Cell {
+    sourceIndex: number;
+    sourceCategory: number;
+    isDegenerate: boolean;
+    containsPoint: boolean;
+    containsSegment: boolean;
+    edgeIndices: number[];
 }
 

@@ -103,6 +103,16 @@ struct segment_traits<Segment> {
 // #define EXTERN
 // #endif
 
+
+struct CellResult {
+  size_t source_index;
+  int source_category;
+  bool is_degenerate;
+  bool contains_point;
+  bool contains_segment;
+  std::vector<int> edge_indices;
+};
+
 struct EdgeResult {
   double x1;
   double y1;
@@ -111,12 +121,14 @@ struct EdgeResult {
   bool isFinite;
   bool isCurved;
   bool isPrimary;
-  std::vector<double> samples;
+  const voronoi_diagram<double>::edge_type* edge_ref; // not for javascript
+  // std::vector<double> samples;
   std::vector<double> controll_points;
 };
 struct DiagrammResult {
   std::vector<double> vertices;
   std::vector<EdgeResult> edges;
+  std::vector<CellResult> cells;
   int numVerticies;
 };
 
@@ -242,27 +254,27 @@ void calc_control_points(
 
 }
 
-void sample_curved_edge(
-    const edge_type& edge,
-    std::vector<point_type>* sampled_edge,
-    std::vector<point_type>* control_points,
-    std::vector<point_type> pointSites,
-    std::vector<segment_type> lineSites,
-    std::vector<double> bbox)
-{
-  double xl = bbox[0];
-  double xh = bbox[2];
-  coordinate_type max_dist = 1E-3 * (xh - xl);
-  point_type point = edge.cell()->contains_point() ?
-      retrieve_point(*edge.cell(), pointSites, lineSites) :
-      retrieve_point(*edge.twin()->cell(), pointSites, lineSites);
-  segment_type segment = edge.cell()->contains_point() ?
-      retrieve_segment(*edge.twin()->cell(), pointSites, lineSites) :
-      retrieve_segment(*edge.cell(), pointSites, lineSites);
-  voronoi_visual_utils<coordinate_type>::discretize(
-      point, segment, max_dist, sampled_edge, bbox);
-  calc_control_points(point, segment, control_points);
-}
+// void sample_curved_edge(
+//     const edge_type& edge,
+//     std::vector<point_type>* sampled_edge,
+//     std::vector<point_type>* control_points,
+//     std::vector<point_type> pointSites,
+//     std::vector<segment_type> lineSites,
+//     std::vector<double> bbox)
+// {
+//   double xl = bbox[0];
+//   double xh = bbox[2];
+//   coordinate_type max_dist = 1E-3 * (xh - xl);
+//   point_type point = edge.cell()->contains_point() ?
+//       retrieve_point(*edge.cell(), pointSites, lineSites) :
+//       retrieve_point(*edge.twin()->cell(), pointSites, lineSites);
+//   segment_type segment = edge.cell()->contains_point() ?
+//       retrieve_segment(*edge.twin()->cell(), pointSites, lineSites) :
+//       retrieve_segment(*edge.cell(), pointSites, lineSites);
+//   voronoi_visual_utils<coordinate_type>::discretize(
+//       point, segment, max_dist, sampled_edge, bbox);
+//   calc_control_points(point, segment, control_points);
+// }
 
 void createVertex(
   const voronoi_diagram<double>::edge_type& edge,
@@ -294,7 +306,7 @@ bool clip_add_finite_edge(
   std::vector<double> bbox
   ) {
 
-  std::vector<point_type> samples_;
+  // std::vector<point_type> samples_;
   std::vector<point_type> controll_points_;
   double xl = bbox[0];
   double xh = bbox[2];
@@ -408,17 +420,24 @@ bool clip_add_finite_edge(
   //   edgeResult->y2);
 
   if (edge.is_curved()) { // only finite edges can be curved
-    samples_.push_back(point_type(edgeResult->x1, edgeResult->y1));
-    samples_.push_back(point_type(edgeResult->x2, edgeResult->y2));    
+    // samples_.push_back(point_type(edgeResult->x1, edgeResult->y1));
+    // samples_.push_back(point_type(edgeResult->x2, edgeResult->y2));    
     controll_points_.push_back(point_type(edgeResult->x1, edgeResult->y1));
     controll_points_.push_back(point_type(edgeResult->x2, edgeResult->y2));
-    sample_curved_edge(edge, &samples_, &controll_points_, pointSites, lineSites, bbox);
+    point_type point = edge.cell()->contains_point() ?
+      retrieve_point(*edge.cell(), pointSites, lineSites) :
+      retrieve_point(*edge.twin()->cell(), pointSites, lineSites);
+    segment_type segment = edge.cell()->contains_point() ?
+      retrieve_segment(*edge.twin()->cell(), pointSites, lineSites) :
+      retrieve_segment(*edge.cell(), pointSites, lineSites);
+    calc_control_points(point, segment, &controll_points_);
+    // sample_curved_edge(edge, &samples_, &controll_points_, pointSites, lineSites, bbox);
   }
-  for (size_t i = 0; i < samples_.size(); i++)
-  {
-    edgeResult->samples.push_back(samples_[i].x());
-    edgeResult->samples.push_back(samples_[i].y());
-  }
+  // for (size_t i = 0; i < samples_.size(); i++)
+  // {
+  //   edgeResult->samples.push_back(samples_[i].x());
+  //   edgeResult->samples.push_back(samples_[i].y());
+  // }
   for (size_t i = 0; i < controll_points_.size(); i++)
   {
     edgeResult->controll_points.push_back(controll_points_[i].x());
@@ -580,8 +599,6 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
   std::vector<point_type> pointSites;
   std::vector<segment_type> lineSites;
 
-  printf("A");
-
   // printf("size %zu \n",
   //         points.size());
   for (size_t i = 0; i < points.size(); i += 2)
@@ -592,14 +609,12 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
       //     pointSites[i/2].x(),
       //     pointSites[i/2].y());
   }
-  printf("B");
 
   for (size_t i = 0; i < segments.size(); i += 4)
   {
       lineSites.push_back(segment_type(point_type(segments[i], segments[i+1]), point_type(segments[i+2], segments[i+3])));
   }
 
-  printf("C");
 
   // Construction of the Voronoi Diagram.
   voronoi_diagram<double> vd;
@@ -611,28 +626,31 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
 
   std::vector<const voronoi_diagram<double>::edge_type*> processed; // to Avoid Duplicates 
 
-  printf("D");
+  // printf("num_edges: %zu \n", vd.num_edges());
 
   for (voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin(); it != vd.edges().end(); ++it) {
     const voronoi_diagram<double>::edge_type* edge = &(*it);
     
     // Avoid Duplicates if we have rendered the twin half-edge (which is the same in the other direction) already
-    bool found = false;
-    for (std::vector<const voronoi_diagram<double>::edge_type*>::iterator it2 = processed.begin(); it2 != processed.end(); ++it2) {
-      if((*it2) == edge->twin())
-        found = true;
-    }
-    if(found) {
-      continue;
-    }
+    // bool found = false;
+    // for (std::vector<const voronoi_diagram<double>::edge_type*>::iterator it2 = processed.begin(); it2 != processed.end(); ++it2) {
+    //   if((*it2) == edge->twin())
+    //     found = true;
+    // }
+    // if(found) {
+    //   continue;
+    // }
+
     // we only add the edge to processed at the end if it was not cliped (because cliping removes some halfEdges that are not cliped from the other side)
 
     EdgeResult edgeResult;
+    
+    edgeResult.edge_ref = edge;
 
     edgeResult.isFinite = edge->is_finite();
     edgeResult.isPrimary = edge->is_primary();
     edgeResult.isCurved = edge->is_curved();
-
+  
     bool added = false;
     if(edge->is_finite()){
       added = clip_add_finite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox);
@@ -643,9 +661,7 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
     if(added){
       processed.push_back(edge);
     }
-
   }
-  printf("E");
 
   result.numVerticies = vd.num_vertices();
   for (voronoi_diagram<double>::const_vertex_iterator it = vd.vertices().begin(); it != vd.vertices().end(); ++it) {
@@ -653,7 +669,56 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
     result.vertices.push_back(vertex.x());
     result.vertices.push_back(vertex.y());
   }
-  printf("F");
+
+  for (voronoi_diagram<double>::const_cell_iterator it = vd.cells().begin(); it != vd.cells().end(); ++it) {
+    const voronoi_diagram<double>::cell_type& cell = *it;
+
+    CellResult cellResult;
+
+    cellResult.source_index = cell.source_index();
+    switch(cell.source_category()){
+        case boost::polygon::SOURCE_CATEGORY_SINGLE_POINT:
+          cellResult.source_category = 0;
+          break;
+        case boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT:
+          cellResult.source_category = 1;
+          break;
+        case boost::polygon::SOURCE_CATEGORY_SEGMENT_END_POINT:
+          cellResult.source_category = 2;
+          break;
+
+        // Segment subtypes.
+        case boost::polygon::SOURCE_CATEGORY_INITIAL_SEGMENT:
+          cellResult.source_category = 3;
+          break;
+        case boost::polygon::SOURCE_CATEGORY_REVERSE_SEGMENT:
+          cellResult.source_category = 4;
+          break;
+        case boost::polygon::SOURCE_CATEGORY_GEOMETRY_SHIFT:
+          cellResult.source_category = 5;
+          break;
+        case boost::polygon::SOURCE_CATEGORY_BITMASK:
+          cellResult.source_category = 6;
+          break;
+    }
+
+    cellResult.is_degenerate = cell.is_degenerate();
+    cellResult.contains_point = cell.contains_point();
+    cellResult.contains_segment = cell.contains_segment();
+    
+    const voronoi_diagram<double>::edge_type* edge = cell.incident_edge();
+    do {
+      for (int i = 0; i < result.edges.size(); i++){
+        // if(result.edges[i].edge_ref == edge || result.edges[i].edge_ref == edge->twin()){
+        if(result.edges[i].edge_ref == edge){
+          cellResult.edge_indices.push_back(i);
+        }
+      }
+      edge = edge->next();
+    } while (edge != cell.incident_edge());
+
+    result.cells.push_back(cellResult);
+  }
 
   return result;
 }
@@ -664,6 +729,16 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
   register_vector<int>("VectorInt");
   register_vector<double>("VectorDouble");
   register_vector<EdgeResult>("VectorEdgeResult");
+  register_vector<CellResult>("VectorCellResult");
+  
+  value_object<CellResult>("CellResult")
+    .field("sourceIndex", &CellResult::source_index)
+    .field("sourceCategory", &CellResult::source_category)
+    .field("isDegenerate", &CellResult::is_degenerate)
+    .field("containsPoint", &CellResult::contains_point)
+    .field("containsSegment", &CellResult::contains_segment)
+    .field("edgeIndices", &CellResult::edge_indices)
+    ;
 
   value_object<EdgeResult>("EdgeResult")
     .field("x1", &EdgeResult::x1)
@@ -673,13 +748,14 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
     .field("isFinite", &EdgeResult::isFinite)
     .field("isCurved", &EdgeResult::isCurved)
     .field("isPrimary", &EdgeResult::isPrimary)
-    .field("samples", &EdgeResult::samples)
+    // .field("samples", &EdgeResult::samples)
     .field("controll_points", &EdgeResult::controll_points)
     ;
 
   value_object<DiagrammResult>("DiagrammResult")
     .field("vertices", &DiagrammResult::vertices)
     .field("edges", &DiagrammResult::edges)
+    .field("cells", &DiagrammResult::cells)
     .field("numVerticies", &DiagrammResult::numVerticies)
     ;
 

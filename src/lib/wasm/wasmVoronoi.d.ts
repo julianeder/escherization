@@ -25,10 +25,29 @@ export interface VectorEdgeResult {
   delete(): void;
 }
 
+export interface VectorCellResult {
+  size(): number;
+  push_back(_0: CellResult): void;
+  resize(_0: number, _1: CellResult): void;
+  set(_0: number, _1: CellResult): boolean;
+  get(_0: number): any;
+  delete(): void;
+}
+
 export type DiagrammResult = {
   vertices: VectorDouble,
   edges: VectorEdgeResult,
+  cells: VectorCellResult,
   numVerticies: number
+};
+
+export type CellResult = {
+  sourceIndex: number,
+  sourceCategory: number,
+  isDegenerate: boolean,
+  containsPoint: boolean,
+  containsSegment: boolean,
+  edgeIndices: VectorInt
 };
 
 export type EdgeResult = {
@@ -39,7 +58,6 @@ export type EdgeResult = {
   isFinite: boolean,
   isCurved: boolean,
   isPrimary: boolean,
-  samples: VectorDouble,
   controll_points: VectorDouble
 };
 
@@ -47,6 +65,7 @@ export interface VoronoiWasmModule {
   VectorInt: {new(): VectorInt};
   VectorDouble: {new(): VectorDouble};
   VectorEdgeResult: {new(): VectorEdgeResult};
+  VectorCellResult: {new(): VectorCellResult};
   computevoronoi(_0: VectorDouble, _1: VectorInt, _2: VectorInt): DiagrammResult;
 }
 export default function instantiate_wasmVoronoi(mod?: any): Promise<VoronoiWasmModule>; 
