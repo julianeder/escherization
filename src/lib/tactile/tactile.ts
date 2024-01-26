@@ -6,7 +6,12 @@
  * file "LICENSE" for more information.
  */
 
+import { SitePoint, SiteSegment } from "../voronoiDataStructures";
+
 export class Point{
+    minus(rhs: Point): Point {
+        return new Point(this.x-rhs.x, this.y-rhs.y);
+    }
 	x: number = 0;
 	y: number = 0;
 
@@ -42,9 +47,22 @@ export function mul( A:number[], B: number[] ): number[]
 export function mulPoint( A:number[], B:Point ): Point
 {
 		// Matrix * Point
-		return { 
-			x : A[0]*B.x + A[1]*B.y + A[2],
-			y : A[3]*B.x + A[4]*B.y + A[5] };
+		return new SitePoint( 
+			A[0]*B.x + A[1]*B.y + A[2],
+			A[3]*B.x + A[4]*B.y + A[5] 
+		);
+
+};
+
+export function mulSegment( A:number[], B:SiteSegment ): SiteSegment
+{
+		// Matrix * Point
+		return new SiteSegment( 
+			A[0]*B.x1 + A[1]*B.y1 + A[2],
+			A[3]*B.x1 + A[4]*B.y1 + A[5],
+			A[0]*B.x2 + A[1]*B.y2 + A[2],
+			A[3]*B.x2 + A[4]*B.y2 + A[5],
+		);
 
 };
 

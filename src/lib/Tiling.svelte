@@ -16,7 +16,7 @@
     type DiagrammResult,
     type CellResult,
   } from "../lib/wasm/wasmVoronoi";
-    import { IsohedralTiling, Point, mulPoint } from "./tactile/tactile";
+  import { IsohedralTiling, Point, mulPoint, mulSegment } from "./tactile/tactile";
 
   export let siteStore: Writable<Sites>;
 
@@ -24,8 +24,11 @@
   let bbox: BBox = { xl: 0, xh: 500, yl: 0, yh: 500 };
 
   let tiles: Point[] = [];
-  let sitePoints: SitePoint[] = [];
-  let siteSegments: SiteSegment[] = [];
+  let tileSitePoints: SitePoint[] = [];
+  let tileSiteSegments: SiteSegment[] = [];
+
+  let tilingSitePoints: SitePoint[] = [];
+  let tilingSiteSegments: SiteSegment[] = [];
   let tileWidth: number = 300;
   let tileHeight: number = 300;
   let voronoiVertices: Vertex[] = [];
@@ -36,10 +39,45 @@
 
   let lastError: any = "";
 
+  const symGroups: Record<string, any> = {
+    "1":  "p1",    
+    "2":  "pg",    
+    "4":  "p2",    
+    "5":  "pgg",   
+    "7":  "p3",    
+    "11":  "p6",    
+    "12":  "cm",    
+    "13":  "pmg",   
+    "16":  "p31m",  
+    // "19":  "p3m1", // only marked tilings 
+    "26":  "cmm",   
+    "28":  "p4",    
+    "37":  "p6m",   
+    "42":  "pm",    
+    "56":  "p4g",   
+    "72":  "pmm",   
+    "76":  "p4m",   
+  };
 
+  const availableTilings: string[] = Object.keys(symGroups);
+  let tilingIdx = 0;
 
-  function updateTiling(newSitePoints: SitePoint[], newSiteSegments: SiteSegment[]) {
-    console.log("updateTiling " + tileWidth + "x" + tileHeight + " l " + newSitePoints.length + " / " + newSiteSegments.length);
+    function update(){
+      updateTiling();
+      updateVoronoi();
+    }
+
+  function updateTiling() {
+    console.log(
+      "updateTiling " +
+        tileWidth +
+        "x" +
+        tileHeight +
+        " l " +
+        tileSitePoints.length +
+        " / " +
+        tileSiteSegments.length,
+    );
 
     let tileScale: number = 100;
     // for (var i = 0; i < newSitePoints.length; i ++) {
@@ -49,36 +87,59 @@
     //   newSiteSegments[i] = scaleSegment(newSiteSegments[i], tileScale/tileWidth,  tileScale/tileHeight);
     // }
 
+    let tileCenter = new Point(tileWidth / 2, tileHeight / 2);
+
     tiles = [];
-    sitePoints = [];
-    siteSegments = [];
-    let tiling: IsohedralTiling = new IsohedralTiling(76);
-    for(let i of tiling.fillRegionBounds(bbox.xl / tileScale, bbox.yl / tileScale, bbox.xh / tileScale, bbox.yh / tileScale)){
+    tilingSitePoints = [];
+    tilingSiteSegments = [];
+    let tiling: IsohedralTiling = new IsohedralTiling(Number(availableTilings[tilingIdx]));
+    for (let i of tiling.fillRegionBounds(
+      bbox.xl / tileScale,
+      bbox.yl / tileScale,
+      bbox.xh / tileScale,
+      bbox.yh / tileScale,
+    )) {
       // Get the 3x3 matrix corresponding to one of the transformed
       // tiles in the filled region.
-      const T = i.T;
+      const M = i.T;
+      // console.log(
+      //   M[0] + " " + M[1] + " " + M[2] + "\n"
+      // + M[3] + " " + M[4] + " " + M[5] + "\n"
+      // + 0 + " " + 0 + " " + 0 + "\n"
+      // );
 
-      let origin = scale(mulPoint(T, new Point(0,0)), tileScale, tileScale);
+      let origin = scale(mulPoint(M, new Point(0, 0)), tileScale, tileScale);
       tiles.push(origin);
 
-      for (var j = 0; j < newSitePoints.length; j++) {
-        sitePoints.push(
-          translatePoint(
-            scale(newSitePoints[j], 
-            tileScale/tileWidth,  
-            tileScale/tileHeight),
-            origin)
+      for (var j = 0; j < tileSitePoints.length; j++) {
+        tilingSitePoints.push(
+          
+        scale(mulPoint(M, scale(tileSitePoints[j], 1/tileWidth, 1/tileHeight)), tileScale, tileScale)
+
+
+          // translatePoint(
+          //   scale(
+          //     tileSitePoints[j],
+          //     tileScale / tileWidth,
+          //     tileScale / tileHeight,
+          //   ),
+          //   origin.minus(tileCenter),
+          // )
         );
       }
 
-      for (var j = 0; j < newSiteSegments.length; j++) {
-        siteSegments.push(
-          translateSegment(
-            scaleSegment(
-              newSiteSegments[j], 
-              tileScale/tileWidth,  
-              tileScale/tileHeight), 
-            origin)
+      for (var j = 0; j < tileSiteSegments.length; j++) {
+        tilingSiteSegments.push(
+          scaleSegment(mulSegment(M, scaleSegment(tileSiteSegments[j], 1/tileWidth, 1/tileHeight)), tileScale, tileScale)
+
+          // translateSegment(
+          //   scaleSegment(
+          //     tileSiteSegments[j],
+          //     tileScale / tileWidth,
+          //     tileScale / tileHeight,
+          //   ),
+          //   origin.minus(tileCenter),
+          // )
         );
       }
 
@@ -86,28 +147,30 @@
       // so that adjacent tiles aren't the same colour.  The resulting
       // value col will be 0, 1, or 2, which you should map to your
       // three favourite colours.
-      const col = tiling.getColour( i.t1, i.t2, i.aspect );
+      const col = tiling.getColour(i.t1, i.t2, i.aspect);
     }
-
   }
 
-  function scale(p: Point, sX: number, sY: number){
+  function scale(p: Point, sX: number, sY: number) {
     return new Point(p.x * sX, p.y * sY);
   }
 
-  function scaleSegment(s: SiteSegment, sX: number, sY: number){
+  function scaleSegment(s: SiteSegment, sX: number, sY: number) {
     return new SiteSegment(s.x1 * sX, s.y1 * sY, s.x2 * sX, s.y2 * sY);
   }
-  
+
   function translateSegment(s: SiteSegment, offset: Point): SiteSegment {
-    return new SiteSegment(s.x1 + offset.x, s.y1 + offset.y, s.x2 + offset.x, s.y2 + offset.y);
+    return new SiteSegment(
+      s.x1 + offset.x,
+      s.y1 + offset.y,
+      s.x2 + offset.x,
+      s.y2 + offset.y,
+    );
   }
-  
+
   function translatePoint(p: SitePoint, offset: Point): SitePoint {
     return new SitePoint(p.x + offset.x, p.y + offset.y);
   }
-
-  
 
   function updateVoronoi() {
     try {
@@ -118,12 +181,12 @@
       bboxVector.push_back(bbox.yh);
 
       const pointVector = new wasmVoronoi.VectorInt();
-      sitePoints.forEach((sp) => {
+      tilingSitePoints.forEach((sp) => {
         pointVector.push_back(sp.x);
         pointVector.push_back(sp.y);
       });
       const segmentVector = new wasmVoronoi.VectorInt();
-      siteSegments.forEach((ss) => {
+      tilingSiteSegments.forEach((ss) => {
         segmentVector.push_back(ss.x1);
         segmentVector.push_back(ss.y1);
         segmentVector.push_back(ss.x2);
@@ -176,12 +239,14 @@
 
         let valid = true;
         if (
-          Number.isNaN(e.x1) || Number.isNaN(e.y1)
-       || Number.isNaN(e.x2) || Number.isNaN(e.y2)
-          ) {
-            console.log("Edge NaN " + i);
-            valid = false;
-          }
+          Number.isNaN(e.x1) ||
+          Number.isNaN(e.y1) ||
+          Number.isNaN(e.x2) ||
+          Number.isNaN(e.y2)
+        ) {
+          console.log("Edge NaN " + i);
+          valid = false;
+        }
 
         newVoronoiEdges.push({
           va: { x: e.x1, y: e.y1, isValid: valid },
@@ -233,10 +298,14 @@
     }
   }
 
-
   function addPoint(event: MouseEvent) {
-    sitePoints = [...sitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
-    siteStore.set({ sitePoints: sitePoints, siteSegments: siteSegments, tileWidth: tileWidth, tileHeight: tileHeight });
+    tilingSitePoints = [...tilingSitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
+    siteStore.set({
+      sitePoints: tilingSitePoints,
+      siteSegments: tilingSiteSegments,
+      tileWidth: tileWidth,
+      tileHeight: tileHeight,
+    });
   }
 
   function downloadSVG() {
@@ -401,17 +470,18 @@
     siteStore.subscribe((value: Sites) => {
       tileWidth = value.tileWidth;
       tileHeight = value.tileHeight;
-      updateTiling(value.sitePoints, value.siteSegments);
-      updateVoronoi();
+      tileSitePoints = value.sitePoints; 
+      tileSiteSegments = value.siteSegments; 
+      update();
     });
-    sitePoints = [
+    tilingSitePoints = [
       new SitePoint(100, 50),
       new SitePoint(300, 50),
       new SitePoint(100, 250),
       new SitePoint(300, 250),
       new SitePoint(200, 150),
     ];
-    siteSegments = [
+    tilingSiteSegments = [
       // new SiteSegment(2, 2, 498, 2),
       // new SiteSegment(498, 2, 498, 298),
       // new SiteSegment(498, 298, 2, 298),
@@ -419,17 +489,30 @@
       // new SiteSegment(100, 100, 100, 200),
       // new SiteSegment(200, 100, 200, 200),
     ];
-    siteStore.set({ sitePoints: sitePoints, siteSegments: siteSegments, tileWidth: tileWidth, tileHeight: tileHeight });
+    siteStore.set({
+      sitePoints: tilingSitePoints,
+      siteSegments: tilingSiteSegments,
+      tileWidth: tileWidth,
+      tileHeight: tileHeight,
+    });
   });
 
+  function tilingPlus() {
+    tilingIdx = (tilingIdx + 1) % availableTilings.length;
+  }
+
+  function tilingMinus() {
+    tilingIdx = (tilingIdx - 1);
+    if(tilingIdx<0) tilingIdx = availableTilings.length-1;
+  }
 </script>
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <svg
   id="voronoiSvg"
-  width="{bbox.xh}"
-  height="{bbox.yh}"
+  width={bbox.xh}
+  height={bbox.yh}
   viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
   xmlns="http://www.w3.org/2000/svg"
   on:click={addPoint}
@@ -437,8 +520,8 @@
   <rect
     x="0"
     y="0"
-    width="{bbox.xh}"
-    height="{bbox.yh}"
+    width={bbox.xh}
+    height={bbox.yh}
     stroke="black"
     stroke-width="3"
     fill="rgb(240, 238, 231)"
@@ -458,27 +541,27 @@
       ></path>
     {/if}
   {/each}
-  {#each sitePoints as siteP, idx}
+  {#each tilingSitePoints as siteP, idx}
     <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="black"
     ></circle>
   {/each}
-  {#each siteSegments as siteS, idx}
+  {#each tilingSiteSegments as siteS, idx}
     <path
-      id="segment {idx + sitePoints.length}"
+      id="segment {idx + tilingSitePoints.length}"
       d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
       stroke="black"
       stroke-width="1"
       fill="none"
     ></path>
     <circle
-      id="segment {idx + sitePoints.length}"
+      id="segment {idx + tilingSitePoints.length}"
       cx={siteS.x1}
       cy={siteS.y1}
       r="2"
       fill="black"
     ></circle>
     <circle
-      id="segment {idx + sitePoints.length}"
+      id="segment {idx + tilingSitePoints.length}"
       cx={siteS.x2}
       cy={siteS.y2}
       r="2"
@@ -522,6 +605,24 @@
     downloadSVG();
   }}>Download SVG</button
 >
+<div class="tilingCtrl">
+  <button
+    on:click={() => {
+      tilingPlus();
+    }}>+</button
+  >
+  <p>IH {availableTilings[tilingIdx]} / {symGroups[availableTilings[tilingIdx]]}</p>
+  <button
+    on:click={() => {
+      tilingMinus();
+    }}>-</button
+  >
+  <button class="fileButton"
+  on:click={() => {
+    update();
+  }}>Update</button
+>
+</div>
 <div class="lastErrorContainer">
   <p class="lastError">{lastError}</p>
 </div>
@@ -531,5 +632,11 @@
     text-align: left;
     color: red;
     font-size: 10pt;
+  }
+
+  .tilingCtrl {
+    display: grid;
+    grid: 50px / 50px 100px 50px auto;
+    width: 200px;
   }
 </style>

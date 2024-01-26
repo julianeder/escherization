@@ -36,6 +36,9 @@ export class SitePoint extends Point {
 }
 
 export class SiteSegment {
+    minus(rhs: Point): any {
+        return new SiteSegment(this.x1-rhs.x, this.y1-rhs.y, this.x2-rhs.x, this.y2-rhs.y);
+    }
     x1: number;
     y1: number;
     x2: number;
