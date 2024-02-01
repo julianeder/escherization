@@ -506,6 +506,40 @@
     return d;
   }
 
+  function onTilingPlus() {
+    tilingIdx = (tilingIdx + 1) % availableTilings.length;
+
+    if (autoUpdate) update();
+  }
+
+  function onTilingMinus() {
+    tilingIdx = tilingIdx - 1;
+    if (tilingIdx < 0) tilingIdx = availableTilings.length - 1;
+
+    if (autoUpdate) update();
+  }
+
+  function onParamChanged(newValue: number, idx: number) {
+    if (idx < tilingParams.length) {
+      tilingParams[idx] = newValue;
+    }
+
+    if (autoUpdate) update();
+  }
+
+  function onResetParams() {
+    let tiling: IsohedralTiling = new IsohedralTiling(
+      Number(availableTilings[tilingIdx]),
+    );
+    if (tiling.numParameters() > 0) {
+      tilingParams = tiling.getParameters();
+    } else {
+      tilingParams = [];
+    }
+
+    if (autoUpdate) update();
+  }
+
   onMount(async () => {
     wasmVoronoi = await instantiate_wasmVoronoi();
     siteStore.subscribe((value: Sites) => {
@@ -537,40 +571,6 @@
       tileHeight: tileHeight,
     });
   });
-
-  function onTilingPlus() {
-    tilingIdx = (tilingIdx + 1) % availableTilings.length;
-
-    if (autoUpdate) update();
-  }
-
-  function onTilingMinus() {
-    tilingIdx = tilingIdx - 1;
-    if (tilingIdx < 0) tilingIdx = availableTilings.length - 1;
-
-    if (autoUpdate) update();
-  }
-
-  function onParamChanged(newValue: number, idx: number){
-    if (idx < tilingParams.length) {
-      tilingParams[idx] = newValue;
-    }
-
-    if (autoUpdate) update();
-  };
-
-  function onResetParams() {
-    let tiling: IsohedralTiling = new IsohedralTiling(
-      Number(availableTilings[tilingIdx]),
-    );
-    if (tiling.numParameters() > 0) {
-      tilingParams = tiling.getParameters();
-    } else {
-      tilingParams = [];
-    }
-
-    if (autoUpdate) update();
-  }
 </script>
 
 <div class="grid grid-cols-1 justify-items-center gap-4">
@@ -593,10 +593,6 @@
       stroke-width="1"
       fill="rgb(248 250 252)"
     />
-    {#each tiles as origin, idx}
-      <circle id="origin {idx}" cx={origin.x} cy={origin.y} r="5" fill="pink"
-      ></circle>
-    {/each}
     {#each voronoiCells as c}
       {#if isCellPathConsistant(c)}
         <path
@@ -665,11 +661,16 @@
         {/if}
       {/if}
     {/each}
+    {#each tiles as origin, idx}
+      <circle id="origin {idx}" cx={origin.x} cy={origin.y} r="5" fill="pink"
+      ></circle>
+    {/each}
   </svg>
 
   <!-- <div class="grid grid-rows-4 content-start"> -->
   <div class="tilingCtrl grid grid-cols-8 gap-4">
-    <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
+    <button
+      class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
       on:click={() => {
         onTilingMinus();
       }}
@@ -683,14 +684,16 @@
         ]}
       </p>
     </div>
-    <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
+    <button
+      class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
       on:click={() => {
         onTilingPlus();
       }}
     >
       &gt;</button
     >
-    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded col-span-2"
+    <button
+      class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded col-span-2"
       on:click={() => {
         update();
       }}>Update</button
@@ -706,16 +709,15 @@
     {#each tilingParams as p, idx}
       <div class="tilingParam flex flex-row gap-4">
         <p class="basis-1/12">p {idx}</p>
-        <div class="min-w-72"
-        >
+        <div class="min-w-72">
           <Range
-          id={idx}
-          min={1}
-          max={200}
-          stepSize={0.1}
-          initialValue={p}
-          decimalPlaces={2}
-          on:change={(e) => onParamChanged(e.detail.value, idx)}
+            id={idx}
+            min={1}
+            max={200}
+            stepSize={0.1}
+            initialValue={p}
+            decimalPlaces={2}
+            on:change={(e) => onParamChanged(e.detail.value, idx)}
           />
         </div>
       </div>
