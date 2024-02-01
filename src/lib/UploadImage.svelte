@@ -30,7 +30,6 @@
 
     let tileCenter = new Point(tileWidth / 2, tileHeight / 2);
 
-
     const initialSitePoints: SitePoint[] = [
         new SitePoint(50, 50),
         new SitePoint(250, 50),
@@ -380,21 +379,26 @@
         segemntsFromTreeRec(n, ss);
         siteSegments = ss; // Trigger Reactive Update
         siteStore.set({
-            sitePoints: sitePoints.map(p => translatePoint(p, tileCenter)),
-            siteSegments: ss.map(s => translateSegment(s, tileCenter)),
+            sitePoints: sitePoints.map((p) => translatePoint(p, tileCenter)),
+            siteSegments: ss.map((s) => translateSegment(s, tileCenter)),
             tileWidth: tileWidth,
             tileHeight: tileHeight,
         });
     }
 
-    function translatePoint(p: SitePoint, tileCenter: Point): SitePoint{
+    function translatePoint(p: SitePoint, tileCenter: Point): SitePoint {
         return new SitePoint(p.x - tileCenter.x, p.y - tileCenter.y);
     }
 
-    function translateSegment(s: SiteSegment, tileCenter: Point): SiteSegment{
-        return new SiteSegment(s.x1 - tileCenter.x, s.y1 - tileCenter.y, s.x2 - tileCenter.x, s.y2 - tileCenter.y);
+    function translateSegment(s: SiteSegment, tileCenter: Point): SiteSegment {
+        return new SiteSegment(
+            s.x1 - tileCenter.x,
+            s.y1 - tileCenter.y,
+            s.x2 - tileCenter.x,
+            s.y2 - tileCenter.y,
+        );
     }
-    
+
     class Node {
         constructor(sitePoint: SitePoint, parent: Node | null) {
             this.sitePoint = sitePoint;
@@ -690,58 +694,75 @@
         tracer = await TraceSkeleton2.load();
 
         siteStore.set({
-            sitePoints: [...sitePoints].map(p => translatePoint(p, tileCenter)),
-            siteSegments: [...initialSiteSegments].map(s => translateSegment(s, tileCenter)),
+            sitePoints: [...sitePoints].map((p) =>
+                translatePoint(p, tileCenter),
+            ),
+            siteSegments: [...initialSiteSegments].map((s) =>
+                translateSegment(s, tileCenter),
+            ),
             tileWidth: tileWidth,
             tileHeight: tileHeight,
         });
-
     });
 </script>
 
 <div>
     <div class="grid grid-cols-1 justify-items-center gap-4">
-        <canvas
-            class="uploadCanvas bg-slate-50 border border-sky-600 col-start-1 row-start-1"
-            bind:this={canvas}
-            width={canvasWidth}
-            height={canvasHeight}
-            style="width: {canvasWidth}px; height: {canvasHeight}px"
-        ></canvas>
-        <div
-            class="overdrawSvg col-start-1 row-start-1"
-            bind:this={svgContainer}
-        >
-            <svg
-                id="previewSvg"
-                width={tileWidth}
-                height={tileHeight}
-                viewBox="0 0 {tileWidth} {tileHeight}"
-                xmlns="http://www.w3.org/2000/svg"
+        <div class="flex flex-cols">
+            <div class="tools flex flex-col">
+                <button class="bg-slate-50 hover:bg-slate-200 border border-sky-600 p-2 rounded w-10 h-10 m-1"
+                > M </button>
+                <button class="bg-slate-50 hover:bg-slate-200 border border-sky-600 p-2 rounded w-10 h-10 m-1"
+                > A </button>
+                <button class="bg-slate-50 hover:bg-slate-200 border border-sky-600 p-2 rounded w-10 h-10 m-1"
+                > D </button>
+            </div>
+            <div class="grid grid-cols-1">
+                <canvas class="uploadCanvas bg-slate-50 border border-sky-600 col-start-1 row-start-1"
+                    bind:this={canvas}
+                    width={canvasWidth}
+                    height={canvasHeight}
+                    style="width: {canvasWidth}px; height: {canvasHeight}px"
+                ></canvas>
+                <div class="overdrawSvg col-start-1 row-start-1"
+                bind:this={svgContainer}
             >
-            <circle id="origin" cx={tileCenter.x} cy={tileCenter.y} r="5" fill="pink"
-            ></circle>
-                {#each sitePoints as siteP}
-                    <circle cx={siteP.x} cy={siteP.y} r="2" fill="black"
+                <svg
+                    id="previewSvg"
+                    width={tileWidth}
+                    height={tileHeight}
+                    viewBox="0 0 {tileWidth} {tileHeight}"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <circle
+                        id="origin"
+                        cx={tileCenter.x}
+                        cy={tileCenter.y}
+                        r="5"
+                        fill="pink"
                     ></circle>
-                {/each}
-                {#each siteSegments as siteS}
-                <path
-                    d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-                    stroke="red"
-                    stroke-width="1"
-                    fill="none"
-                ></path>
-                <circle cx={siteS.x1} cy={siteS.y1} r="2" fill="red"
-                ></circle>
-                <circle cx={siteS.x2} cy={siteS.y2} r="2" fill="red"
-                ></circle>
-            {/each}
-            </svg>
+                    {#each sitePoints as siteP}
+                        <circle cx={siteP.x} cy={siteP.y} r="2" fill="black"
+                        ></circle>
+                    {/each}
+                    {#each siteSegments as siteS}
+                        <path
+                            d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
+                            stroke="red"
+                            stroke-width="1"
+                            fill="none"
+                        ></path>
+                        <circle cx={siteS.x1} cy={siteS.y1} r="2" fill="red"
+                        ></circle>
+                        <circle cx={siteS.x2} cy={siteS.y2} r="2" fill="red"
+                        ></circle>
+                    {/each}
+                </svg>
+            </div>
+            </div>
         </div>
-        <div
+        <div class="resolution-slider min-w-72 font-sans text-center text-sky-400"
             class:purple-theme={false}
-            class="resolution-slider min-w-72 font-sans text-center text-sky-400"
         >
             <label for="basic-range">Deviation Tolerance</label>
             <Range
@@ -751,27 +772,23 @@
                 on:change={(e) => onResolutionChanged(e.detail.value)}
             />
         </div>
-        <button
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
             on:click={() => {
                 fileinput.click();
             }}>Upload Image</button
         >
-        <button
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
             on:click={() => {
                 downloadCanvasImage();
             }}>Download Image</button
         >
-        <button
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
             on:click={() => {
                 downloadSVG();
             }}>Download SVG</button
         >
-        <input
+        <input type="file"
             style="display:none"
-            type="file"
             accept=".jpg, .jpeg, .png"
             on:change={(e) => onFileSelected(e)}
             bind:this={fileinput}

@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import MainPage from "./lib/MainPage.svelte";
   import UploadImage from "./lib/UploadImage.svelte";
   import Tiling from "./lib/Tiling.svelte";
   import { writable, type Writable } from "svelte/store";
@@ -18,21 +16,22 @@
   <header class="sticky z-50 bg-white top-0 p-4">
     <h1 class="text-4xl font-sans text-center text-sky-400">Eschherization</h1>
   </header>
-  <div class="flex-grow">
-    <div class="flex flex-row">
-      <div class="basis-1/2">
+    <div class="flex flex-row flex-wrap">
+      <div class="flex-grow flex-1" 
+      style="min-width: 600px">
         <p class="text-2xl font-sans text-center text-sky-400 p-4">Upload Image</p>
         <UploadImage {siteStore}></UploadImage>
       </div>
+
       <div
-        class=" min-h-[1em] w-px self-stretch bg-gradient-to-tr from-transparent via-neutral-500 to-transparent opacity-20 dark:opacity-100"
+        class="col-start-2 min-h-[1em] w-px self-stretch bg-gradient-to-tr from-transparent via-neutral-500 to-transparent opacity-20 dark:opacity-100"
       ></div>
 
-      <div class="basis-1/2">
+      <div class="flex-grow flex-1" 
+      style="min-width: 600px">
         <p class="text-2xl font-sans text-center text-sky-400 p-4">Tiling</p>
         <Tiling {siteStore}></Tiling>
       </div>
-    </div>
   </div>
 
   <div class="sticky z-50 bottom-0"
