@@ -47,9 +47,20 @@
     let sitePoints: Array<SitePoint> = initialSitePoints; // local copy of Segments for visualization as svg
     let siteSegments: Array<SiteSegment> = initialSiteSegments; // local copy of Segments for visualization as svg
 
+    function updateStore(){
+
+        siteStore.set({
+            sitePoints: sitePoints.map((p) => translatePoint(p, tileCenter)),
+            siteSegments: siteSegments.map((s) => translateSegment(s, tileCenter)),
+            tileWidth: tileWidth,
+            tileHeight: tileHeight,
+        });
+    }
+
     function onFileSelected(e: any) {
         Promise.resolve().then(() => handleFileUpload(e)); // Run Async
     }
+
     function handleFileUpload(e: any) {
         sitePoints = [];
         let imageFile = e.target?.files[0];
@@ -378,12 +389,8 @@
         let ss: Array<SiteSegment> = [];
         segemntsFromTreeRec(n, ss);
         siteSegments = ss; // Trigger Reactive Update
-        siteStore.set({
-            sitePoints: sitePoints.map((p) => translatePoint(p, tileCenter)),
-            siteSegments: ss.map((s) => translateSegment(s, tileCenter)),
-            tileWidth: tileWidth,
-            tileHeight: tileHeight,
-        });
+        updateStore();
+
     }
 
     function translatePoint(p: SitePoint, tileCenter: Point): SitePoint {
@@ -541,14 +548,14 @@
         y: number,
     ): Array<SitePoint> {
         let n: Array<SitePoint> = [];
-        if (thinImag[fromXY(x - 1, y - 1)]) n.push({ x: x - 1, y: y - 1 });
-        if (thinImag[fromXY(x - 1, y)]) n.push({ x: x - 1, y: y });
-        if (thinImag[fromXY(x - 1, y + 1)]) n.push({ x: x - 1, y: y + 1 });
-        if (thinImag[fromXY(x, y - 1)]) n.push({ x: x, y: y - 1 });
-        if (thinImag[fromXY(x, y + 1)]) n.push({ x: x, y: y + 1 });
-        if (thinImag[fromXY(x + 1, y - 1)]) n.push({ x: x + 1, y: y - 1 });
-        if (thinImag[fromXY(x + 1, y)]) n.push({ x: x + 1, y: y });
-        if (thinImag[fromXY(x + 1, y + 1)]) n.push({ x: x + 1, y: y + 1 });
+        if (thinImag[fromXY(x - 1, y - 1)]) n.push(new SitePoint(x - 1, y - 1));
+        if (thinImag[fromXY(x - 1, y)]) n.push(     new SitePoint(x - 1, y ));
+        if (thinImag[fromXY(x - 1, y + 1)]) n.push( new SitePoint(x - 1, y + 1 ));
+        if (thinImag[fromXY(x, y - 1)]) n.push(     new SitePoint(x, y - 1 ));
+        if (thinImag[fromXY(x, y + 1)]) n.push(     new SitePoint(x, y + 1 ));
+        if (thinImag[fromXY(x + 1, y - 1)]) n.push( new SitePoint(x + 1, y - 1 ));
+        if (thinImag[fromXY(x + 1, y)]) n.push(     new SitePoint(x + 1, y ));
+        if (thinImag[fromXY(x + 1, y + 1)]) n.push( new SitePoint(x + 1, y + 1 ));
         return n.sort(
             (a, b) => thinImag[fromXY(b.x, b.y)] - thinImag[fromXY(a.x, a.y)],
         ); // Sort to process Ends and Crossings first;
@@ -692,18 +699,50 @@
 
     onMount(async () => {
         tracer = await TraceSkeleton2.load();
-
-        siteStore.set({
-            sitePoints: [...sitePoints].map((p) =>
-                translatePoint(p, tileCenter),
-            ),
-            siteSegments: [...initialSiteSegments].map((s) =>
-                translateSegment(s, tileCenter),
-            ),
-            tileWidth: tileWidth,
-            tileHeight: tileHeight,
-        });
+        updateStore();
     });
+
+
+    var selectedElement: any = null;
+    var offset: any = null;
+    function makeDraggable(evt: any) {
+        var svg = evt.target;
+        svg!.addEventListener('mousedown', startDrag);
+        svg!.addEventListener('mousemove', drag);
+        svg!.addEventListener('mouseup', endDrag);
+        svg!.addEventListener('mouseleave', endDrag);
+        function startDrag(evt: any) {
+            if (evt.target.classList.contains('draggable')) {
+                selectedElement = evt.target;
+                offset = getMousePosition(evt);
+                console.log(selectedElement.getAttributeNS(null, "cx"));
+                console.log(offset);
+                offset.x -= parseFloat(selectedElement.getAttributeNS(null, "cx"));
+                offset.y -= parseFloat(selectedElement.getAttributeNS(null, "cy"));
+            }
+        }
+        function drag(evt: any) {
+            if (selectedElement != null) {
+                evt.preventDefault();
+                var coord = getMousePosition(evt);
+                selectedElement.setAttributeNS(null, "cx", coord.x - offset.x);
+                selectedElement.setAttributeNS(null, "cy", coord.y - offset.y);
+                tileCenter.x = coord.x - offset.x;
+                tileCenter.y = coord.y - offset.y;
+            }
+        }
+        function endDrag(evt: any) {
+            selectedElement = null;
+            updateStore();
+        }
+        function getMousePosition(evt: any) {
+            var CTM = svg.getScreenCTM();
+            return {
+                x: (evt.clientX - CTM.e) / CTM.a,
+                y: (evt.clientY - CTM.f) / CTM.d
+            };
+        }
+    }
 </script>
 
 <div>
@@ -729,12 +768,14 @@
             >
                 <svg
                     id="previewSvg"
-                    width={tileWidth}
-                    height={tileHeight}
-                    viewBox="0 0 {tileWidth} {tileHeight}"
+                    on:load={makeDraggable}
+                    width={canvasWidth}
+                    height={canvasHeight}
+                    viewBox="0 0 {canvasWidth} {canvasHeight}"
                     xmlns="http://www.w3.org/2000/svg"
                 >
-                    <circle
+                <g transform="translate({imgX} {imgY})">
+                <circle class="draggable"
                         id="origin"
                         cx={tileCenter.x}
                         cy={tileCenter.y}
@@ -757,6 +798,7 @@
                         <circle cx={siteS.x2} cy={siteS.y2} r="2" fill="red"
                         ></circle>
                     {/each}
+                </g>
                 </svg>
             </div>
             </div>
@@ -797,4 +839,16 @@
 </div>
 
 <style>
+ .draggable {
+    cursor:move;
+  }
+
+  /* .Handle {
+    display:block; position:absolute;
+    width:8px; height:8px;
+    border:solid 1px black;
+    background:yellow;
+  }
+
+  .Handle:global(.ui-draggable-helper) { visibility:hidden } */
 </style>
