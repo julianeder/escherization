@@ -111,13 +111,11 @@
     } else {
       if (tiling.numParameters() > 0) {
         tilingParams = tiling.getParameters();
-      }
-      else{
+      } else {
         tilingParams = [];
-      } 
+      }
     }
     console.log(tilingParams);
-
 
     prevTilingIndex = tilingIdx;
 
@@ -561,199 +559,190 @@
     if (autoUpdate) update();
   };
 
-  function resetParams(){
+  function resetParams() {
     let tiling: IsohedralTiling = new IsohedralTiling(
       Number(availableTilings[tilingIdx]),
     );
     if (tiling.numParameters() > 0) {
       tilingParams = tiling.getParameters();
-    }
-    else{
+    } else {
       tilingParams = [];
-    } 
+    }
 
     if (autoUpdate) update();
-
   }
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
-<!-- svelte-ignore a11y-no-static-element-interactions -->
-<svg
-  id="voronoiSvg"
-  width={bbox.xh}
-  height={bbox.yh}
-  viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
-  xmlns="http://www.w3.org/2000/svg"
-  on:click={addPoint}
->
-  <rect
-    x="0"
-    y="0"
+<div class="grid grid-cols-1 justify-items-center gap-4">
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <svg
+    id="voronoiSvg"
     width={bbox.xh}
     height={bbox.yh}
-    stroke="black"
-    stroke-width="3"
-    fill="rgb(240, 238, 231)"
-  />
-  {#each tiles as origin, idx}
-    <circle id="origin {idx}" cx={origin.x} cy={origin.y} r="5" fill="pink"
-    ></circle>
-  {/each}
-  {#each voronoiCells as c}
-    {#if isCellPathConsistant(c)}
-      <path
-        id="cell {c.sourceIndex}"
-        d={getCellPath(c)}
-        stroke="black"
-        stroke-width="0"
-        fill="red"
-      ></path>
-    {/if}
-  {/each}
-  {#each tilingSitePoints as siteP, idx}
-    <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="black"
-    ></circle>
-  {/each}
-  {#each tilingSiteSegments as siteS, idx}
-    <path
-      id="segment {idx + tilingSitePoints.length}"
-      d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-      stroke="black"
+    viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
+    xmlns="http://www.w3.org/2000/svg"
+    on:click={addPoint}
+  >
+    <rect
+      x="0"
+      y="0"
+      width={bbox.xh}
+      height={bbox.yh}
+      stroke="rgb(2 132 199)"
       stroke-width="1"
-      fill="none"
-    ></path>
-    <circle
-      id="segment {idx + tilingSitePoints.length}"
-      cx={siteS.x1}
-      cy={siteS.y1}
-      r="2"
-      fill="black"
-    ></circle>
-    <circle
-      id="segment {idx + tilingSitePoints.length}"
-      cx={siteS.x2}
-      cy={siteS.y2}
-      r="2"
-      fill="black"
-    ></circle>
-  {/each}
-  {#each voronoiEdges as e, idx}
-    {#if e.isValid}
-      <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
-      <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
-      {#if e.isCurved}
+      fill="rgb(248 250 252)"
+    />
+    {#each tiles as origin, idx}
+      <circle id="origin {idx}" cx={origin.x} cy={origin.y} r="5" fill="pink"
+      ></circle>
+    {/each}
+    {#each voronoiCells as c}
+      {#if isCellPathConsistant(c)}
         <path
-          d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
-            .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
-            .x} {e.controlPoints[2].y}"
-          stroke="blue"
-          stroke-width="1"
-          fill="none"
-        ></path>
-      {:else if e.isPrimary}
-        <path
-          d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-          stroke="blue"
-          stroke-width="1"
-          fill="none"
-        ></path>
-      {:else if showSecondary}
-        <path
-          d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-          stroke="green"
-          stroke-width="1"
-          fill="none"
+          id="cell {c.sourceIndex}"
+          d={getCellPath(c)}
+          stroke="black"
+          stroke-width="0"
+          fill="red"
         ></path>
       {/if}
-    {/if}
-  {/each}
-</svg>
+    {/each}
+    {#each tilingSitePoints as siteP, idx}
+      <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="black"
+      ></circle>
+    {/each}
+    {#each tilingSiteSegments as siteS, idx}
+      <path
+        id="segment {idx + tilingSitePoints.length}"
+        d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
+        stroke="black"
+        stroke-width="1"
+        fill="none"
+      ></path>
+      <circle
+        id="segment {idx + tilingSitePoints.length}"
+        cx={siteS.x1}
+        cy={siteS.y1}
+        r="2"
+        fill="black"
+      ></circle>
+      <circle
+        id="segment {idx + tilingSitePoints.length}"
+        cx={siteS.x2}
+        cy={siteS.y2}
+        r="2"
+        fill="black"
+      ></circle>
+    {/each}
+    {#each voronoiEdges as e, idx}
+      {#if e.isValid}
+        <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
+        <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
+        {#if e.isCurved}
+          <path
+            d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
+              .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
+              .x} {e.controlPoints[2].y}"
+            stroke="blue"
+            stroke-width="1"
+            fill="none"
+          ></path>
+        {:else if e.isPrimary}
+          <path
+            d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+            stroke="blue"
+            stroke-width="1"
+            fill="none"
+          ></path>
+        {:else if showSecondary}
+          <path
+            d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+            stroke="green"
+            stroke-width="1"
+            fill="none"
+          ></path>
+        {/if}
+      {/if}
+    {/each}
+  </svg>
 
-<div class="tilingCtrl">
-  <button
-    on:click={() => {
-      tilingMinus();
-    }}
-  >
-    &lt;</button
-  >
-  <p>
-    IH {availableTilings[tilingIdx]} / {symGroups[availableTilings[tilingIdx]]}
-  </p>
-  <button
-    on:click={() => {
-      tilingPlus();
-    }}
-  >
-    &gt;</button
-  >
-  <button
-    class="fileButton"
-    on:click={() => {
-      update();
-    }}>Update</button>
-  <label>
-    <input type="checkbox" bind:checked={autoUpdate} />
-    Auto Update
-  </label>
-</div>
-<div class="tilingParams">
-  {#each tilingParams as p, idx}
-    <div class="tilingParam">
-      <p style="margin: 0;">p {idx}</p>
-      <Range
-        id={idx}
-        min={1} 
-        max={200}
-        stepSize={0.1}
-        initialValue={p}
-        decimalPlaces={2}
-        on:change={(e) => onParamChanged(e.detail.value, idx)}
-      />
+  <!-- <div class="grid grid-rows-4 content-start"> -->
+  <div class="tilingCtrl grid grid-cols-8 gap-4">
+    <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
+      on:click={() => {
+        tilingMinus();
+      }}
+    >
+      &lt;</button
+    >
+    <div class="bg-slate-100 flex items-center justify-center col-span-2">
+      <p class="text-center">
+        IH {availableTilings[tilingIdx]} / {symGroups[
+          availableTilings[tilingIdx]
+        ]}
+      </p>
     </div>
-  {/each}
-</div>
-<div class="actionButtons">
+    <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
+      on:click={() => {
+        tilingPlus();
+      }}
+    >
+      &gt;</button
+    >
+    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded col-span-2"
+      on:click={() => {
+        update();
+      }}>Update</button
+    >
+    <div class="bg-slate-100 flex items-center justify-center col-span-2">
+      <label class="p-2">
+        <input type="checkbox" bind:checked={autoUpdate} />
+        Auto Update
+      </label>
+    </div>
+  </div>
+  <div class="tilingParams">
+    {#each tilingParams as p, idx}
+      <div class="tilingParam flex flex-row gap-4">
+        <p class="basis-1/12">p {idx}</p>
+        <div class="min-w-72"
+        >
+          <Range
+          id={idx}
+          min={1}
+          max={200}
+          stepSize={0.1}
+          initialValue={p}
+          decimalPlaces={2}
+          on:change={(e) => onParamChanged(e.detail.value, idx)}
+          />
+        </div>
+      </div>
+    {/each}
+  </div>
+  <div class="actionButtons grid grid-cols-2 gap-4 max-h-10">
+    <button
+      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+      on:click={() => {
+        resetParams();
+      }}
+    >
+      Reset Params
+    </button>
+    <button
+      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+      on:click={() => {
+        downloadSVG();
+      }}>Download SVG</button
+    >
+  </div>
+  <!-- </div> -->
 
-<button
-    class="fileButton"
-    on:click={() => {resetParams(); }}>
-    Reset Params
-  </button>
-  <button
-  class="fileButton"
-  on:click={() => {
-    downloadSVG();
-  }}>Download SVG</button
->
-</div>
-
-<div class="lastErrorContainer">
-  <p class="lastError">{lastError}</p>
+  <div class="lastErrorContainer">
+    <p class="text-red-700 text-sm">{lastError}</p>
+  </div>
 </div>
 
 <style>
-  .lastError {
-    text-align: left;
-    color: red;
-    font-size: 10pt;
-  }
-
-  .tilingCtrl {
-    display: grid;
-    grid: 50px / 50px 100px 50px auto 100px;
-  }
-
-  .tilingParams {
-    padding: 20px;
-  }
-  .tilingParam {
-    display: grid;
-    grid: 20px / 50px auto;
-  }
-  .actionButtons{
-    display: grid;
-    grid: 50px / 250px 250px;
-  }
 </style>

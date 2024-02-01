@@ -528,19 +528,17 @@
 
 </script>
 
-<div id='app'>
-    <div class='drawingContainer'>
+<div>
+    <div class='grid grid-cols-1 justify-items-center gap-4'>
         <canvas
-            class='uploadCanvas'
+            class='uploadCanvas bg-slate-50 border border-sky-600 col-start-1 row-start-1'
             bind:this={canvas}
             width={canvasWidth}
             height={canvasHeight}
             style='width: {canvasWidth}px; height: {canvasHeight}px'
         ></canvas>
-        <div
-            class='overdrawSvg'
+        <div class='overdrawSvg col-start-1 row-start-1'
             bind:this={svgContainer}
-            style='left: {imgX}px; top: {imgY}px; width: {tileWidth}px; height: {tileHeight}px;'
         >
             <svg id='previewSvg'
                 width={tileWidth}
@@ -562,10 +560,9 @@
                 {/each}
             </svg>
         </div>
-    </div>
-    <div class:purple-theme={false} class='resolution-slider'>
-        <label for='basic-range'>Deviation Tolerance</label>
-        <Range
+        <div class:purple-theme={false} class='resolution-slider min-w-72 font-sans text-center text-sky-400'>
+            <label for='basic-range'>Deviation Tolerance</label>
+            <Range
             min={1}
             max={50}
             initialValue={deviation}
@@ -573,19 +570,19 @@
         />
     </div>
     <button
-        class='fileButton'
+        class='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40'
         on:click={() => {
             fileinput.click();
         }}>Upload Image</button
     >
     <button
-        class='fileButton'
+        class='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40'
         on:click={() => {
             downloadCanvasImage();
         }}>Download Image</button
     >
     <button
-        class='fileButton'
+        class='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40'
         on:click={() => {
             downloadSVG();
         }}>Download SVG</button
@@ -596,30 +593,9 @@
         accept='.jpg, .jpeg, .png'
         on:change={(e) => onFileSelected(e)}
         bind:this={fileinput}
-    />
+        />
+    </div>
 </div>
-
+    
 <style>
-    #app {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-flow: column;
-    }
-    .drawingContainer {
-        position: relative;
-    }
-    .uploadCanvas {
-        border-color: #000;
-        background-color: #f8f8f8;
-        border-style: solid;
-        border-width: 1px;
-    }
-    .overdrawSvg {
-        position: absolute;
-        z-index: 10;
-    }
-    .resolution-slider {
-        width: 300px;
-    }
 </style>

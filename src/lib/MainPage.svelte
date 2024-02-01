@@ -12,7 +12,7 @@
 </main>
 
 <style>
-    main {
+    /* main {
         height: 100%;
         overflow-y: auto;
     }
@@ -41,6 +41,6 @@
         color: #ff3e00;
         font-size: 3em;
         font-weight: 100;
-    }
+    } */
 
 </style>
