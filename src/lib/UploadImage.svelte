@@ -35,10 +35,10 @@
     //   new SiteSegment(2, 298, 2, 2),
     ];
 
-    const onFileSelected = (e: any) => {
+    function onFileSelected(e: any){
         Promise.resolve().then(() => handleFileUpload(e)); // Run Async
     };
-    const handleFileUpload = (e: any) => {
+    function handleFileUpload(e: any){
         let imageFile = e.target?.files[0];
         let reader = new FileReader();
         reader.readAsDataURL(imageFile);
@@ -64,7 +64,7 @@
         };
     }
 
-    const drawImageScaled = (img: HTMLImageElement) => {
+    function drawImageScaled(img: HTMLImageElement){
         if(ctx == null) return;
         let canvas = ctx.canvas ;
         let hRatio = canvas.width  / img.width;
@@ -104,13 +104,13 @@
 
     }
 
-    const onResolutionChanged = (newRes: number) => {
+    function onResolutionChanged(newRes: number){
         deviation = newRes;
         Promise.resolve().then(updateSkelleton); // Run Async
     
     };
 
-    const calcNeighbourCnt16 = (thinImag: number[], x: number ,y: number) => {
+    function calcNeighbourCnt16(thinImag: number[], x: number ,y: number){
         let neighbourCnt: number = 0;
         if(thinImag[fromXY(x-2, y-2)]) neighbourCnt ++;
         if(thinImag[fromXY(x-1, y-2)]) neighbourCnt ++;
@@ -153,11 +153,11 @@
         if(thinImag[fromXY(x-1, y  )]) neighbourCnt ++;
         return neighbourCnt;
     }
-    const fromI = (i: number) => { return {x: i % tileWidth, y: Math.floor(i / tileWidth)}} 
+    function fromI(i: number){ return {x: i % tileWidth, y: Math.floor(i / tileWidth)}} 
     
-    const fromXY = (x: number, y: number) => { return y * tileWidth + x; }
+    function fromXY(x: number, y: number){ return y * tileWidth + x; }
     
-    const updateSkelleton = () => {
+    function updateSkelleton(){
         if(ctx == null) return;
 
         let imageData: ImageData = ctx.getImageData(imgX, imgY, tileWidth, tileHeight);

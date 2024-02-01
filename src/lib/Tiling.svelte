@@ -538,20 +538,20 @@
     });
   });
 
-  function tilingPlus() {
+  function onTilingPlus() {
     tilingIdx = (tilingIdx + 1) % availableTilings.length;
 
     if (autoUpdate) update();
   }
 
-  function tilingMinus() {
+  function onTilingMinus() {
     tilingIdx = tilingIdx - 1;
     if (tilingIdx < 0) tilingIdx = availableTilings.length - 1;
 
     if (autoUpdate) update();
   }
 
-  const onParamChanged = (newValue: number, idx: number) => {
+  function onParamChanged(newValue: number, idx: number){
     if (idx < tilingParams.length) {
       tilingParams[idx] = newValue;
     }
@@ -559,7 +559,7 @@
     if (autoUpdate) update();
   };
 
-  function resetParams() {
+  function onResetParams() {
     let tiling: IsohedralTiling = new IsohedralTiling(
       Number(availableTilings[tilingIdx]),
     );
@@ -671,7 +671,7 @@
   <div class="tilingCtrl grid grid-cols-8 gap-4">
     <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
       on:click={() => {
-        tilingMinus();
+        onTilingMinus();
       }}
     >
       &lt;</button
@@ -685,7 +685,7 @@
     </div>
     <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
       on:click={() => {
-        tilingPlus();
+        onTilingPlus();
       }}
     >
       &gt;</button
@@ -725,7 +725,7 @@
     <button
       class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
       on:click={() => {
-        resetParams();
+        onResetParams();
       }}
     >
       Reset Params
