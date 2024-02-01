@@ -5,10 +5,17 @@
   // Props
   export let min = 0;
   export let max = 100;
+  export let stepSize = 1;
+  export let decimalPlaces = 0;
   export let initialValue = 0;
   export let id: any = null;
-  export let value =
-    typeof initialValue === "string" ? parseInt(initialValue) : initialValue;
+  export let value: number =
+    typeof initialValue === "string" ? parseFloat(initialValue) / stepSize : initialValue / stepSize;
+
+  // The Code is Rective to its dependant variables 
+  $: {
+     value = typeof initialValue === "string" ? parseFloat(initialValue) / stepSize : initialValue / stepSize;
+  }
 
   // Node Bindings
   let container: any = null;
@@ -43,7 +50,8 @@
   // Allows both bind:value and on:change for parent value retrieval
   function setValue(val) {
     value = val;
-    dispatch("change", { value });
+    let result: number = (value * stepSize).toFixed(decimalPlaces);
+    dispatch("change", { value: result });
   }
 
   function onTrackEvent(e) {
@@ -179,7 +187,7 @@
     role="slider"
     aria-valuemin={min}
     aria-valuemax={max}
-    aria-valuenow={value}
+    aria-valuenow={(value * stepSize).toFixed(decimalPlaces)}
     {id}
     on:mousedown={onTrackEvent}
     on:touchstart={onTrackEvent}
@@ -201,7 +209,7 @@
             in:fly={{ y: 7, duration: 200 }}
             out:fade={{ duration: 100 }}
           >
-            {value}
+            {(value * stepSize).toFixed(decimalPlaces)}
           </div>
         {/if}
       </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { writable, get, type Writable } from "svelte/store";
+  import Range from "./Range.svelte";
   import { onMount } from "svelte";
   import {
     BBox,
@@ -16,7 +17,12 @@
     type DiagrammResult,
     type CellResult,
   } from "../lib/wasm/wasmVoronoi";
-  import { IsohedralTiling, Point, mulPoint, mulSegment } from "./tactile/tactile";
+  import {
+    IsohedralTiling,
+    Point,
+    mulPoint,
+    mulSegment,
+  } from "./tactile/tactile";
 
   export let siteStore: Writable<Sites>;
 
@@ -39,33 +45,37 @@
 
   let lastError: any = "";
 
+  let tilingParams: number[] = [];
+
+  let autoUpdate: boolean = false;
+
   const symGroups: Record<string, any> = {
-    "1":  "p1",    
-    "2":  "pg",    
-    "4":  "p2",    
-    "5":  "pgg",   
-    "7":  "p3",    
-    "11":  "p6",    
-    "12":  "cm",    
-    "13":  "pmg",   
-    "16":  "p31m",  
-    // "19":  "p3m1", // only marked tilings 
-    "26":  "cmm",   
-    "28":  "p4",    
-    "37":  "p6m",   
-    "42":  "pm",    
-    "56":  "p4g",   
-    "72":  "pmm",   
-    "76":  "p4m",   
+    "1": "p1",
+    "2": "pg",
+    "4": "p2",
+    "5": "pgg",
+    "7": "p3",
+    "11": "p6",
+    "12": "cm",
+    "13": "pmg",
+    "16": "p31m",
+    "26": "cmm",
+    "28": "p4",
+    "37": "p6m",
+    "42": "pm",
+    "56": "p4g",
+    "72": "pmm",
+    "76": "p4m",
   };
 
   const availableTilings: string[] = Object.keys(symGroups);
   let tilingIdx = 0;
+  let prevTilingIndex = -1;
 
-    function update(){
-      updateTiling();
-      updateVoronoi();
-    }
+  function update() {
+    updateTiling();
+    updateVoronoi();
+  }
 
   function updateTiling() {
     console.log(
@@ -92,7 +102,25 @@
     tiles = [];
     tilingSitePoints = [];
     tilingSiteSegments = [];
-    let tiling: IsohedralTiling = new IsohedralTiling(Number(availableTilings[tilingIdx]));
+    let tiling: IsohedralTiling = new IsohedralTiling(
+      Number(availableTilings[tilingIdx]),
+    );
+
+    if (prevTilingIndex == tilingIdx) {
+      tiling.setParameters(tilingParams);
+    } else {
+      if (tiling.numParameters() > 0) {
+        tilingParams = tiling.getParameters();
+      }
+      else{
+        tilingParams = [];
+      } 
+    }
+    console.log(tilingParams);
+
+
+    prevTilingIndex = tilingIdx;
+
     for (let i of tiling.fillRegionBounds(
       bbox.xl / tileScale,
       bbox.yl / tileScale,
@@ -113,9 +141,14 @@
 
       for (var j = 0; j < tileSitePoints.length; j++) {
         tilingSitePoints.push(
-          
-        scale(mulPoint(M, scale(tileSitePoints[j], 1/tileWidth, 1/tileHeight)), tileScale, tileScale)
-
+          scale(
+            mulPoint(
+              M,
+              scale(tileSitePoints[j], 1 / tileWidth, 1 / tileHeight),
+            ),
+            tileScale,
+            tileScale,
+          ),
 
           // translatePoint(
           //   scale(
@@ -130,7 +163,14 @@
 
       for (var j = 0; j < tileSiteSegments.length; j++) {
         tilingSiteSegments.push(
-          scaleSegment(mulSegment(M, scaleSegment(tileSiteSegments[j], 1/tileWidth, 1/tileHeight)), tileScale, tileScale)
+          scaleSegment(
+            mulSegment(
+              M,
+              scaleSegment(tileSiteSegments[j], 1 / tileWidth, 1 / tileHeight),
+            ),
+            tileScale,
+            tileScale,
+          ),
 
           // translateSegment(
           //   scaleSegment(
@@ -299,7 +339,10 @@
   }
 
   function addPoint(event: MouseEvent) {
-    tilingSitePoints = [...tilingSitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
+    tilingSitePoints = [
+      ...tilingSitePoints,
+      new SitePoint(event.offsetX, event.offsetY),
+    ]; // This syntax triggeres Sveltes reactive reload
     siteStore.set({
       sitePoints: tilingSitePoints,
       siteSegments: tilingSiteSegments,
@@ -470,8 +513,8 @@
     siteStore.subscribe((value: Sites) => {
       tileWidth = value.tileWidth;
       tileHeight = value.tileHeight;
-      tileSitePoints = value.sitePoints; 
-      tileSiteSegments = value.siteSegments; 
+      tileSitePoints = value.sitePoints;
+      tileSiteSegments = value.siteSegments;
       update();
     });
     tilingSitePoints = [
@@ -499,11 +542,38 @@
 
   function tilingPlus() {
     tilingIdx = (tilingIdx + 1) % availableTilings.length;
+
+    if (autoUpdate) update();
   }
 
   function tilingMinus() {
-    tilingIdx = (tilingIdx - 1);
-    if(tilingIdx<0) tilingIdx = availableTilings.length-1;
+    tilingIdx = tilingIdx - 1;
+    if (tilingIdx < 0) tilingIdx = availableTilings.length - 1;
+
+    if (autoUpdate) update();
+  }
+
+  const onParamChanged = (newValue: number, idx: number) => {
+    if (idx < tilingParams.length) {
+      tilingParams[idx] = newValue;
+    }
+
+    if (autoUpdate) update();
+  };
+
+  function resetParams(){
+    let tiling: IsohedralTiling = new IsohedralTiling(
+      Number(availableTilings[tilingIdx]),
+    );
+    if (tiling.numParameters() > 0) {
+      tilingParams = tiling.getParameters();
+    }
+    else{
+      tilingParams = [];
+    } 
+
+    if (autoUpdate) update();
+
   }
 </script>
 
@@ -599,30 +669,66 @@
     {/if}
   {/each}
 </svg>
+
+<div class="tilingCtrl">
+  <button
+    on:click={() => {
+      tilingMinus();
+    }}
+  >
+    &lt;</button
+  >
+  <p>
+    IH {availableTilings[tilingIdx]} / {symGroups[availableTilings[tilingIdx]]}
+  </p>
+  <button
+    on:click={() => {
+      tilingPlus();
+    }}
+  >
+    &gt;</button
+  >
+  <button
+    class="fileButton"
+    on:click={() => {
+      update();
+    }}>Update</button>
+  <label>
+    <input type="checkbox" bind:checked={autoUpdate} />
+    Auto Update
+  </label>
+</div>
+<div class="tilingParams">
+  {#each tilingParams as p, idx}
+    <div class="tilingParam">
+      <p style="margin: 0;">p {idx}</p>
+      <Range
+        id={idx}
+        min={1} 
+        max={200}
+        stepSize={0.1}
+        initialValue={p}
+        decimalPlaces={2}
+        on:change={(e) => onParamChanged(e.detail.value, idx)}
+      />
+    </div>
+  {/each}
+</div>
+<div class="actionButtons">
+
 <button
+    class="fileButton"
+    on:click={() => {resetParams(); }}>
+    Reset Params
+  </button>
+  <button
   class="fileButton"
   on:click={() => {
     downloadSVG();
   }}>Download SVG</button
 >
-<div class="tilingCtrl">
-  <button
-    on:click={() => {
-      tilingPlus();
-    }}>+</button
-  >
-  <p>IH {availableTilings[tilingIdx]} / {symGroups[availableTilings[tilingIdx]]}</p>
-  <button
-    on:click={() => {
-      tilingMinus();
-    }}>-</button
-  >
-  <button class="fileButton"
-  on:click={() => {
-    update();
-  }}>Update</button
->
 </div>
+
 <div class="lastErrorContainer">
   <p class="lastError">{lastError}</p>
 </div>
@@ -636,7 +742,18 @@
 
   .tilingCtrl {
     display: grid;
-    grid: 50px / 50px 100px 50px auto;
-    width: 200px;
+    grid: 50px / 50px 100px 50px auto 100px;
+  }
+
+  .tilingParams {
+    padding: 20px;
+  }
+  .tilingParam {
+    display: grid;
+    grid: 20px / 50px auto;
+  }
+  .actionButtons{
+    display: grid;
+    grid: 50px / 250px 250px;
   }
 </style>
