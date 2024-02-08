@@ -79,6 +79,7 @@ export interface Edge {
     isPrimary: boolean;
     isCurved: boolean;
     isValid: boolean;
+    isBetweenSameColorCells: boolean;
 }
 
 export interface Cell {

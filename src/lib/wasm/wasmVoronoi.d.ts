@@ -59,7 +59,8 @@ export type EdgeResult = {
   isFinite: boolean,
   isCurved: boolean,
   isPrimary: boolean,
-  controll_points: VectorDouble
+  controll_points: VectorDouble,
+  isBetweenSameColorCells: boolean
 };
 
 export interface VoronoiWasmModule {

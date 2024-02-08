@@ -18,7 +18,7 @@
   <header class="sticky z-50 bg-white top-0 p-4">
     <h1 class="text-4xl font-sans text-center text-sky-400">Eschherization</h1>
   </header>
-    <div class="flex flex-row flex-wrap">
+  <div class="flex flex-row flex-wrap flex-grow">
       <div class="flex-grow flex-1" 
       style="min-width: 600px">
         <p class="text-2xl font-sans text-center text-sky-400 p-4">Upload Image</p>
@@ -36,8 +36,7 @@
       </div>
   </div>
 
-  <div class="fixed z-50 bottom-0 w-screen"
-  style="background-color: #0a4275"
+  <div class="sticky z-50 bottom-0 w-screen bg-sky-900"
   >
     <footer
       class="flex flex-col items-center text-center"

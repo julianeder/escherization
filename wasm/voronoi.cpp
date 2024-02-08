@@ -122,6 +122,7 @@ struct EdgeResult {
   bool isFinite;
   bool isCurved;
   bool isPrimary;
+  bool isBetweenSameColorCells;
   const voronoi_diagram<double>::edge_type* edge_ref; // not for javascript
   // std::vector<double> samples;
   std::vector<double> controll_points;
@@ -625,52 +626,8 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
 
   DiagrammResult result;
 
-  std::vector<const voronoi_diagram<double>::edge_type*> processed; // to Avoid Duplicates 
-
-  // printf("num_edges: %zu \n", vd.num_edges());
-
-  for (voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin(); it != vd.edges().end(); ++it) {
-    const voronoi_diagram<double>::edge_type* edge = &(*it);
-    
-    // Avoid Duplicates if we have rendered the twin half-edge (which is the same in the other direction) already
-    // bool found = false;
-    // for (std::vector<const voronoi_diagram<double>::edge_type*>::iterator it2 = processed.begin(); it2 != processed.end(); ++it2) {
-    //   if((*it2) == edge->twin())
-    //     found = true;
-    // }
-    // if(found) {
-    //   continue;
-    // }
-
-    // we only add the edge to processed at the end if it was not cliped (because cliping removes some halfEdges that are not cliped from the other side)
-
-    EdgeResult edgeResult;
-    
-    edgeResult.edge_ref = edge;
-
-    edgeResult.isFinite = edge->is_finite();
-    edgeResult.isPrimary = edge->is_primary();
-    edgeResult.isCurved = edge->is_curved();
-  
-    bool added = false;
-    if(edge->is_finite()){
-      added = clip_add_finite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox);
-    }else{
-      added = clip_add_infinite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox);
-    }
-
-    if(added){
-      processed.push_back(edge);
-    }
-  }
-
-  result.numVerticies = vd.num_vertices();
-  for (voronoi_diagram<double>::const_vertex_iterator it = vd.vertices().begin(); it != vd.vertices().end(); ++it) {
-    const voronoi_diagram<double>::vertex_type& vertex = *it;
-    result.vertices.push_back(vertex.x());
-    result.vertices.push_back(vertex.y());
-  }
-
+  // --------- CELLS --------------
+  // we need to do this part before edges were iterated
   for (voronoi_diagram<double>::const_cell_iterator it = vd.cells().begin(); it != vd.cells().end(); ++it) {
     const voronoi_diagram<double>::cell_type& cell = *it;
 
@@ -716,18 +673,74 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
     cellResult.contains_segment = cell.contains_segment();
     cellResult.color = cell.color();
     
-    const voronoi_diagram<double>::edge_type* edge = cell.incident_edge();
-    do {
-      for (int i = 0; i < result.edges.size(); i++){
-        // if(result.edges[i].edge_ref == edge || result.edges[i].edge_ref == edge->twin()){
-        if(result.edges[i].edge_ref == edge){
-          cellResult.edge_indices.push_back(i);
-        }
-      }
-      edge = edge->next();
-    } while (edge != cell.incident_edge());
+    
 
     result.cells.push_back(cellResult);
+  }
+
+  // --------- EDGES --------------
+  std::vector<const voronoi_diagram<double>::edge_type*> processed; // to Avoid Duplicates 
+  // printf("num_edges: %zu \n", vd.num_edges());
+  for (voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin(); it != vd.edges().end(); ++it) {
+    const voronoi_diagram<double>::edge_type* edge = &(*it);
+    
+    // Avoid Duplicates if we have rendered the twin half-edge (which is the same in the other direction) already
+    // bool found = false;
+    // for (std::vector<const voronoi_diagram<double>::edge_type*>::iterator it2 = processed.begin(); it2 != processed.end(); ++it2) {
+    //   if((*it2) == edge->twin())
+    //     found = true;
+    // }
+    // if(found) {
+    //   continue;
+    // }
+
+    // we only add the edge to processed at the end if it was not cliped (because cliping removes some halfEdges that are not cliped from the other side)
+
+    EdgeResult edgeResult;
+    
+    edgeResult.edge_ref = edge;
+
+    edgeResult.isFinite = edge->is_finite();
+    edgeResult.isPrimary = edge->is_primary();
+    edgeResult.isCurved = edge->is_curved();
+    edgeResult.isBetweenSameColorCells = edge->cell()->color() == edge->twin()->cell()->color();
+  
+    bool added = false;
+    if(edge->is_finite()){
+      added = clip_add_finite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox);
+    }else{
+      added = clip_add_infinite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox);
+    }
+
+    if(added){
+      processed.push_back(edge);
+    }
+  }
+
+  // --------- VERTICIES --------------
+  result.numVerticies = vd.num_vertices();
+  for (voronoi_diagram<double>::const_vertex_iterator it = vd.vertices().begin(); it != vd.vertices().end(); ++it) {
+    const voronoi_diagram<double>::vertex_type& vertex = *it;
+    result.vertices.push_back(vertex.x());
+    result.vertices.push_back(vertex.y());
+  }
+
+
+  // -------- CELLS 2 ---------------
+  // we need to do this part after edges were iterated
+  for (int j = 0; j < vd.cells().size(); ++j) {
+    const voronoi_diagram<double>::cell_type& cell = vd.cells()[j];
+
+    const voronoi_diagram<double>::edge_type* edge = cell.incident_edge();
+      do {
+        for (int i = 0; i < result.edges.size(); i++){
+          // if(result.edges[i].edge_ref == edge || result.edges[i].edge_ref == edge->twin()){
+          if(result.edges[i].edge_ref == edge){
+            result.cells[j].edge_indices.push_back(i);
+          }
+        }
+        edge = edge->next();
+      } while (edge != cell.incident_edge());
   }
 
   return result;
@@ -761,6 +774,7 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
     .field("isPrimary", &EdgeResult::isPrimary)
     // .field("samples", &EdgeResult::samples)
     .field("controll_points", &EdgeResult::controll_points)
+    .field("isBetweenSameColorCells", &EdgeResult::isBetweenSameColorCells)
     ;
 
   value_object<DiagrammResult>("DiagrammResult")

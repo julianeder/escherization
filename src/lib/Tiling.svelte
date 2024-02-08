@@ -23,6 +23,7 @@
     mulPoint,
     mulSegment,
   } from "./tactile/tactile";
+  import ColorPicker from "svelte-awesome-color-picker";
 
   export let siteStore: Writable<Sites>;
 
@@ -48,6 +49,10 @@
   let tilingParams: number[] = [];
 
   let autoUpdate: boolean = false;
+  let showBorder: boolean = true;
+  let showSkeleton: boolean = true;
+  let showOrigins: boolean = true;
+  let showBackground: boolean = true;
 
   const symGroups: Record<string, any> = {
     "1": "p1",
@@ -71,6 +76,10 @@
   const availableTilings: string[] = Object.keys(symGroups);
   let tilingIdx = 0;
   let prevTilingIndex = -1;
+
+  let color1: string = "#e06d4380";
+  let color2: string = "#59da5980";
+  let color3: string = "#c3c63580";
 
   function update() {
     updateTiling();
@@ -205,7 +214,7 @@
       s.y1 + offset.y,
       s.x2 + offset.x,
       s.y2 + offset.y,
-      s.color
+      s.color,
     );
   }
 
@@ -238,14 +247,12 @@
         segmentColorVector.push_back(ss.color);
       });
 
-
-
       let result: DiagrammResult = wasmVoronoi.computevoronoi(
         bboxVector,
         pointVector,
         segmentVector,
         pointColorVector,
-        segmentColorVector
+        segmentColorVector,
       );
       let newVoronoiVertices: Vertex[] = [];
       for (var i = 0; i < result.vertices.size(); i += 2) {
@@ -305,7 +312,9 @@
           controlPoints: controlPoints,
           isPrimary: e.isPrimary,
           isValid: valid,
+          isBetweenSameColorCells: e.isBetweenSameColorCells,
         });
+        console.log(e.isBetweenSameColorCells);
       }
 
       let newVoronoiCells: Cell[] = [];
@@ -559,8 +568,7 @@
       tileHeight = value.tileHeight;
       tileSitePoints = value.sitePoints;
       tileSiteSegments = value.siteSegments;
-      if(autoUpdate)
-        update();
+      if (autoUpdate) update();
     });
     tilingSitePoints = [
       new SitePoint(100, 50),
@@ -584,6 +592,10 @@
       tileHeight: tileHeight,
     });
   });
+
+  function color1Changed(rgba: any) {
+    console.log(rgba);
+  }
 </script>
 
 <div class="grid grid-cols-1 justify-items-center gap-4">
@@ -607,45 +619,47 @@
       fill="rgb(248 250 252)"
     />
     {#each voronoiCells as c}
-      {#if isCellPathConsistant(c)}
+      {#if showBackground && isCellPathConsistant(c)}
         <path
           id="cell {c.sourceIndex}"
           d={getCellPath(c)}
           stroke="black"
           stroke-width="0"
-          fill={c.color == 0 ? "red" : c.color == 1 ? "blue" : "green" }
+          fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
         ></path>
       {/if}
     {/each}
-    {#each tilingSitePoints as siteP, idx}
-      <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="black"
-      ></circle>
-    {/each}
-    {#each tilingSiteSegments as siteS, idx}
-      <path
-        id="segment {idx + tilingSitePoints.length}"
-        d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-        stroke="black"
-        stroke-width="1"
-        fill="none"
-      ></path>
-      <circle
-        id="segment {idx + tilingSitePoints.length}"
-        cx={siteS.x1}
-        cy={siteS.y1}
-        r="2"
-        fill="black"
-      ></circle>
-      <circle
-        id="segment {idx + tilingSitePoints.length}"
-        cx={siteS.x2}
-        cy={siteS.y2}
-        r="2"
-        fill="black"
-      ></circle>
-    {/each}
+    {#if showSkeleton}
+      {#each tilingSitePoints as siteP, idx}
+        <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="black"
+        ></circle>
+      {/each}
+      {#each tilingSiteSegments as siteS, idx}
+        <path
+          id="segment {idx + tilingSitePoints.length}"
+          d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
+          stroke="black"
+          stroke-width="1"
+          fill="none"
+        ></path>
+        <circle
+          id="segment {idx + tilingSitePoints.length}"
+          cx={siteS.x1}
+          cy={siteS.y1}
+          r="2"
+          fill="black"
+        ></circle>
+        <circle
+          id="segment {idx + tilingSitePoints.length}"
+          cx={siteS.x2}
+          cy={siteS.y2}
+          r="2"
+          fill="black"
+        ></circle>
+      {/each}
+    {/if}
     {#each voronoiEdges as e, idx}
-      {#if e.isValid}
+      {#if e.isValid && !e.isBetweenSameColorCells && showBorder}
         <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
         <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
         {#if e.isCurved}
@@ -675,8 +689,10 @@
       {/if}
     {/each}
     {#each tiles as origin, idx}
-      <circle id="origin {idx}" cx={origin.x} cy={origin.y} r="5" fill="pink"
-      ></circle>
+      {#if showOrigins}
+        <circle id="origin {idx}" cx={origin.x} cy={origin.y} r="5" fill="pink"
+        ></circle>
+      {/if}
     {/each}
   </svg>
 
@@ -752,7 +768,41 @@
       }}>Download SVG</button
     >
   </div>
-  <!-- </div> -->
+  <p class="text-xl font-sans text-center text-sky-400 p-4">
+    Display Settings
+  </p>
+  <div class="colorSettings grid grid-cols-4 gap-4">
+    <div class="bg-slate-100 flex items-center justify-center h-10">
+      <label class="p-2">
+        <input type="checkbox" bind:checked={showBorder} />
+        Show Border
+      </label>
+    </div>
+    <div class="bg-slate-100 flex items-center justify-center h-10">
+      <label class="p-2">
+        <input type="checkbox" bind:checked={showSkeleton} />
+        Show Skeleton
+      </label>
+    </div>
+    <div class="bg-slate-100 flex items-center justify-center h-10">
+      <label class="p-2">
+        <input type="checkbox" bind:checked={showOrigins} />
+        Show Origins
+      </label>
+    </div>
+    <div class="bg-slate-100 flex items-center justify-center h-10">
+      <label class="p-2">
+        <input type="checkbox" bind:checked={showBackground} />
+        Show Background
+      </label>
+    </div>
+  </div>
+  <div class="colorSettings grid grid-cols-3 gap-4 min-h-80">
+    <ColorPicker bind:hex={color1} label="Color 1" />
+    <ColorPicker bind:hex={color2} label="Color 2" />
+    <ColorPicker bind:hex={color3} label="Color 3" />
+  </div>
+
 
   <div class="lastErrorContainer">
     <p class="text-red-700 text-sm">{lastError}</p>
