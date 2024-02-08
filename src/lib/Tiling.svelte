@@ -78,16 +78,16 @@
   }
 
   function updateTiling() {
-    console.log(
-      "updateTiling " +
-        tileWidth +
-        "x" +
-        tileHeight +
-        " l " +
-        tileSitePoints.length +
-        " / " +
-        tileSiteSegments.length,
-    );
+    // console.log(
+    //   "updateTiling " +
+    //     tileWidth +
+    //     "x" +
+    //     tileHeight +
+    //     " l " +
+    //     tileSitePoints.length +
+    //     " / " +
+    //     tileSiteSegments.length,
+    // );
 
     let tileScale: number = 100;
     // for (var i = 0; i < newSitePoints.length; i ++) {
@@ -115,7 +115,7 @@
         tilingParams = [];
       }
     }
-    console.log(tilingParams);
+    // console.log(tilingParams);
 
     prevTilingIndex = tilingIdx;
 
@@ -547,7 +547,8 @@
       tileHeight = value.tileHeight;
       tileSitePoints = value.sitePoints;
       tileSiteSegments = value.siteSegments;
-      update();
+      if(autoUpdate)
+        update();
     });
     tilingSitePoints = [
       new SitePoint(100, 50),

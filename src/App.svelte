@@ -13,6 +13,8 @@
 </script>
 
 <main class="flex flex-col min-h-screen">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet">
   <header class="sticky z-50 bg-white top-0 p-4">
     <h1 class="text-4xl font-sans text-center text-sky-400">Eschherization</h1>
   </header>
@@ -34,13 +36,12 @@
       </div>
   </div>
 
-  <div class="sticky z-50 bottom-0"
+  <div class="fixed z-50 bottom-0 w-screen"
   style="background-color: #0a4275"
   >
     <footer
       class="flex flex-col items-center text-center"
     >
-      <!--Copyright section-->
       <div
         class="w-full p-1 text-center"
       >
