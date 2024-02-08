@@ -153,7 +153,7 @@
     }
 
     function translatePoint(p: SitePoint, tileCenter: Point): SitePoint {
-        return new SitePoint(p.x - tileCenter.x, p.y - tileCenter.y);
+        return new SitePoint(p.x - tileCenter.x, p.y - tileCenter.y, p.color);
     }
 
     function translateSegment(s: SiteSegment, tileCenter: Point): SiteSegment {
@@ -162,6 +162,7 @@
             s.y1 - tileCenter.y,
             s.x2 - tileCenter.x,
             s.y2 - tileCenter.y,
+            s.color
         );
     }
 

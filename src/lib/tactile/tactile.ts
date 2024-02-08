@@ -10,14 +10,17 @@ import { SitePoint, SiteSegment } from "../voronoiDataStructures";
 
 export class Point{
     minus(rhs: Point): Point {
-        return new Point(this.x-rhs.x, this.y-rhs.y);
+        return new Point(this.x-rhs.x, this.y-rhs.y, this.color);
     }
 	x: number = 0;
 	y: number = 0;
+	color: number = 0;
 
-	constructor(x: number, y: number){
+
+	constructor(x: number, y: number, color: number = 0){
 		this.x = x;
 		this.y = y;
+		this.color = color;
 	}
 }
 
@@ -49,7 +52,8 @@ export function mulPoint( A:number[], B:Point ): Point
 		// Matrix * Point
 		return new SitePoint( 
 			A[0]*B.x + A[1]*B.y + A[2],
-			A[3]*B.x + A[4]*B.y + A[5] 
+			A[3]*B.x + A[4]*B.y + A[5],
+			B.color
 		);
 
 };
@@ -62,6 +66,7 @@ export function mulSegment( A:number[], B:SiteSegment ): SiteSegment
 			A[3]*B.x1 + A[4]*B.y1 + A[5],
 			A[0]*B.x2 + A[1]*B.y2 + A[2],
 			A[3]*B.x2 + A[4]*B.y2 + A[5],
+			B.color
 		);
 
 };

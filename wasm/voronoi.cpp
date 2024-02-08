@@ -111,6 +111,7 @@ struct CellResult {
   bool contains_point;
   bool contains_segment;
   std::vector<int> edge_indices;
+  int color;
 };
 
 struct EdgeResult {
@@ -595,7 +596,7 @@ bool clip_add_infinite_edge(
     return true;
 }
 
-EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vector<int> points, std::vector<int> segments) {
+EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vector<int> points, std::vector<int> segments, std::vector<int> pointColors, std::vector<int> segmentColors) {
   std::vector<point_type> pointSites;
   std::vector<segment_type> lineSites;
 
@@ -702,9 +703,18 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
           break;
     }
 
+    if(cellResult.source_category == 0){
+      // printf("1 idx %zu color %d \n",cell.source_index(), pointColors[cell.source_index()] );
+      cell.color(pointColors[cell.source_index()]);
+    }else{
+      // printf("2 idx %zu color %d \n",cell.source_index(), segmentColors[cell.source_index()] );
+      cell.color(segmentColors[cell.source_index()]);
+    }
+
     cellResult.is_degenerate = cell.is_degenerate();
     cellResult.contains_point = cell.contains_point();
     cellResult.contains_segment = cell.contains_segment();
+    cellResult.color = cell.color();
     
     const voronoi_diagram<double>::edge_type* edge = cell.incident_edge();
     do {
@@ -738,6 +748,7 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
     .field("containsPoint", &CellResult::contains_point)
     .field("containsSegment", &CellResult::contains_segment)
     .field("edgeIndices", &CellResult::edge_indices)
+    .field("color", &CellResult::color)
     ;
 
   value_object<EdgeResult>("EdgeResult")

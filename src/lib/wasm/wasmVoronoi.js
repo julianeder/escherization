@@ -14,7 +14,7 @@ Module["ready"] = new Promise((resolve, reject) => {
  readyPromiseReject = reject;
 });
 
-[ "_main", "getExceptionMessage", "___get_exception_message", "_free", "_memory", "__Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_", "___indirect_function_table", "_fflush", "onRuntimeInitialized" ].forEach(prop => {
+[ "_main", "getExceptionMessage", "___get_exception_message", "_free", "_memory", "__Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_S5_S5_", "___indirect_function_table", "_fflush", "onRuntimeInitialized" ].forEach(prop => {
  if (!Object.getOwnPropertyDescriptor(Module["ready"], prop)) {
   Object.defineProperty(Module["ready"], prop, {
    get: () => abort("You are getting " + prop + " on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js"),
@@ -2815,6 +2815,7 @@ var wasmImports = {
  /** @export */ invoke_viii: invoke_viii,
  /** @export */ invoke_viiii: invoke_viiii,
  /** @export */ invoke_viiiii: invoke_viiiii,
+ /** @export */ invoke_viiiiii: invoke_viiiiii,
  /** @export */ invoke_viiiiiiiiii: invoke_viiiiiiiiii
 };
 
@@ -2822,7 +2823,7 @@ var wasmExports = createWasm();
 
 var ___wasm_call_ctors = createExportWrapper("__wasm_call_ctors");
 
-var __Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_ = Module["__Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_"] = createExportWrapper("_Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_");
+var __Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_S5_S5_ = Module["__Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_S5_S5_"] = createExportWrapper("_Z7computeNSt3__26vectorIdNS_9allocatorIdEEEENS0_IiNS1_IiEEEES5_S5_S5_");
 
 var ___cxa_free_exception = createExportWrapper("__cxa_free_exception");
 
@@ -2993,6 +2994,17 @@ function invoke_iiiii(index, a1, a2, a3, a4) {
  var sp = stackSave();
  try {
   return getWasmTableEntry(index)(a1, a2, a3, a4);
+ } catch (e) {
+  stackRestore(sp);
+  if (!(e instanceof EmscriptenEH)) throw e;
+  _setThrew(1, 0);
+ }
+}
+
+function invoke_viiiiii(index, a1, a2, a3, a4, a5, a6) {
+ var sp = stackSave();
+ try {
+  getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6);
  } catch (e) {
   stackRestore(sp);
   if (!(e instanceof EmscriptenEH)) throw e;

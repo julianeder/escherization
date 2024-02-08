@@ -125,6 +125,11 @@
       bbox.xh / tileScale,
       bbox.yh / tileScale,
     )) {
+      // Use a simple colouring algorithm to pick a colour for this tile
+      // so that adjacent tiles aren't the same colour.  The resulting
+      // value col will be 0, 1, or 2, which you should map to your
+      // three favourite colours.
+      const color = tiling.getColour(i.t1, i.t2, i.aspect);
       // Get the 3x3 matrix corresponding to one of the transformed
       // tiles in the filled region.
       const M = i.T;
@@ -138,6 +143,7 @@
       tiles.push(origin);
 
       for (var j = 0; j < tileSitePoints.length; j++) {
+        tileSitePoints[j].color = color;
         tilingSitePoints.push(
           scale(
             mulPoint(
@@ -160,6 +166,8 @@
       }
 
       for (var j = 0; j < tileSiteSegments.length; j++) {
+        tileSiteSegments[j].color = color;
+
         tilingSiteSegments.push(
           scaleSegment(
             mulSegment(
@@ -180,21 +188,15 @@
           // )
         );
       }
-
-      // Use a simple colouring algorithm to pick a colour for this tile
-      // so that adjacent tiles aren't the same colour.  The resulting
-      // value col will be 0, 1, or 2, which you should map to your
-      // three favourite colours.
-      const col = tiling.getColour(i.t1, i.t2, i.aspect);
     }
   }
 
   function scale(p: Point, sX: number, sY: number) {
-    return new Point(p.x * sX, p.y * sY);
+    return new Point(p.x * sX, p.y * sY, p.color);
   }
 
   function scaleSegment(s: SiteSegment, sX: number, sY: number) {
-    return new SiteSegment(s.x1 * sX, s.y1 * sY, s.x2 * sX, s.y2 * sY);
+    return new SiteSegment(s.x1 * sX, s.y1 * sY, s.x2 * sX, s.y2 * sY, s.color);
   }
 
   function translateSegment(s: SiteSegment, offset: Point): SiteSegment {
@@ -203,11 +205,12 @@
       s.y1 + offset.y,
       s.x2 + offset.x,
       s.y2 + offset.y,
+      s.color
     );
   }
 
   function translatePoint(p: SitePoint, offset: Point): SitePoint {
-    return new SitePoint(p.x + offset.x, p.y + offset.y);
+    return new SitePoint(p.x + offset.x, p.y + offset.y, p.color);
   }
 
   function updateVoronoi() {
@@ -219,22 +222,30 @@
       bboxVector.push_back(bbox.yh);
 
       const pointVector = new wasmVoronoi.VectorInt();
+      const pointColorVector = new wasmVoronoi.VectorInt();
       tilingSitePoints.forEach((sp) => {
         pointVector.push_back(sp.x);
         pointVector.push_back(sp.y);
+        pointColorVector.push_back(sp.color);
       });
       const segmentVector = new wasmVoronoi.VectorInt();
+      const segmentColorVector = new wasmVoronoi.VectorInt();
       tilingSiteSegments.forEach((ss) => {
         segmentVector.push_back(ss.x1);
         segmentVector.push_back(ss.y1);
         segmentVector.push_back(ss.x2);
         segmentVector.push_back(ss.y2);
+        segmentColorVector.push_back(ss.color);
       });
+
+
 
       let result: DiagrammResult = wasmVoronoi.computevoronoi(
         bboxVector,
         pointVector,
         segmentVector,
+        pointColorVector,
+        segmentColorVector
       );
       let newVoronoiVertices: Vertex[] = [];
       for (var i = 0; i < result.vertices.size(); i += 2) {
@@ -307,6 +318,7 @@
           containsPoint: c.containsPoint,
           containsSegment: c.containsSegment,
           edgeIndices: [],
+          color: c.color,
         };
         newVoronoiCells.push(newCell);
         for (var j = 0; j < c.edgeIndices.size(); j++) {
@@ -601,7 +613,7 @@
           d={getCellPath(c)}
           stroke="black"
           stroke-width="0"
-          fill="red"
+          fill={c.color == 0 ? "red" : c.color == 1 ? "blue" : "green" }
         ></path>
       {/if}
     {/each}
