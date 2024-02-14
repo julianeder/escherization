@@ -24,6 +24,7 @@
   "dependencies": {
     "skeleton-tracing-js": "^1.0.4",
     "skeleton-tracing-wasm": "^1.0.3",
-    "svelte-awesome-color-picker": "^3.0.4"
+    "svelte-awesome-color-picker": "^3.0.4",
+    "transformation-matrix": "^2.15.0"
   }
 }

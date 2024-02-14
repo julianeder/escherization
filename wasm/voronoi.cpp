@@ -112,6 +112,7 @@ struct CellResult {
   bool contains_segment;
   std::vector<int> edge_indices;
   int color;
+  int tile_idx;
 };
 
 struct EdgeResult {
@@ -597,7 +598,14 @@ bool clip_add_infinite_edge(
     return true;
 }
 
-EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vector<int> points, std::vector<int> segments, std::vector<int> pointColors, std::vector<int> segmentColors) {
+EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
+  std::vector<double> bbox, std::vector<int> points, 
+  std::vector<int> segments, 
+  std::vector<int> pointColors, 
+  std::vector<int> segmentColors,
+  std::vector<int> pointTileIdxs,
+  std::vector<int> segmentTileIdxs
+  ) {
   std::vector<point_type> pointSites;
   std::vector<segment_type> lineSites;
 
@@ -663,9 +671,12 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(std::vector<double> bbox, std::vecto
     if(cellResult.source_category == 0){
       // printf("1 idx %zu color %d \n",cell.source_index(), pointColors[cell.source_index()] );
       cell.color(pointColors[cell.source_index()]);
+      cellResult.tile_idx = pointTileIdxs[cell.source_index()];
     }else{
       // printf("2 idx %zu color %d \n",cell.source_index(), segmentColors[cell.source_index()] );
       cell.color(segmentColors[cell.source_index()]);
+      cellResult.tile_idx = segmentTileIdxs[cell.source_index()];
+      // printf("idx %zu tile_idx %d \n",cell.source_index(), segmentTileIdxs[cell.source_index()] );
     }
 
     cellResult.is_degenerate = cell.is_degenerate();
@@ -762,6 +773,7 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
     .field("containsSegment", &CellResult::contains_segment)
     .field("edgeIndices", &CellResult::edge_indices)
     .field("color", &CellResult::color)
+    .field("tileIdx", &CellResult::tile_idx)
     ;
 
   value_object<EdgeResult>("EdgeResult")

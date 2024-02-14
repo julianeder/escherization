@@ -48,7 +48,8 @@ export type CellResult = {
   containsPoint: boolean,
   containsSegment: boolean,
   edgeIndices: VectorInt,
-  color: number
+  color: number,
+  tileIdx: number
 };
 
 export type EdgeResult = {
@@ -68,6 +69,6 @@ export interface VoronoiWasmModule {
   VectorDouble: {new(): VectorDouble};
   VectorEdgeResult: {new(): VectorEdgeResult};
   VectorCellResult: {new(): VectorCellResult};
-  computevoronoi(_0: VectorDouble, _1: VectorInt, _2: VectorInt, _3: VectorInt, _4: VectorInt): DiagrammResult;
+  computevoronoi(_0: VectorDouble, _1: VectorInt, _2: VectorInt, _3: VectorInt, _4: VectorInt, _5: VectorInt, _6: VectorInt): DiagrammResult;
 }
 export default function instantiate_wasmVoronoi(mod?: any): Promise<VoronoiWasmModule>; 

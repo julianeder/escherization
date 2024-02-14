@@ -9,6 +9,7 @@
     import { Vectorization } from "./vectorization";
 
     export let siteStore: Writable<Sites>;
+    export let imageStore: Writable<HTMLImageElement |null>;
 
     let tracer: any;
 
@@ -65,6 +66,8 @@
             ),
             tileWidth: tileWidth,
             tileHeight: tileHeight,
+            tileCenter: tileCenter,
+            imageOffset: new Point(imgX, imgY)
         });
     }
 
@@ -93,6 +96,7 @@
 
                     //Trigger Reactive Update?
                     siteSegments = Vectorization.updateSkelleton(ctx!, imgX, imgY, tileWidth, tileHeight, deviation);
+                    imageStore.set(image);
                     updateStore();
 
                 });
@@ -153,7 +157,7 @@
     }
 
     function translatePoint(p: SitePoint, tileCenter: Point): SitePoint {
-        return new SitePoint(p.x - tileCenter.x, p.y - tileCenter.y, p.color);
+        return new SitePoint(p.x - tileCenter.x, p.y - tileCenter.y, p.color, p.M, p.tileIdx);
     }
 
     function translateSegment(s: SiteSegment, tileCenter: Point): SiteSegment {
@@ -162,7 +166,9 @@
             s.y1 - tileCenter.y,
             s.x2 - tileCenter.x,
             s.y2 - tileCenter.y,
-            s.color
+            s.color,
+            s.M,
+            s.tileIdx
         );
     }
 
@@ -314,7 +320,7 @@
         }
         else if(activeTool=="addSegment"){
             if(creatingSegmet == null){
-                creatingSegmet = new SiteSegment(evt.offsetX - imgX, evt.offsetY - imgY, evt.offsetX - imgX, evt.offsetY - imgY);
+                creatingSegmet = new SiteSegment(evt.offsetX - imgX, evt.offsetY - imgY, evt.offsetX - imgX, evt.offsetY - imgY, undefined, [], -1);
             }else{
                 creatingSegmet.x2 = evt.offsetX - imgX;
                 creatingSegmet.y2 = evt.offsetY - imgY;
