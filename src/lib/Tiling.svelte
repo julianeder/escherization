@@ -11,6 +11,7 @@
     Sites,
     type Cell,
     type Tile,
+    Point,
   } from "./voronoiDataStructures";
   import instantiate_wasmVoronoi, {
     type VoronoiWasmModule,
@@ -20,9 +21,7 @@
   } from "../lib/wasm/wasmVoronoi";
   import {
     IsohedralTiling,
-    Point,
     mul,
-    mulPoint,
     mulSegment,
   } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
@@ -158,7 +157,7 @@
       // );
 
       let origin = scalePoint(
-        mulPoint(M, new Point(0, 0)),
+        SitePoint.mulPoint(M, new SitePoint(0, 0)),
         tilingSize,
         tilingSize,
       );
@@ -171,7 +170,7 @@
 
         tilingSitePoints.push(
           scalePoint(
-            mulPoint(
+            SitePoint.mulPoint(
               M,
               scalePoint(
                 tileSitePoints[j],
@@ -208,8 +207,8 @@
     }
   }
 
-  function scalePoint(p: Point, sX: number, sY: number) {
-    return new Point(p.x * sX, p.y * sY, p.color, p.M, p.tileIdx);
+  function scalePoint(p: SitePoint, sX: number, sY: number): SitePoint {
+    return new SitePoint(p.x * sX, p.y * sY, p.color, p.M, p.tileIdx);
   }
 
   function scaleSegment(s: SiteSegment, sX: number, sY: number) {

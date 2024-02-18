@@ -1,6 +1,5 @@
 import { writable, type Writable } from "svelte/store";
-import { Sites } from "./voronoiDataStructures";
-import { Point } from "./tactile/tactile";
+import { Sites, Point } from "./voronoiDataStructures";
 
 export const canvasSize: Point = new Point(300, 300);
 

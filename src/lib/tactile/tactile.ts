@@ -6,27 +6,9 @@
  * file "LICENSE" for more information.
  */
 
-import { SitePoint, SiteSegment } from "../voronoiDataStructures";
-
-export class Point {
-	minus(rhs: Point): Point {
-		return new Point(this.x - rhs.x, this.y - rhs.y, this.color, this.M, this.tileIdx);
-	}
-	x: number = 0;
-	y: number = 0;
-	color: number = 0;
-    M: number[] = [];
-	tileIdx: number;
+import { SiteSegment, Point } from "../voronoiDataStructures";
 
 
-	constructor(x: number, y: number, color: number = 0, M: number[] = [], tileIdx: number = -1) {
-		this.x = x;
-		this.y = y;
-		this.color = color;
-		this.M = M;
-		this.tileIdx = tileIdx;
-	}
-}
 
 export const EdgeShape = {
 	J: 10001,
@@ -47,18 +29,6 @@ export function mul(A: number[], B: number[]): number[] {
 	A[3] * B[0] + A[4] * B[3],
 	A[3] * B[1] + A[4] * B[4],
 	A[3] * B[2] + A[4] * B[5] + A[5]];
-
-};
-
-export function mulPoint(A: number[], B: Point): SitePoint {
-	// Matrix * Point
-	return new SitePoint(
-		A[0] * B.x + A[1] * B.y + A[2],
-		A[3] * B.x + A[4] * B.y + A[5],
-		B.color,
-		B.M,
-		B.tileIdx
-	);
 
 };
 
@@ -1887,7 +1857,7 @@ const tiling_type_data = (function () {
 	];
 })();
 export function makePoint(coeffs: number[], offs: number, params: number[]) {
-	let ret = { x: 0.0, y: 0.0 }
+	let ret = new Point(0.0, 0.0);
 
 	for (let i = 0; i < params.length; ++i) {
 		ret.x += coeffs[offs + i] * params[i];
@@ -2099,10 +2069,10 @@ export class IsohedralTiling {
 
 	* fillRegionBounds(xmin: number, ymin: number, xmax: number, ymax: number) {
 		yield* this.fillRegionQuad(
-			{ x: xmin, y: ymin },
-			{ x: xmax, y: ymin },
-			{ x: xmax, y: ymax },
-			{ x: xmin, y: ymax });
+			new Point(xmin, ymin ),
+			new Point(xmax, ymin ),
+			new Point(xmax, ymax ),
+			new Point(xmin, ymax ));
 	}
 
 	* fillRegionQuad(A: Point, B: Point, C: Point, D: Point) {
@@ -2113,16 +2083,16 @@ export class IsohedralTiling {
 
 		let last_y: number;
 
-		function bc(M: number[], p: Point) {
-			return {
-				x: M[0] * p.x + M[1] * p.y,
-				y: M[2] * p.x + M[3] * p.y
-			};
+		function bc(M: number[], p: Point): Point {
+			return new Point(
+				M[0] * p.x + M[1] * p.y,
+				M[2] * p.x + M[3] * p.y
+			);
 		};
 
-		function sampleAtHeight(P: Point, Q: Point, y: number) {
+		function sampleAtHeight(P: Point, Q: Point, y: number): Point {
 			const t = (y - P.y) / (Q.y - P.y);
-			return { x: (1.0 - t) * P.x + t * Q.x, y: y };
+			return new Point((1.0 - t) * P.x + t * Q.x, y );
 		}
 
 		function* doFill(A: Point, B: Point, C: Point, D: Point, do_top: boolean) {

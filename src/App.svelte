@@ -1,12 +1,6 @@
 <script lang="ts">
   import UploadImage from "./lib/UploadImage.svelte";
   import Tiling from "./lib/Tiling.svelte";
-  import { writable, type Writable } from "svelte/store";
-  import { Sites } from "./lib/voronoiDataStructures";
-  import { Point } from "./lib/tactile/tactile";
-
-
-
 </script>
 
 <main class="flex flex-col min-h-screen">

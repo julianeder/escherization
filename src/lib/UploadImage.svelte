@@ -4,8 +4,7 @@
     import TraceSkeleton from "./trace_skeleton.vanilla";
     import TraceSkeleton2 from "./wasmSkelleton/index";
     import { onMount } from "svelte";
-    import { SitePoint, SiteSegment, Sites } from "./voronoiDataStructures";
-    import { Point } from "./tactile/tactile";
+    import { Point, SitePoint, SiteSegment, Sites } from "./voronoiDataStructures";
     import { Vectorization } from "./vectorization";
     import { canvasSize, imageStore, siteStore } from "./state";
 
@@ -331,12 +330,11 @@
         if(activeTool == "delete"){
             if(evt.target.classList.contains("siteSegmentPoint")){
                 let idx: number = Number((evt.target.id as string).substring(17));
-                // console.log(idx)
                 if(idx % 2 == 0)
                     idx = idx / 2;
                 else
                     idx = (idx-1) / 2;
-                console.log(idx)
+                // console.log(idx)
                 siteSegments.splice(idx, 1);
                 siteSegments = [...siteSegments];
                 updateStore();

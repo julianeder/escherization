@@ -1,5 +1,3 @@
-import { Point } from "./tactile/tactile";
-
 export class BBox {
     xl: number;
     xh: number;
@@ -26,17 +24,46 @@ export class Sites{
     imageOffset: Point = new Point(0,0);
 }
 
-export class SitePoint extends Point {
+export class Point {
+	x: number = 0;
+	y: number = 0;
 
-    // voronoiId: number = -1;
+	constructor(x: number, y: number) {
+		this.x = x;
+		this.y = y;
+	}
+}
+
+export class SitePoint extends Point {
+    minus(rhs: SitePoint): SitePoint {
+        return new SitePoint(this.x - rhs.x, this.y - rhs.y, this.color, this.M, this.tileIdx);
+    }
+
+    static mulPoint(A: number[], B: SitePoint): SitePoint {
+        // Matrix * Point
+        return new SitePoint(
+            A[0] * B.x + A[1] * B.y + A[2],
+            A[3] * B.x + A[4] * B.y + A[5],
+            B.color,
+            B.M,
+            B.tileIdx
+        );
+    
+    };
+
+    color: number = 0;
+    M: number[] = [];
+    tileIdx: number;
 
     constructor(x: number, y: number, color: number = 0, M:number[] = [], tileIdx: number = -1) {
-        super(x, y, color, M, tileIdx);
-
-        // this.x = x;
-        // this.y = y;
+        super(x, y);
+        this.color = color;
+		this.M = M;
+		this.tileIdx = tileIdx;
     }
 }
+
+
 
 export class SiteSegment {
     minus(rhs: Point): any {
