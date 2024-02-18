@@ -7,9 +7,7 @@
     import { SitePoint, SiteSegment, Sites } from "./voronoiDataStructures";
     import { Point } from "./tactile/tactile";
     import { Vectorization } from "./vectorization";
-
-    export let siteStore: Writable<Sites>;
-    export let imageStore: Writable<HTMLImageElement |null>;
+    import { canvasSize, imageStore, siteStore } from "./state";
 
     let tracer: any;
 
@@ -19,8 +17,6 @@
     let ctx: CanvasRenderingContext2D | null = null;
     let svgContainer: any;
 
-    const canvasWidth: number = 300;
-    const canvasHeight: number = 300;
     let tileWidth: number = 300;
     let tileHeight: number = 300;
     let imgX: number = 0;
@@ -58,6 +54,12 @@
 
     let creatingSegmet: SiteSegment | null = null;
 
+    function update(){
+        //Trigger Reactive Update?
+        siteSegments = Vectorization.updateSkelleton(ctx!, imgX, imgY, tileWidth, tileHeight, deviation);
+        updateStore();
+    }
+
     function updateStore() {
         siteStore.set({
             sitePoints: sitePoints.map((p) => translatePoint(p, tileCenter)),
@@ -89,15 +91,14 @@
                     ctx = canvas.getContext("2d", {
                         willReadFrequently: true,
                     });
-                    ctx?.clearRect(0, 0, canvasWidth, canvasHeight);
+                    ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
                     drawImageScaled(image);
                     // ctx.fillStyle = ctx.createPattern(image, 'repeat');
                     // ctx.fillRect(0, 0, width, height);
 
-                    //Trigger Reactive Update?
-                    siteSegments = Vectorization.updateSkelleton(ctx!, imgX, imgY, tileWidth, tileHeight, deviation);
+                    update();
                     imageStore.set(image);
-                    updateStore();
+
 
                 });
             image.src = inputImage;
@@ -151,9 +152,9 @@
         ctx.putImageData(newImgageData, imgX, imgY);
     }
 
-    function onResolutionChanged(newRes: number) {
+    function onDeviationToleranceChanged(newRes: number) {
         deviation = newRes;
-        Promise.resolve().then(updateSkelleton); // Run Async
+        Promise.resolve().then(update); // Run Async
     }
 
     function translatePoint(p: SitePoint, tileCenter: Point): SitePoint {
@@ -190,14 +191,9 @@
         }
     }
 
-    onMount(async () => {
-        tracer = await TraceSkeleton2.load();
-        updateStore();
-    });
-
-    var selectedElement: any = null;
-    var offset: any = null;
     function makeDraggable(evt: any) {
+        var selectedElement: any = null;
+        var offset: any = null;
         var svg = evt.target;
         svg!.addEventListener("mousedown", startDrag);
         svg!.addEventListener("mousemove", drag);
@@ -335,7 +331,7 @@
         if(activeTool == "delete"){
             if(evt.target.classList.contains("siteSegmentPoint")){
                 let idx: number = Number((evt.target.id as string).substring(17));
-                console.log(idx)
+                // console.log(idx)
                 if(idx % 2 == 0)
                     idx = idx / 2;
                 else
@@ -351,14 +347,19 @@
     function sitePointClick(evt: any){
         if(activeTool == "delete"){
             if(evt.target.classList.contains("sitePoint")){
-                let idx: number = Number((evt.target.id as string).substring(17));
-                console.log(idx)
+                let idx: number = Number((evt.target.id as string).substring(10));
+                // console.log(idx)
                 sitePoints.splice(idx, 1);
                 sitePoints = sitePoints; // Trigger Reactive Update
                 updateStore();
             }
         }
     }
+
+    onMount(async () => {
+        tracer = await TraceSkeleton2.load();
+        updateStore();
+    });
 
 </script>
 
@@ -435,9 +436,9 @@
                 <canvas
                     class="uploadCanvas bg-slate-50 border border-sky-600 col-start-1 row-start-1"
                     bind:this={canvas}
-                    width={canvasWidth}
-                    height={canvasHeight}
-                    style="width: {canvasWidth}px; height: {canvasHeight}px"
+                    width={canvasSize.x}
+                    height={canvasSize.y}
+                    style="width: {canvasSize.x}px; height: {canvasSize.y}px"
                 ></canvas>
                 <div
                     class="overdrawSvg col-start-1 row-start-1"
@@ -446,9 +447,9 @@
                     <svg
                         id="previewSvg"
                         on:load={makeDraggable}
-                        width={canvasWidth}
-                        height={canvasHeight}
-                        viewBox="0 0 {canvasWidth} {canvasHeight}"
+                        width={canvasSize.x}
+                        height={canvasSize.y}
+                        viewBox="0 0 {canvasSize.x} {canvasSize.y}"
                         xmlns="http://www.w3.org/2000/svg"
                     >
                         <g transform="translate({imgX} {imgY})"
@@ -561,7 +562,7 @@
                 min={1}
                 max={50}
                 initialValue={deviation}
-                on:change={(e) => onResolutionChanged(e.detail.value)}
+                on:change={(e) => onDeviationToleranceChanged(e.detail.value)}
             />
         </div>
         <button

@@ -34,10 +34,10 @@
     toSVG,
     inverse,
     translate,
+    rotate,
   } from "transformation-matrix";
+    import { imageStore, siteStore } from "./state";
 
-  export let siteStore: Writable<Sites>;
-  export let imageStore: Writable<HTMLImageElement | null>;
 
   let wasmVoronoi: VoronoiWasmModule;
   let bbox: BBox = { xl: 0, xh: 500, yl: 0, yh: 500 };
@@ -196,8 +196,8 @@
               M,
               scaleSegment(
                 tileSiteSegments[j],
-                tileSize / tileWidth,
-                tileSize / tileHeight,
+                tileSize / 300,
+                tileSize / 300,
               ),
             ),
             tilingSize,
@@ -650,31 +650,25 @@
     if (autoUpdate) update();
   }
 
-  //a = 0, c = 1, e = 2
-  //b = 3, d = 4, f = 5
-  function getTransformationForCell(c: Cell): string {
-    if (c.containsPoint) {
-      return "";
-    } else if (c.containsSegment) {
-      let M: number[] = tilingSiteSegments[c.sourceIndex].M;
-      return getTransformation(M);
-    }
-    return "";
-  }
+  function getTransformation(mat: number[], origin: Point): string {
+    let M: Matrix = { a: mat[0], b: mat[3], c: mat[1], d: mat[4], e: mat[2], f: mat[5] };
 
-  function getTransformation(M: number[], origin: Point): string {
-    let MM: Matrix = { a: M[0], b: M[3], c: M[1], d: M[4], e: M[2], f: M[5] };
-    MM.e = MM.e*tilingSize;
-    MM.f = MM.f*tilingSize;
+    // Decompose M into Translation, Rotation, Scale Matrices
+    let T: Matrix = { a: 0, b: 0, c: 0, d: 0, e: M.e, f: M.f };
+    M.e = 0; //MM.e*tilingSize;
+    M.f = 0; //MM.f*tilingSize;
+    let sx = Math.sqrt(M.a*M.a + M.b*M.b);
+    let sy = Math.sqrt(M.c*M.c + M.d*M.d);
+    let R: Matrix = { a: M.a / sx, b: M.b / sx, c: M.c / sy, d: M.d / sy, e: 0, f: 0 };
+    let angle = Math.atan2(M.b, M.a);
+
     let Mtransform = compose(
-      translate(-tileCenter.x + imageOffset.x, -tileCenter.y + imageOffset.y),
-      scale(tileSize / 300, tileSize / 300, 0 , 0),
-      MM,
-      scale(tilingSize, tilingSize, origin.x, origin.y),
-      // scale(tilingSize, tilingSize),
+      rotate(angle, origin.x, origin.y),
+      scale(sx * tilingSize * tileSize / 300, sy * tilingSize * tileSize / 300, origin.x, origin.y),
+      translate(-tileCenter.x + origin.x, -tileCenter.y + origin.y),
       );
-      console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y + " imageOffset: "  + imageOffset.x +" "+ imageOffset.y +  " / " + toSVG(Mtransform))
-      console.log("e: " + MM.e + " f "+ MM.f)
+      // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y + " imageOffset: "  + imageOffset.x +" "+ imageOffset.y +  " / " + toSVG(Mtransform))
+      // console.log("e: " + MM.e + " f "+ MM.f)
       return toSVG(Mtransform);
   }
 
@@ -747,7 +741,6 @@
     {#each voronoiCells as c}
       {#if showBackground && isCellPathConsistant(c)}
         {#if showBackgroundImage}
-          <g>
             <path
               id="cell {c.sourceIndex}"
               d={getCellPath(c)}
@@ -755,18 +748,14 @@
               stroke-width="0"
               fill={getPatternUrl(c)}
             ></path>
-          </g>
         {:else}
-          <g transform={getTransformationForCell(c)}>
             <path
               id="cell {c.sourceIndex}"
               d={getCellPath(c)}
               stroke="black"
               stroke-width="0"
-              transform={getInverseTransformation(c)}
               fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
             ></path>
-          </g>
         {/if}
       {/if}
     {/each}

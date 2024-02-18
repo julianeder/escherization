@@ -3,18 +3,9 @@
   import Tiling from "./lib/Tiling.svelte";
   import { writable, type Writable } from "svelte/store";
   import { Sites } from "./lib/voronoiDataStructures";
-    import { Point } from "./lib/tactile/tactile";
+  import { Point } from "./lib/tactile/tactile";
 
-  let siteStore: Writable<Sites> = writable({
-    sitePoints: [],
-    siteSegments: [],
-    tileWidth: 300,
-    tileHeight: 300,
-    tileCenter: new Point(0,0),
-    imageOffset: new Point(0,0),
-  });
 
-  export let imageStore: Writable<HTMLImageElement | null> = writable(null);
 
 </script>
 
@@ -28,7 +19,7 @@
       <div class="flex-grow flex-1" 
       style="min-width: 600px">
         <p class="text-2xl font-sans text-center text-sky-400 p-4">Upload Image</p>
-        <UploadImage {siteStore}, {imageStore}></UploadImage>
+        <UploadImage></UploadImage>
       </div>
 
       <div
@@ -38,7 +29,7 @@
       <div class="flex-grow flex-1" 
       style="min-width: 600px">
         <p class="text-2xl font-sans text-center text-sky-400 p-4">Tiling</p>
-        <Tiling {siteStore}, {imageStore}></Tiling>
+        <Tiling></Tiling>
       </div>
   </div>
 
