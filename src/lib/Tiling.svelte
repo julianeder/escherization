@@ -32,6 +32,7 @@
     rotate,
   } from "transformation-matrix";
   import { imageStore, siteStore } from "./state";
+    import { checkIntersections } from "./collisionDetection";
 
   let wasmVoronoi: VoronoiWasmModule;
   let bbox: BBox = new BBox(0, 500, 0, 500);
@@ -96,7 +97,14 @@
 
   function update() {
     updateTiling();
-    updateVoronoi();
+
+    if(checkIntersections(tilingSiteSegments)){
+      lastError = "Collision between tiles detected, please change the paremeters (e.g. decrease Tile Size)"
+    }
+    else{
+      lastError = ""
+      updateVoronoi();
+    }
   }
 
   function updateTiling() {
@@ -266,7 +274,7 @@
         segmentTileIdxVector.push_back(ss.tileIdx);
       });
 
-      console.log(tilingSiteSegments[726]);
+      // console.log(tilingSiteSegments[72]);
 
       let result: DiagrammResult = wasmVoronoi.computevoronoi(
         bboxVector,
@@ -353,9 +361,9 @@
           isBetweenSameColorCells: e.isBetweenSameColorCells,
         });
 
-        if (newVoronoiEdges.length == 727) {
-          console.log(newVoronoiEdges[726]);
-        }
+        // if (newVoronoiEdges.length == 98) {
+        //   console.log(newVoronoiEdges[97]);
+        // }
 
         // console.log(e.isBetweenSameColorCells);
       }
@@ -878,6 +886,9 @@
       {/if}
     {/each}
   </svg>
+  <div class="lastErrorContainer max-w-96">
+    <p class="text-red-700 text-sm break-words">{lastError}</p>
+  </div>
 
   <!-- <div class="grid grid-rows-4 content-start"> -->
   <p class="text-xl font-sans text-center text-sky-400 p-4">Tiling Settings</p>
@@ -1015,10 +1026,6 @@
     <ColorPicker bind:hex={color1} label="Color 1" />
     <ColorPicker bind:hex={color2} label="Color 2" />
     <ColorPicker bind:hex={color3} label="Color 3" />
-  </div>
-
-  <div class="lastErrorContainer">
-    <p class="text-red-700 text-sm">{lastError}</p>
   </div>
 </div>
 

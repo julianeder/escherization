@@ -145,12 +145,12 @@ struct DiagrammResult {
 };
 
 Point retrieve_point(
-  const voronoi_diagram<double>::cell_type& cell,
+  const voronoi_diagram<double>::cell_type* cell,
   std::vector<Point> pointSites,
   std::vector<Segment> lineSites
   ) {
-  voronoi_diagram<double>::cell_type::source_index_type index = cell.source_index();
-  voronoi_diagram<double>::cell_type::source_category_type category = cell.source_category();
+  voronoi_diagram<double>::cell_type::source_index_type index = cell->source_index();
+  voronoi_diagram<double>::cell_type::source_category_type category = cell->source_category();
   if (category == boost::polygon::SOURCE_CATEGORY_SINGLE_POINT) {
     return pointSites[index];
   }
@@ -162,8 +162,8 @@ Point retrieve_point(
   }
 }
 
-Segment retrieve_segment(const cell_type& cell, std::vector<Point> pointSites, std::vector<Segment> lineSites) {
-  source_index_type index = cell.source_index() - pointSites.size();
+Segment retrieve_segment(const cell_type* cell, std::vector<Point> pointSites, std::vector<Segment> lineSites) {
+  source_index_type index = cell->source_index() - pointSites.size();
   return lineSites[index];
 }
 
@@ -343,11 +343,6 @@ bool clip_add_finite_edge(
   if(isnan(direction.x()) || isnan(direction.y()))
     return false;
 
-  if(i == 869)
-    printf("X dir %d %f \n", i, direction.x());
-  if(i == 869)
-    printf("Y dir %d %f \n", i, direction.y());
-
   double dxdy = direction.x() / direction.y();
   double dydx = direction.y() / direction.x();
 
@@ -447,11 +442,11 @@ bool clip_add_finite_edge(
     controll_points_.push_back(point_type(edgeResult->x1, edgeResult->y1));
     controll_points_.push_back(point_type(edgeResult->x2, edgeResult->y2));
     Point point = edge.cell()->contains_point() ?
-      retrieve_point(*edge.cell(), pointSites, lineSites) :
-      retrieve_point(*edge.twin()->cell(), pointSites, lineSites);
+      retrieve_point(edge.cell(), pointSites, lineSites) :
+      retrieve_point(edge.twin()->cell(), pointSites, lineSites);
     Segment segment = edge.cell()->contains_point() ?
-      retrieve_segment(*edge.twin()->cell(), pointSites, lineSites) :
-      retrieve_segment(*edge.cell(), pointSites, lineSites);
+      retrieve_segment(edge.twin()->cell(), pointSites, lineSites) :
+      retrieve_segment(edge.cell(), pointSites, lineSites);
     calc_control_points(point, segment, &controll_points_);
     // sample_curved_edge(edge, &samples_, &controll_points_, pointSites, lineSites, bbox);
   }
@@ -482,8 +477,8 @@ bool clip_add_infinite_edge(
     // vertex - voronoi vertex from which the voronoi edge starts
     // p1, p2 - sitePoints that the edge is equal distance from
 
-    if (edge.vertex0() == NULL)
-      return false;
+    // if (edge.vertex0() == NULL)
+    //   return false;
 
     // printf("infinite %d %f %f - %f %f \n",
     //   edge.is_primary(),
@@ -497,25 +492,43 @@ bool clip_add_infinite_edge(
     double yl = bbox[1];
     double yh = bbox[3];
 
-    if(i == 869)
-        printf("before %d \n", i);
+    bool vertex0isZero = false;
 
-    // completely outside
-    if((edge.vertex0()->x() <= xl)
-    || (edge.vertex0()->x() >= xh)
-    || (edge.vertex0()->y() <= yl)
-    || (edge.vertex0()->y() >= yh)){
-      if(i == 869) printf("compl outside \n");
-      return false;
+    // completely outside (we assume that the edge goes outwards from the bbox and therefore is not visible if the finite start point is inside the bbox)
+    if((edge.vertex0() != NULL) && (edge.vertex1() == NULL)){
+      if((edge.vertex0()->x() <= xl)
+      || (edge.vertex0()->x() >= xh)
+      || (edge.vertex0()->y() <= yl)
+      || (edge.vertex0()->y() >= yh)){
+        return false;
+      }
+    }
+    if((edge.vertex0() == NULL) && (edge.vertex1() != NULL)){
+      vertex0isZero = true;
+      if((edge.vertex1()->x() <= xl)
+      || (edge.vertex1()->x() >= xh)
+      || (edge.vertex1()->y() <= yl)
+      || (edge.vertex1()->y() >= yh)){
+        return false;
+      }
     }
 
-    if(i == 869)
-        printf("after %d \n", i);
-    const voronoi_diagram<double>::cell_type& cell1 = *edge.cell();
-    const voronoi_diagram<double>::cell_type& cell2 = *edge.twin()->cell();
+    const voronoi_diagram<double>::cell_type* cell1 = edge.cell();
+    const voronoi_diagram<double>::cell_type* cell2 = edge.twin()->cell();
+    // if (i == 125) printf("v %p %p %s %s \n", edge.vertex0(), edge.vertex1(), 
+    // (edge.vertex0() == NULL) ? "true" : "false", 
+    // (edge.vertex1() != NULL) ? "true" : "false"
+    // );
+
+    // if (i == 125) printf("swaping %s \n", vertex0isZero ? "true" : "false");
+    if(vertex0isZero){
+      cell1 = edge.twin()->cell();
+      cell2 = edge.cell();
+    }
+
     point_type origin, direction;
     // Infinite edges could not be created by two segment sites.
-    if (cell1.contains_point() && cell2.contains_point()) {
+    if (cell1->contains_point() && cell2->contains_point()) {
       Point p1 = retrieve_point(cell1, pointSites, lineSites);
       Point p2 = retrieve_point(cell2, pointSites, lineSites);
       // printf("p1 %f %f p2 %f %f \n",
@@ -527,31 +540,31 @@ bool clip_add_infinite_edge(
       origin.y((p1.y() + p2.y()) * 0.5);
       direction.x(p1.y() - p2.y()); // orthogonal to the direction between the points
       direction.y(p2.x() - p1.x());
+      // if (i == 125) printf("direction A %f %f \n", direction.x(), direction.y());
+
     } else {
-      origin = cell1.contains_segment() ?
+      origin = cell1->contains_segment() ?
           retrieve_point(cell2, pointSites, lineSites) :
           retrieve_point(cell1, pointSites, lineSites);
-      Segment segment = cell1.contains_segment() ?
+      Segment segment = cell1->contains_segment() ?
           retrieve_segment(cell1, pointSites, lineSites) :
           retrieve_segment(cell2, pointSites, lineSites);
       coordinate_type dx = high(segment).x() - low(segment).x();
       coordinate_type dy = high(segment).y() - low(segment).y();
-      if ((low(segment) == origin) ^ cell1.contains_point()) {
+      if ((low(segment) == origin) ^ cell1->contains_point()) {
         direction.x(dy);
         direction.y(-dx);
       } else {
         direction.x(-dy);
         direction.y(dx);
       }
+      // if (i == 125) printf("direction B %f %f \n", direction.x(), direction.y());
+
     }
 
-  if(i == 869)
-    printf("X dir %d %f \n", i, direction.x());
-  if(i == 869)
-    printf("Y dir %d %f \n", i, direction.y());
-
-    if(isnan(direction.x()) || isnan(direction.y()))
+    if(isnan(direction.x()) || isnan(direction.y())){
       return false;
+    }
 
 
     //normalize
@@ -630,7 +643,6 @@ bool clip_add_infinite_edge(
       }
     }
     result->edges.push_back(*edgeResult);
-    if(i == 869) printf("done\n");
     return true;
 }
 
@@ -656,8 +668,8 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
       //     pointSites[i/2].y());
   }
 
-  printf("segment size %zu \n",
-          segments.size());
+  // printf("segment size %zu \n",
+  //         segments.size());
   for (size_t i = 0; i < segments.size(); i += 4)
   {
       lineSites.push_back(Segment(segments[i], segments[i+1], segments[i+2], segments[i+3]));
@@ -764,20 +776,20 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
   
     bool added = false;
     
-    if(result.edges.size() == 727){
-      printf("Edge %d %s %zu %d %zu %d %f %f %f %f \n",
-        i,
-        edge->is_finite() ? "true" : "false",
-        edge->cell()->source_index(),
-        edge->cell()->source_category(),
-        edge->twin()->cell()->source_index(),
-        edge->twin()->cell()->source_category(),
-        edgeResult.x1,
-        edgeResult.y1,
-        edgeResult.x2,
-        edgeResult.y2
-      );
-    }
+    // if(result.edges.size() == 97){
+    //   printf("Edge before %d %s %zu %d %zu %d %f %f %f %f \n",
+    //     i,
+    //     edge->is_finite() ? "true" : "false",
+    //     edge->cell()->source_index(),
+    //     edge->cell()->source_category(),
+    //     edge->twin()->cell()->source_index(),
+    //     edge->twin()->cell()->source_category(),
+    //     (edge->vertex0() != NULL) ? (edge->vertex0()->x()) : NAN ,
+    //     (edge->vertex0() != NULL) ? (edge->vertex0()->y()) : NAN ,
+    //     (edge->vertex1() != NULL) ? (edge->vertex1()->x()) : NAN ,
+    //     (edge->vertex1() != NULL) ? (edge->vertex1()->y()) : NAN 
+    //   );
+    // }
 
     if(edge->is_finite()){
       added = clip_add_finite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox, i);
@@ -785,6 +797,20 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
       added = clip_add_infinite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox, i);
     }
 
+    // if(result.edges.size() == 98){
+    //   printf("Edge after %d %s %zu %d %zu %d %f %f %f %f \n",
+    //     i,
+    //     edge->is_finite() ? "true" : "false",
+    //     edge->cell()->source_index(),
+    //     edge->cell()->source_category(),
+    //     edge->twin()->cell()->source_index(),
+    //     edge->twin()->cell()->source_category(),
+    //     edgeResult.x1,
+    //     edgeResult.y1,
+    //     edgeResult.x2,
+    //     edgeResult.y2
+    //   );
+    // }
 
     if(added){
       processed.push_back(edge);

@@ -4,9 +4,15 @@
     import TraceSkeleton from "./trace_skeleton.vanilla";
     import TraceSkeleton2 from "./wasmSkelleton/index";
     import { onMount } from "svelte";
-    import { Point, SitePoint, SiteSegment, Sites } from "./voronoiDataStructures";
+    import {
+        Point,
+        SitePoint,
+        SiteSegment,
+        Sites,
+    } from "./voronoiDataStructures";
     import { Vectorization } from "./vectorization";
     import { canvasSize, imageStore, siteStore } from "./state";
+    import { checkIntersections } from "./collisionDetection";
 
     let tracer: any;
 
@@ -25,12 +31,12 @@
 
     let activeTool: string = "move";
     let styles = {
-		'cursorDraggable': 'move',
-		'cursorBackground': 'default',
-	};
+        cursorDraggable: "move",
+        cursorBackground: "default",
+    };
     $: cssVarStyles = Object.entries(styles)
-		.map(([key, value]) => `--${key}:${value}`)
-		.join(';');
+        .map(([key, value]) => `--${key}:${value}`)
+        .join(";");
 
     let tileCenter = new Point(tileWidth / 2, tileHeight / 2);
 
@@ -53,23 +59,48 @@
 
     let creatingSegmet: SiteSegment | null = null;
 
-    function update(){
+    let lastError: any = "";
+
+    function update() {
         //Trigger Reactive Update?
-        siteSegments = Vectorization.updateSkelleton(ctx!, imgX, imgY, tileWidth, tileHeight, deviation);
+        siteSegments = Vectorization.updateSkelleton(
+            ctx!,
+            imgX,
+            imgY,
+            tileWidth,
+            tileHeight,
+            deviation,
+        );
         updateStore();
     }
 
     function updateStore() {
-        siteStore.set({
-            sitePoints: sitePoints.map((p) => translatePoint(p, tileCenter)),
-            siteSegments: siteSegments.map((s) =>
-                translateSegment(s, tileCenter),
-            ),
-            tileWidth: tileWidth,
-            tileHeight: tileHeight,
-            tileCenter: tileCenter,
-            imageOffset: new Point(imgX, imgY)
-        });
+        if (checkIntersections(siteSegments)) {
+            lastError =
+                "Site Intersection in Input detected, please remove intersections";
+            siteStore.set({
+                sitePoints: [],
+                siteSegments: [],
+                tileWidth: tileWidth,
+                tileHeight: tileHeight,
+                tileCenter: tileCenter,
+                imageOffset: new Point(imgX, imgY),
+            });
+        } else {
+            lastError = "";
+            siteStore.set({
+                sitePoints: sitePoints.map((p) =>
+                    translatePoint(p, tileCenter),
+                ),
+                siteSegments: siteSegments.map((s) =>
+                    translateSegment(s, tileCenter),
+                ),
+                tileWidth: tileWidth,
+                tileHeight: tileHeight,
+                tileCenter: tileCenter,
+                imageOffset: new Point(imgX, imgY),
+            });
+        }
     }
 
     function onFileSelected(e: any) {
@@ -97,8 +128,6 @@
 
                     update();
                     imageStore.set(image);
-
-
                 });
             image.src = inputImage;
             // let img = inputImage;
@@ -157,7 +186,13 @@
     }
 
     function translatePoint(p: SitePoint, tileCenter: Point): SitePoint {
-        return new SitePoint(p.x - tileCenter.x, p.y - tileCenter.y, p.color, p.M, p.tileIdx);
+        return new SitePoint(
+            p.x - tileCenter.x,
+            p.y - tileCenter.y,
+            p.color,
+            p.M,
+            p.tileIdx,
+        );
     }
 
     function translateSegment(s: SiteSegment, tileCenter: Point): SiteSegment {
@@ -168,7 +203,7 @@
             s.y2 - tileCenter.y,
             s.color,
             s.M,
-            s.tileIdx
+            s.tileIdx,
         );
     }
 
@@ -218,60 +253,84 @@
             if (selectedElement != null) {
                 evt.preventDefault();
                 var coord = getMousePosition(evt);
-                if (selectedElement.classList.contains("tileCenter")){
-                    selectedElement.setAttributeNS(null, "cx", coord.x - offset.x);
-                    selectedElement.setAttributeNS(null, "cy", coord.y - offset.y);
+                if (selectedElement.classList.contains("tileCenter")) {
+                    selectedElement.setAttributeNS(
+                        null,
+                        "cx",
+                        coord.x - offset.x,
+                    );
+                    selectedElement.setAttributeNS(
+                        null,
+                        "cy",
+                        coord.y - offset.y,
+                    );
                     tileCenter.x = coord.x - offset.x;
                     tileCenter.y = coord.y - offset.y;
-                }
-                else if (selectedElement.classList.contains("sitePoint")){
-                    selectedElement.setAttributeNS(null, "cx", coord.x - offset.x);
-                    selectedElement.setAttributeNS(null, "cy", coord.y - offset.y);
-                    let idx: number = Number((selectedElement.id as string).substring(10)); //Requires specific id numbering scheme
+                } else if (selectedElement.classList.contains("sitePoint")) {
+                    selectedElement.setAttributeNS(
+                        null,
+                        "cx",
+                        coord.x - offset.x,
+                    );
+                    selectedElement.setAttributeNS(
+                        null,
+                        "cy",
+                        coord.y - offset.y,
+                    );
+                    let idx: number = Number(
+                        (selectedElement.id as string).substring(10),
+                    ); //Requires specific id numbering scheme
                     sitePoints[idx].x = coord.x - offset.x;
                     sitePoints[idx].y = coord.y - offset.y;
-                }
-                else if (selectedElement.classList.contains("siteSegmentPoint")){
-                    selectedElement.setAttributeNS(null, "cx", coord.x - offset.x);
-                    selectedElement.setAttributeNS(null, "cy", coord.y - offset.y);
-                    let idx: number = Number((selectedElement.id as string).substring(17)); //Requires specific id numbering scheme
+                } else if (
+                    selectedElement.classList.contains("siteSegmentPoint")
+                ) {
+                    selectedElement.setAttributeNS(
+                        null,
+                        "cx",
+                        coord.x - offset.x,
+                    );
+                    selectedElement.setAttributeNS(
+                        null,
+                        "cy",
+                        coord.y - offset.y,
+                    );
+                    let idx: number = Number(
+                        (selectedElement.id as string).substring(17),
+                    ); //Requires specific id numbering scheme
                     let ss: SiteSegment;
-                    if(idx % 2 == 0){
+                    if (idx % 2 == 0) {
                         ss = siteSegments[idx / 2];
                         ss.x1 = coord.x - offset.x;
                         ss.y1 = coord.y - offset.y;
-                        ss.connected_12.forEach(s => {
+                        ss.connected_12.forEach((s) => {
                             s.x2 = ss.x1;
                             s.y2 = ss.y1;
                         });
-                        ss.connected_11.forEach(s => {
+                        ss.connected_11.forEach((s) => {
                             s.x1 = ss.x1;
                             s.y1 = ss.y1;
                         });
-                    }
-                    else{
-                        ss = siteSegments[(idx-1)/2];
+                    } else {
+                        ss = siteSegments[(idx - 1) / 2];
                         ss.x2 = coord.x - offset.x;
                         ss.y2 = coord.y - offset.y;
-                        ss.connected_21.forEach(s => {
+                        ss.connected_21.forEach((s) => {
                             s.x1 = ss.x2;
                             s.y1 = ss.y2;
                         });
-                        ss.connected_22.forEach(s => {
+                        ss.connected_22.forEach((s) => {
                             s.x2 = ss.x2;
                             s.y2 = ss.y2;
                         });
-                    
                     }
                     siteSegments = [...siteSegments];
-
-
                 }
             }
 
-            if(creatingSegmet != null){
+            if (creatingSegmet != null) {
                 var coord = getMousePosition(evt);
-                creatingSegmet.x2 = coord.x- imgX;
+                creatingSegmet.x2 = coord.x - imgX;
                 creatingSegmet.y2 = coord.y - imgY;
                 creatingSegmet = creatingSegmet;
             }
@@ -291,32 +350,41 @@
         }
     }
 
-    function setActiveTool(newTool: string){
+    function setActiveTool(newTool: string) {
         activeTool = newTool;
-        if(activeTool == "move"){
+        if (activeTool == "move") {
             styles.cursorDraggable = "move";
             styles.cursorBackground = "default";
-        }else if(activeTool == "add" || activeTool=="addSegment"){
+        } else if (activeTool == "add" || activeTool == "addSegment") {
             styles.cursorDraggable = "default";
             styles.cursorBackground = "crosshair";
-        }else if(activeTool == "delete"){ 
+        } else if (activeTool == "delete") {
             styles.cursorDraggable = "default";
             styles.cursorBackground = "default";
         }
 
-        if(activeTool != "addSegment")
-            creatingSegmet = null;
+        if (activeTool != "addSegment") creatingSegmet = null;
     }
 
-    function backgroundClick(evt: any){
-        if(activeTool == "add"){
-            sitePoints = [...sitePoints, new SitePoint(evt.offsetX - imgX, evt.offsetY - imgY)];
+    function backgroundClick(evt: any) {
+        if (activeTool == "add") {
+            sitePoints = [
+                ...sitePoints,
+                new SitePoint(evt.offsetX - imgX, evt.offsetY - imgY),
+            ];
             updateStore();
-        }
-        else if(activeTool=="addSegment"){
-            if(creatingSegmet == null){
-                creatingSegmet = new SiteSegment(evt.offsetX - imgX, evt.offsetY - imgY, evt.offsetX - imgX, evt.offsetY - imgY, undefined, [], -1);
-            }else{
+        } else if (activeTool == "addSegment") {
+            if (creatingSegmet == null) {
+                creatingSegmet = new SiteSegment(
+                    evt.offsetX - imgX,
+                    evt.offsetY - imgY,
+                    evt.offsetX - imgX,
+                    evt.offsetY - imgY,
+                    undefined,
+                    [],
+                    -1,
+                );
+            } else {
                 creatingSegmet.x2 = evt.offsetX - imgX;
                 creatingSegmet.y2 = evt.offsetY - imgY;
                 siteSegments = [...siteSegments, creatingSegmet];
@@ -326,14 +394,14 @@
         }
     }
 
-    function siteSegmentClick(evt: any){
-        if(activeTool == "delete"){
-            if(evt.target.classList.contains("siteSegmentPoint")){
-                let idx: number = Number((evt.target.id as string).substring(17));
-                if(idx % 2 == 0)
-                    idx = idx / 2;
-                else
-                    idx = (idx-1) / 2;
+    function siteSegmentClick(evt: any) {
+        if (activeTool == "delete") {
+            if (evt.target.classList.contains("siteSegmentPoint")) {
+                let idx: number = Number(
+                    (evt.target.id as string).substring(17),
+                );
+                if (idx % 2 == 0) idx = idx / 2;
+                else idx = (idx - 1) / 2;
                 // console.log(idx)
                 siteSegments.splice(idx, 1);
                 siteSegments = [...siteSegments];
@@ -342,10 +410,12 @@
         }
     }
 
-    function sitePointClick(evt: any){
-        if(activeTool == "delete"){
-            if(evt.target.classList.contains("sitePoint")){
-                let idx: number = Number((evt.target.id as string).substring(10));
+    function sitePointClick(evt: any) {
+        if (activeTool == "delete") {
+            if (evt.target.classList.contains("sitePoint")) {
+                let idx: number = Number(
+                    (evt.target.id as string).substring(10),
+                );
                 // console.log(idx)
                 sitePoints.splice(idx, 1);
                 sitePoints = sitePoints; // Trigger Reactive Update
@@ -358,7 +428,6 @@
         tracer = await TraceSkeleton2.load();
         updateStore();
     });
-
 </script>
 
 <div>
@@ -368,14 +437,18 @@
                 {#if activeTool == "move"}
                     <button
                         class="bg-sky-500 hover:bg-sky-300 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => { setActiveTool("move"); }}
+                        on:click={() => {
+                            setActiveTool("move");
+                        }}
                     >
                         <span class="material-icons md-36">open_with</span>
                     </button>
                 {:else}
                     <button
                         class="bg-slate-50 hover:bg-slate-200 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => { setActiveTool("move"); }}
+                        on:click={() => {
+                            setActiveTool("move");
+                        }}
                     >
                         <span class="material-icons md-36">open_with</span>
                     </button>
@@ -383,7 +456,9 @@
                 {#if activeTool == "add"}
                     <button
                         class="bg-sky-500 hover:bg-sky-300 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => { setActiveTool("add"); }}
+                        on:click={() => {
+                            setActiveTool("add");
+                        }}
                     >
                         <span class="material-icons md-36">add</span>
                         <div class="relative -top-4 left-3 text-xs">P</div>
@@ -391,7 +466,9 @@
                 {:else}
                     <button
                         class="bg-slate-50 hover:bg-slate-200 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => { setActiveTool("add"); }}
+                        on:click={() => {
+                            setActiveTool("add");
+                        }}
                     >
                         <span class="material-icons md-36">add</span>
                         <div class="relative -top-4 left-3 text-xs">P</div>
@@ -400,7 +477,9 @@
                 {#if activeTool == "addSegment"}
                     <button
                         class="bg-sky-500 hover:bg-sky-300 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => { setActiveTool("addSegment"); }}
+                        on:click={() => {
+                            setActiveTool("addSegment");
+                        }}
                     >
                         <span class="material-icons md-36">add</span>
                         <div class="relative -top-4 left-3 text-xs">S</div>
@@ -408,7 +487,9 @@
                 {:else}
                     <button
                         class="bg-slate-50 hover:bg-slate-200 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => { setActiveTool("addSegment"); }}
+                        on:click={() => {
+                            setActiveTool("addSegment");
+                        }}
                     >
                         <span class="material-icons md-36">add</span>
                         <div class="relative -top-4 left-3 text-xs">S</div>
@@ -417,14 +498,18 @@
                 {#if activeTool == "delete"}
                     <button
                         class="bg-sky-500 hover:bg-sky-300 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => { setActiveTool("delete"); }}
+                        on:click={() => {
+                            setActiveTool("delete");
+                        }}
                     >
                         <span class="material-icons md-36">delete</span>
                     </button>
                 {:else}
                     <button
                         class="bg-slate-50 hover:bg-slate-200 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => { setActiveTool("delete"); }}
+                        on:click={() => {
+                            setActiveTool("delete");
+                        }}
                     >
                         <span class="material-icons md-36">delete</span>
                     </button>
@@ -450,22 +535,21 @@
                         viewBox="0 0 {canvasSize.x} {canvasSize.y}"
                         xmlns="http://www.w3.org/2000/svg"
                     >
-                        <g transform="translate({imgX} {imgY})"
-                        >
+                        <g transform="translate({imgX} {imgY})">
                             <!-- svelte-ignore a11y-click-events-have-key-events -->
                             <!-- svelte-ignore a11y-no-static-element-interactions -->
                             <rect
                                 width={tileWidth}
                                 height={tileHeight}
                                 class="svgBackground"
-                                style="{cssVarStyles}"
+                                style={cssVarStyles}
                                 fill="transparent"
                                 on:click={(evt) => backgroundClick(evt)}
-                                >
+                            >
                             </rect>
                             <circle
                                 class="tileCenter draggable"
-                                style="{cssVarStyles}"
+                                style={cssVarStyles}
                                 id="origin"
                                 cx={tileCenter.x}
                                 cy={tileCenter.y}
@@ -476,19 +560,19 @@
                             {#each sitePoints as siteP, idx}
                                 <!-- svelte-ignore a11y-no-static-element-interactions -->
                                 <circle
-                                    id={"sitePoint_"+ (idx) }
+                                    id={"sitePoint_" + idx}
                                     class="sitePoint draggable"
-                                    style="{cssVarStyles}"
+                                    style={cssVarStyles}
                                     cx={siteP.x}
                                     cy={siteP.y}
                                     r="2"
                                     fill="black"
-                                    on:click={ (evt) => sitePointClick(evt) }
-
+                                    on:click={(evt) => sitePointClick(evt)}
                                 ></circle>
                             {/each}
                             {#each siteSegments as siteS, idx}
                                 <path
+                                    id={"siteSegment_" + idx}
                                     d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
                                     stroke="red"
                                     stroke-width="1"
@@ -497,26 +581,26 @@
                                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                                 <!-- svelte-ignore a11y-no-static-element-interactions -->
                                 <circle
-                                    id={"siteSegmentPoint_"+ (idx*2) }
+                                    id={"siteSegmentPoint_" + idx * 2}
                                     class="siteSegmentPoint draggable"
-                                    style="{cssVarStyles}"
+                                    style={cssVarStyles}
                                     cx={siteS.x1}
                                     cy={siteS.y1}
                                     r="2"
                                     fill="red"
-                                    on:click={ (evt) => siteSegmentClick(evt) }
+                                    on:click={(evt) => siteSegmentClick(evt)}
                                 ></circle>
                                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                                 <!-- svelte-ignore a11y-no-static-element-interactions -->
                                 <circle
-                                    id={"siteSegmentPoint_"+ (idx * 2 + 1) }
+                                    id={"siteSegmentPoint_" + (idx * 2 + 1)}
                                     class="siteSegmentPoint draggable"
-                                    style="{cssVarStyles}"
+                                    style={cssVarStyles}
                                     cx={siteS.x2}
                                     cy={siteS.y2}
                                     r="2"
                                     fill="red"
-                                    on:click={ (evt) => siteSegmentClick(evt) }
+                                    on:click={(evt) => siteSegmentClick(evt)}
                                 ></circle>
                             {/each}
                             {#if creatingSegmet != null}
@@ -543,11 +627,14 @@
                                     cy={creatingSegmet.y2}
                                     r="2"
                                     fill="red"
-                                    on:click={ (evt) => backgroundClick(evt) }
+                                    on:click={(evt) => backgroundClick(evt)}
                                 ></circle>
                             {/if}
                         </g>
                     </svg>
+                </div>
+                <div class="lastErrorContainer max-w-72">
+                    <p class="text-red-700 text-sm break-words">{lastError}</p>
                 </div>
             </div>
         </div>
@@ -595,7 +682,7 @@
     .draggable {
         cursor: var(--cursorDraggable, default);
     }
-    .svgBackground{
+    .svgBackground {
         cursor: var(--cursorBackground, default);
     }
 </style>
