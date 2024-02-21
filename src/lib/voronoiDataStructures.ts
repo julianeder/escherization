@@ -1,4 +1,8 @@
 export class BBox {
+    contains(x: number, y: number): any {
+        return (this.xl < x && x < this.xh) && (this.yl < y && y < this.yh);
+    }
+
     xl: number;
     xh: number;
     yl: number;

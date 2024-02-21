@@ -19,11 +19,7 @@
     type DiagrammResult,
     type CellResult,
   } from "../lib/wasm/wasmVoronoi";
-  import {
-    IsohedralTiling,
-    mul,
-    mulSegment,
-  } from "./tactile/tactile";
+  import { IsohedralTiling, mul, mulSegment } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
   import {
     type Matrix,
@@ -35,11 +31,10 @@
     translate,
     rotate,
   } from "transformation-matrix";
-    import { imageStore, siteStore } from "./state";
-
+  import { imageStore, siteStore } from "./state";
 
   let wasmVoronoi: VoronoiWasmModule;
-  let bbox: BBox = { xl: 0, xh: 500, yl: 0, yh: 500 };
+  let bbox: BBox = new BBox(0, 500, 0, 500);
 
   let tiles: Tile[] = [];
   let tileSitePoints: SitePoint[] = [];
@@ -163,46 +158,42 @@
       );
       tiles.push({ origin: origin, M: M });
 
-      for (var j = 0; j < tileSitePoints.length; j++) {
-        tileSitePoints[j].color = color;
-        tileSitePoints[j].tileIdx = tiles.length - 1;
-        tileSitePoints[j].M = M;
-
-        tilingSitePoints.push(
-          scalePoint(
-            SitePoint.mulPoint(
-              M,
-              scalePoint(
-                tileSitePoints[j],
-                tileSize / tileWidth,
-                tileSize / tileHeight,
-              ),
+      for (let j = 0; j < tileSitePoints.length; j++) {
+        let newSitePoint: SitePoint = scalePoint(
+          SitePoint.mulPoint(
+            M,
+            scalePoint(
+              tileSitePoints[j],
+              tileSize / tileWidth,
+              tileSize / tileHeight,
             ),
-            tilingSize,
-            tilingSize,
           ),
+          tilingSize,
+          tilingSize,
         );
+
+        newSitePoint.color = color;
+        newSitePoint.tileIdx = tiles.length - 1;
+        newSitePoint.M = M;
+        if(bbox.contains(newSitePoint.x, newSitePoint.y))
+          tilingSitePoints.push(newSitePoint);
       }
 
-      for (var j = 0; j < tileSiteSegments.length; j++) {
-        tileSiteSegments[j].color = color;
-        tileSiteSegments[j].M = M;
-        tileSiteSegments[j].tileIdx = tiles.length - 1;
-
-        tilingSiteSegments.push(
-          scaleSegment(
-            mulSegment(
-              M,
-              scaleSegment(
-                tileSiteSegments[j],
-                tileSize / 300,
-                tileSize / 300,
-              ),
-            ),
-            tilingSize,
-            tilingSize,
+      for (let j = 0; j < tileSiteSegments.length; j++) {
+        let newSiteSegment: SiteSegment = scaleSegment(
+          mulSegment(
+            M,
+            scaleSegment(tileSiteSegments[j], tileSize / 300, tileSize / 300),
           ),
+          tilingSize,
+          tilingSize,
         );
+        newSiteSegment.color = color;
+        newSiteSegment.M = M;
+        newSiteSegment.tileIdx = tiles.length - 1;
+
+        if(bbox.contains(newSiteSegment.x1, newSiteSegment.y1) || bbox.contains(newSiteSegment.x2, newSiteSegment.y2))
+          tilingSiteSegments.push(newSiteSegment);
       }
     }
   }
@@ -219,7 +210,7 @@
       s.y2 * sY,
       s.color,
       s.M,
-      s.tileIdx
+      s.tileIdx,
     );
   }
 
@@ -231,12 +222,18 @@
       s.y2 + offset.y,
       s.color,
       s.M,
-      s.tileIdx
+      s.tileIdx,
     );
   }
 
   function translatePoint(p: SitePoint, offset: Point): SitePoint {
-    return new SitePoint(p.x + offset.x, p.y + offset.y, p.color, p.M, p.tileIdx);
+    return new SitePoint(
+      p.x + offset.x,
+      p.y + offset.y,
+      p.color,
+      p.M,
+      p.tileIdx,
+    );
   }
 
   function updateVoronoi() {
@@ -269,6 +266,8 @@
         segmentTileIdxVector.push_back(ss.tileIdx);
       });
 
+      console.log(tilingSiteSegments[726]);
+
       let result: DiagrammResult = wasmVoronoi.computevoronoi(
         bboxVector,
         pointVector,
@@ -279,14 +278,21 @@
         segmentTileIdxVector,
       );
       let newVoronoiVertices: Vertex[] = [];
-      for (var i = 0; i < result.vertices.size(); i += 2) {
+      for (let i = 0; i < result.vertices.size(); i += 2) {
         // console.log("Vert: ", result.vertices.get(i));
         let valid = true;
         if (
           Number.isNaN(result.vertices.get(i)) ||
           Number.isNaN(result.vertices.get(i + 1))
         ) {
-          console.log("Vertex NaN " + i);
+          console.log(
+            "Vertex " +
+              i +
+              ": " +
+              result.vertices.get(i) +
+              " " +
+              result.vertices.get(i + 1),
+          );
           valid = false;
         }
         newVoronoiVertices.push({
@@ -297,16 +303,23 @@
       }
 
       let newVoronoiEdges: Edge[] = [];
-      for (var i = 0; i < result.edges.size(); i++) {
+      for (let i = 0; i < result.edges.size(); i++) {
         let e: EdgeResult = result.edges.get(i);
         let controlPoints: Vertex[] = [];
-        for (var j = 0; j < e.controll_points.size(); j += 2) {
-          let valid = true;
+        let valid = true;
+        for (let j = 0; j < e.controll_points.size(); j += 2) {
           if (
             Number.isNaN(e.controll_points.get(j)) ||
             Number.isNaN(e.controll_points.get(j + 1))
           ) {
-            console.log("CP NaN " + i);
+            console.log(
+              "CP " +
+                i +
+                ": " +
+                e.controll_points.get(j) +
+                " " +
+                e.controll_points.get(j + 1),
+            );
             valid = false;
           }
           const v: Vertex = {
@@ -317,14 +330,15 @@
           controlPoints.push(v);
         }
 
-        let valid = true;
         if (
           Number.isNaN(e.x1) ||
           Number.isNaN(e.y1) ||
           Number.isNaN(e.x2) ||
           Number.isNaN(e.y2)
         ) {
-          console.log("Edge NaN " + i);
+          console.log(
+            "Edge " + i + ": " + e.x1 + " " + e.y1 + " " + e.x2 + " " + e.y2,
+          );
           valid = false;
         }
 
@@ -338,11 +352,16 @@
           isValid: valid,
           isBetweenSameColorCells: e.isBetweenSameColorCells,
         });
+
+        if (newVoronoiEdges.length == 727) {
+          console.log(newVoronoiEdges[726]);
+        }
+
         // console.log(e.isBetweenSameColorCells);
       }
 
       let newVoronoiCells: Cell[] = [];
-      for (var i = 0; i < result.cells.size(); i++) {
+      for (let i = 0; i < result.cells.size(); i++) {
         let c: CellResult = result.cells.get(i);
         let newCell: Cell = {
           sourceIndex: c.sourceIndex,
@@ -355,7 +374,7 @@
           tileIdx: c.tileIdx,
         };
         newVoronoiCells.push(newCell);
-        for (var j = 0; j < c.edgeIndices.size(); j++) {
+        for (let j = 0; j < c.edgeIndices.size(); j++) {
           let newIndex: number = c.edgeIndices.get(j);
           if (newIndex >= newVoronoiEdges.length)
             console.warn(
@@ -393,7 +412,7 @@
       tileWidth: tileWidth,
       tileHeight: tileHeight,
       tileCenter: tileCenter,
-      imageOffset: imageOffset
+      imageOffset: imageOffset,
     });
   }
 
@@ -411,7 +430,10 @@
   function isCellPathConsistant(c: Cell): boolean {
     if (c.edgeIndices.length <= 1) return false;
 
-    for (let i: number = 1; i < c.edgeIndices.length - 1; i++) {
+    // Check if each endpoint matches the next start point
+    for (let i: number = 1; i <= c.edgeIndices.length - 1; i++) {
+      if (!voronoiEdges[c.edgeIndices[i - 1]].isValid) return false;
+
       if (
         voronoiEdges[c.edgeIndices[i - 1]].vb.x !=
           voronoiEdges[c.edgeIndices[i]].va.x ||
@@ -419,18 +441,23 @@
           voronoiEdges[c.edgeIndices[i]].va.y
       )
         return false;
+      if (
+        Number.isNaN(voronoiEdges[c.edgeIndices[i]].va.x) ||
+        Number.isNaN(voronoiEdges[c.edgeIndices[i]].va.y)
+      )
+        return false;
     }
 
-    let i = c.edgeIndices.length - 1;
-    if (
-      voronoiEdges[c.edgeIndices[i - 1]].vb.x !=
-        voronoiEdges[c.edgeIndices[i]].va.x ||
-      voronoiEdges[c.edgeIndices[i - 1]].vb.y !=
-        voronoiEdges[c.edgeIndices[i]].va.y
-    )
-      return false;
+    // if (
+    //   voronoiEdges[c.edgeIndices[i - 1]].vb.x !=
+    //   voronoiEdges[c.edgeIndices[i]].va.x ||
+    //   voronoiEdges[c.edgeIndices[i - 1]].vb.y !=
+    //   voronoiEdges[c.edgeIndices[i]].va.y
+    //   )
+    //   return false;
 
     // close loop
+    let i = c.edgeIndices.length - 1;
     if (
       voronoiEdges[c.edgeIndices[i]].vb.x !=
         voronoiEdges[c.edgeIndices[0]].va.x ||
@@ -601,7 +628,7 @@
       tileSiteSegments = value.siteSegments;
       tileCenter = value.tileCenter;
       imageOffset = value.imageOffset;
-      
+
       if (autoUpdate) update();
     });
 
@@ -650,25 +677,44 @@
   }
 
   function getTransformation(mat: number[], origin: Point): string {
-    let M: Matrix = { a: mat[0], b: mat[3], c: mat[1], d: mat[4], e: mat[2], f: mat[5] };
+    let M: Matrix = {
+      a: mat[0],
+      b: mat[3],
+      c: mat[1],
+      d: mat[4],
+      e: mat[2],
+      f: mat[5],
+    };
 
     // Decompose M into Translation, Rotation, Scale Matrices
     let T: Matrix = { a: 0, b: 0, c: 0, d: 0, e: M.e, f: M.f };
     M.e = 0; //MM.e*tilingSize;
     M.f = 0; //MM.f*tilingSize;
-    let sx = Math.sqrt(M.a*M.a + M.b*M.b);
-    let sy = Math.sqrt(M.c*M.c + M.d*M.d);
-    let R: Matrix = { a: M.a / sx, b: M.b / sx, c: M.c / sy, d: M.d / sy, e: 0, f: 0 };
+    let sx = Math.sqrt(M.a * M.a + M.b * M.b);
+    let sy = Math.sqrt(M.c * M.c + M.d * M.d);
+    let R: Matrix = {
+      a: M.a / sx,
+      b: M.b / sx,
+      c: M.c / sy,
+      d: M.d / sy,
+      e: 0,
+      f: 0,
+    };
     let angle = Math.atan2(M.b, M.a);
 
     let Mtransform = compose(
       rotate(angle, origin.x, origin.y),
-      scale(sx * tilingSize * tileSize / 300, sy * tilingSize * tileSize / 300, origin.x, origin.y),
+      scale(
+        (sx * tilingSize * tileSize) / 300,
+        (sy * tilingSize * tileSize) / 300,
+        origin.x,
+        origin.y,
+      ),
       translate(-tileCenter.x + origin.x, -tileCenter.y + origin.y),
-      );
-      // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y + " imageOffset: "  + imageOffset.x +" "+ imageOffset.y +  " / " + toSVG(Mtransform))
-      // console.log("e: " + MM.e + " f "+ MM.f)
-      return toSVG(Mtransform);
+    );
+    // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y + " imageOffset: "  + imageOffset.x +" "+ imageOffset.y +  " / " + toSVG(Mtransform))
+    // console.log("e: " + MM.e + " f "+ MM.f)
+    return toSVG(Mtransform);
   }
 
   function getInverseTransformation(cell: Cell): string {
@@ -740,34 +786,34 @@
     {#each voronoiCells as c}
       {#if showBackground && isCellPathConsistant(c)}
         {#if showBackgroundImage}
-            <path
-              id="cell {c.sourceIndex}"
-              d={getCellPath(c)}
-              stroke="black"
-              stroke-width="0"
-              fill={getPatternUrl(c)}
-            ></path>
+          <path
+            id="cell {c.sourceIndex}"
+            d={getCellPath(c)}
+            stroke="black"
+            stroke-width="0"
+            fill={getPatternUrl(c)}
+          ></path>
         {:else}
-            <path
-              id="cell {c.sourceIndex}"
-              d={getCellPath(c)}
-              stroke="black"
-              stroke-width="0"
-              fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
-            ></path>
+          <path
+            id="cell {c.sourceIndex}"
+            d={getCellPath(c)}
+            stroke="black"
+            stroke-width="0"
+            fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
+          ></path>
         {/if}
       {/if}
     {/each}
     {#if showSkeleton}
       {#each tilingSitePoints as siteP, idx}
-        <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="black"
+        <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="red"
         ></circle>
       {/each}
       {#each tilingSiteSegments as siteS, idx}
         <path
           id="segment {idx + tilingSitePoints.length}"
           d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-          stroke="black"
+          stroke="red"
           stroke-width="1"
           fill="none"
         ></path>
@@ -776,14 +822,14 @@
           cx={siteS.x1}
           cy={siteS.y1}
           r="2"
-          fill="black"
+          fill="red"
         ></circle>
         <circle
           id="segment {idx + tilingSitePoints.length}"
           cx={siteS.x2}
           cy={siteS.y2}
           r="2"
-          fill="black"
+          fill="red"
         ></circle>
       {/each}
     {/if}
@@ -791,8 +837,9 @@
       {#if e.isValid && !e.isBetweenSameColorCells && showBorder}
         <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
         <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
-        {#if e.isCurved}
+        {#if e.isCurved && e.controlPoints.length == 3}
           <path
+            id={"edge_" + idx}
             d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
               .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
               .x} {e.controlPoints[2].y}"
@@ -802,6 +849,7 @@
           ></path>
         {:else if e.isPrimary}
           <path
+            id={"edge_" + idx}
             d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
             stroke="blue"
             stroke-width="1"
@@ -809,6 +857,7 @@
           ></path>
         {:else if showSecondary}
           <path
+            id={"edge_" + idx}
             d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
             stroke="green"
             stroke-width="1"
