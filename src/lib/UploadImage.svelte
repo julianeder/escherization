@@ -1,20 +1,18 @@
 <script lang="ts">
-    import { type Writable } from "svelte/store";
     import Range from "./Range.svelte";
-    import TraceSkeleton from "./trace_skeleton.vanilla";
     import TraceSkeleton2 from "./wasmSkelleton/index";
     import { onMount } from "svelte";
     import {
         Point,
         SitePoint,
         SiteSegment,
-        Sites,
     } from "./voronoiDataStructures";
     import { Vectorization } from "./vectorization";
     import { canvasSize, imageStore, siteStore } from "./state";
     import { checkIntersections } from "./collisionDetection";
 
     let tracer: any;
+
 
     let inputImage: any, fileinput: any;
 
@@ -122,20 +120,20 @@
                         willReadFrequently: true,
                     });
                     ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
-                    drawImageScaled(image);
+                    let imageData:ImageData | null = drawImageScaled(image);
                     // ctx.fillStyle = ctx.createPattern(image, 'repeat');
                     // ctx.fillRect(0, 0, width, height);
-
                     update();
-                    imageStore.set(image);
+                    console.log("w h" + imageData?.width + " " + imageData?.height);
+                    imageStore.set({image: image, imageData: imageData});
                 });
             image.src = inputImage;
             // let img = inputImage;
         };
     }
 
-    function drawImageScaled(img: HTMLImageElement) {
-        if (ctx == null) return;
+    function drawImageScaled(img: HTMLImageElement): ImageData | null {
+        if (ctx == null) return null;
         let canvas = ctx.canvas;
         let hRatio = canvas.width / img.width;
         let vRatio = canvas.height / img.height;
@@ -178,6 +176,7 @@
             tileHeight,
         );
         ctx.putImageData(newImgageData, imgX, imgY);
+        return newImgageData;
     }
 
     function onDeviationToleranceChanged(newRes: number) {
@@ -207,7 +206,7 @@
         );
     }
 
-    const downloadCanvasImage = () => {
+    function downloadCanvasImage(){
         var link = document.createElement("a");
         link.download = "canvas.png";
         link.href = canvas.toDataURL();

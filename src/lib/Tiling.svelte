@@ -19,6 +19,8 @@
     type DiagrammResult,
     type CellResult,
   } from "../lib/wasm/wasmVoronoi";
+  import instantiate_wasmMorph, { type MorphWasmModule } from "../lib/wasm/wasmMorph";
+
   import { IsohedralTiling, mul, mulSegment } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
   import {
@@ -31,10 +33,11 @@
     translate,
     rotate,
   } from "transformation-matrix";
-  import { imageStore, siteStore } from "./state";
+  import { ImageStoreContent, imageStore, siteStore } from "./state";
     import { checkIntersections } from "./collisionDetection";
 
   let wasmVoronoi: VoronoiWasmModule;
+  let wasmMorph: MorphWasmModule;
   let bbox: BBox = new BBox(0, 500, 0, 500);
 
   let tiles: Tile[] = [];
@@ -54,6 +57,7 @@
   let imageOffset: Point;
 
   let backgroundImage: HTMLImageElement | null;
+  let backgroundImageData: ImageData | null;
 
   let showSecondary: boolean = false;
 
@@ -104,8 +108,24 @@
     else{
       lastError = ""
       updateVoronoi();
+      updateMorph();
     }
   }
+
+  function updateMorph(){
+        console.log("do Morph");
+      if(backgroundImageData != null){ 
+        const pointTileIdxVector = new wasmMorph.VectorByte();
+        backgroundImageData.data.forEach((b) => pointTileIdxVector.push_back(b));
+        let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height, pointTileIdxVector);     
+        
+        let newVoronoiEdges: Edge[] = [];
+        for (let i = 0; i < result.size(); i++) {
+          // let e: number = result.get(i);
+          backgroundImageData.data[i] = result.get(i);
+        }
+      }
+    }
 
   function updateTiling() {
     // console.log(
@@ -204,44 +224,6 @@
           tilingSiteSegments.push(newSiteSegment);
       }
     }
-  }
-
-  function scalePoint(p: SitePoint, sX: number, sY: number): SitePoint {
-    return new SitePoint(p.x * sX, p.y * sY, p.color, p.M, p.tileIdx);
-  }
-
-  function scaleSegment(s: SiteSegment, sX: number, sY: number) {
-    return new SiteSegment(
-      s.x1 * sX,
-      s.y1 * sY,
-      s.x2 * sX,
-      s.y2 * sY,
-      s.color,
-      s.M,
-      s.tileIdx,
-    );
-  }
-
-  function translateSegment(s: SiteSegment, offset: Point): SiteSegment {
-    return new SiteSegment(
-      s.x1 + offset.x,
-      s.y1 + offset.y,
-      s.x2 + offset.x,
-      s.y2 + offset.y,
-      s.color,
-      s.M,
-      s.tileIdx,
-    );
-  }
-
-  function translatePoint(p: SitePoint, offset: Point): SitePoint {
-    return new SitePoint(
-      p.x + offset.x,
-      p.y + offset.y,
-      p.color,
-      p.M,
-      p.tileIdx,
-    );
   }
 
   function updateVoronoi() {
@@ -408,6 +390,46 @@
       throw e;
     }
   }
+
+  function scalePoint(p: SitePoint, sX: number, sY: number): SitePoint {
+    return new SitePoint(p.x * sX, p.y * sY, p.color, p.M, p.tileIdx);
+  }
+
+  function scaleSegment(s: SiteSegment, sX: number, sY: number) {
+    return new SiteSegment(
+      s.x1 * sX,
+      s.y1 * sY,
+      s.x2 * sX,
+      s.y2 * sY,
+      s.color,
+      s.M,
+      s.tileIdx,
+    );
+  }
+
+  function translateSegment(s: SiteSegment, offset: Point): SiteSegment {
+    return new SiteSegment(
+      s.x1 + offset.x,
+      s.y1 + offset.y,
+      s.x2 + offset.x,
+      s.y2 + offset.y,
+      s.color,
+      s.M,
+      s.tileIdx,
+    );
+  }
+
+  function translatePoint(p: SitePoint, offset: Point): SitePoint {
+    return new SitePoint(
+      p.x + offset.x,
+      p.y + offset.y,
+      p.color,
+      p.M,
+      p.tileIdx,
+    );
+  }
+
+
 
   function addPoint(event: MouseEvent) {
     tilingSitePoints = [
@@ -628,6 +650,8 @@
 
   onMount(async () => {
     wasmVoronoi = await instantiate_wasmVoronoi();
+    wasmMorph = await instantiate_wasmMorph();
+
 
     siteStore.subscribe((value: Sites) => {
       tileWidth = value.tileWidth;
@@ -640,8 +664,9 @@
       if (autoUpdate) update();
     });
 
-    imageStore.subscribe((value: HTMLImageElement | null) => {
-      backgroundImage = value;
+    imageStore.subscribe((value: ImageStoreContent) => {
+      backgroundImage = value.image;
+      backgroundImageData = value.imageData;
       // console.log(backgroundImage);
       // if (autoUpdate) update();
     });

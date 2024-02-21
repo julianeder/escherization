@@ -12,4 +12,9 @@ export let siteStore: Writable<Sites> = writable({
   imageOffset: new Point(0,0),
 });
 
-export let imageStore: Writable<HTMLImageElement | null> = writable(null);
+export class ImageStoreContent{
+  image: HTMLImageElement | null = null;
+  imageData: ImageData | null = null;
+}
+
+export let imageStore: Writable<ImageStoreContent> = writable({image: null, imageData: null});
