@@ -132,6 +132,7 @@ export interface Cell {
 }
 
 export interface Tile {
+    tileIdx: number;
     origin: Point;
     M: number[];
 }

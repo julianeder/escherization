@@ -19,7 +19,7 @@
     type DiagrammResult,
     type CellResult,
   } from "../lib/wasm/wasmVoronoi";
-  import instantiate_wasmMorph, { type MorphWasmModule } from "../lib/wasm/wasmMorph";
+  import instantiate_wasmMorph, { type FeatureLine, type MorphWasmModule } from "../lib/wasm/wasmMorph";
 
   import { IsohedralTiling, mul, mulSegment } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
@@ -43,6 +43,7 @@
   let tiles: Tile[] = [];
   let tileSitePoints: SitePoint[] = [];
   let tileSiteSegments: SiteSegment[] = [];
+  let outlines: FeatureLine[][] = []; 
 
   let tilingSitePoints: SitePoint[] = [];
   let tilingSiteSegments: SiteSegment[] = [];
@@ -113,19 +114,80 @@
   }
 
   function updateMorph(){
+
+    // Get Outline
+    outlines = [];
+    for (let i = 0; i < tiles.length; i++) {
+      if(tiles[i].tileIdx == 14){
+        let outline: FeatureLine[] = [];
+        // console.log(tiles[i].tileIdx + " " + tiles[i].origin.x + " " + tiles[i].origin.y);
+        voronoiCells.filter(c => c.tileIdx == tiles[i].tileIdx).forEach(c => {
+          // console.log(c)
+          c.edgeIndices.forEach(idxE => {
+            if(voronoiEdges[idxE].isPrimary && !voronoiEdges[idxE].isBetweenSameColorCells){              
+              // console.log(voronoiEdges[idxE])
+              let featureLine: FeatureLine = {
+                startPoint: {x: voronoiEdges[idxE].va.x, y: voronoiEdges[idxE].va.y},
+                endPoint:{x: voronoiEdges[idxE].vb.x, y: voronoiEdges[idxE].vb.y}
+              } 
+              outline.push(featureLine);
+            }
+          })
+        });
+        outlines.push(outline);
+      }
+    }
+    console.log(outlines);
+    outlines = outlines; // Reactive Update
+
+    // Morphing
+    if(backgroundImageData != null){ 
         console.log("do Morph");
-      if(backgroundImageData != null){ 
-        const pointTileIdxVector = new wasmMorph.VectorByte();
-        backgroundImageData.data.forEach((b) => pointTileIdxVector.push_back(b));
-        let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height, pointTileIdxVector);     
         
-        let newVoronoiEdges: Edge[] = [];
+        const imageDataVector = new wasmMorph.VectorByte();
+        backgroundImageData.data.forEach((b) => imageDataVector.push_back(b));
+        
+        
+        const srcLinesVector = new wasmMorph.VectorFeatureLine();
+        tileSiteSegments.forEach((ss) => srcLinesVector.push_back({
+          startPoint: {x: ss.x1, y: ss.y1},
+          endPoint: {x: ss.x2, y: ss.y2}
+        }))
+        
+        const morphLinesVector = new wasmMorph.VectorFeatureLine();
+        tileSiteSegments.forEach((ss) => morphLinesVector.push_back({
+          startPoint: {x: ss.x1, y: ss.y1},
+          endPoint: {x: ss.x2, y: ss.y2}
+        }))
+
+        
+        let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height, 
+          imageDataVector, 
+          srcLinesVector, 
+          morphLinesVector);     
+        
+        console.log("result.size " + result.size());
         for (let i = 0; i < result.size(); i++) {
           // let e: number = result.get(i);
           backgroundImageData.data[i] = result.get(i);
         }
+        console.log(backgroundImageData.data);
+        backgroundImage = imagedataToImage(backgroundImageData);
+
       }
     }
+
+  function imagedataToImage(imagedata: ImageData) {
+      var canvas = document.createElement('canvas');
+      var ctx = canvas.getContext('2d');
+      canvas.width = imagedata.width;
+      canvas.height = imagedata.height;
+      ctx!.putImageData(imagedata, 0, 0);
+
+      var image = new Image();
+      image.src = canvas.toDataURL();
+      return image;
+  }
 
   function updateTiling() {
     // console.log(
@@ -184,7 +246,8 @@
         tilingSize,
         tilingSize,
       );
-      tiles.push({ origin: origin, M: M });
+      let tile: Tile = { origin: origin, M: M, tileIdx: tiles.length - 1 }; //tileIndex counting up
+      tiles.push(tile);
 
       for (let j = 0; j < tileSitePoints.length; j++) {
         let newSitePoint: SitePoint = scalePoint(
@@ -201,7 +264,7 @@
         );
 
         newSitePoint.color = color;
-        newSitePoint.tileIdx = tiles.length - 1;
+        newSitePoint.tileIdx = tile.tileIdx;
         newSitePoint.M = M;
         if(bbox.contains(newSitePoint.x, newSitePoint.y))
           tilingSitePoints.push(newSitePoint);
@@ -218,7 +281,7 @@
         );
         newSiteSegment.color = color;
         newSiteSegment.M = M;
-        newSiteSegment.tileIdx = tiles.length - 1;
+        newSiteSegment.tileIdx = tile.tileIdx;
 
         if(bbox.contains(newSiteSegment.x1, newSiteSegment.y1) || bbox.contains(newSiteSegment.x2, newSiteSegment.y2))
           tilingSiteSegments.push(newSiteSegment);
@@ -910,11 +973,21 @@
         ></circle>
       {/if}
     {/each}
-  </svg>
+    {#each outlines as outline}
+      {#each outline as fl, idx}
+        <path
+          id={"outline_" + idx}
+          d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl.endPoint.y}"
+          stroke="yellow"
+          stroke-width="1"
+          fill="none"
+        ></path>
+        {/each}
+      {/each}
+    </svg>
   <div class="lastErrorContainer max-w-96">
     <p class="text-red-700 text-sm break-words">{lastError}</p>
   </div>
-
   <!-- <div class="grid grid-rows-4 content-start"> -->
   <p class="text-xl font-sans text-center text-sky-400 p-4">Tiling Settings</p>
   <div class="grid grid-cols-4">

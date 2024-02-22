@@ -43,11 +43,16 @@ export class Vectorization {
     // console.log('w ' + width + ' h ' +  height + ' imgX ' + imgX + ' imgY ' + imgY);
     // console.log(imageData);
     // let { polylines, rects, thinImag } = TraceSkeleton.fromImageData(imageData, resolution);
+    let binaryImg: number[] = TraceSkeleton.imageDataToBinary(imageData);
+
+    let borderImg: number[] = Vectorization.getBorderImg(binaryImg);
+
     let thinImag = TraceSkeleton.thinningZS(
-        TraceSkeleton.imageDataToBinary(imageData),
+        binaryImg,
         tileWidth,
         tileHeight,
     );
+
     let thinImagRGB: number[] = [];
     let i = 0;
     let j = 0;
@@ -211,6 +216,15 @@ export class Vectorization {
     let n: Node = Vectorization.vectorize(thinImag, crossings, ends);
 
     Vectorization.visualizeTreeRec(n, thinImagRGB);
+
+    for (let x = 0; x < Vectorization.tileWidth; x++) {
+        for (let y = 0; y < Vectorization.tileHeight; y++) {
+            if(borderImg[this.fromXY(x,y)] == 1){
+                thinImagRGB[this.fromXY(x,y) * 4] = 255;
+            }
+        }
+    }
+
     var thinImgageData = new ImageData(
         new Uint8ClampedArray(thinImagRGB),
         tileWidth,
@@ -224,6 +238,30 @@ export class Vectorization {
     Vectorization.segemntsFromTreeRec(n, ss);
 
     return ss;
+}
+
+static getBorderImg(binaryImg: number[]): number[]{
+
+    let borderImg: number[] = Array<number>(binaryImg.length);
+    for (let x = 0; x < Vectorization.tileWidth; x++) {
+        for (let y = 0; y < Vectorization.tileHeight; y++) {
+            if(binaryImg[this.fromXY(x,y)] == 0 && 
+                (
+                binaryImg[this.fromXY(x-1,y)] == 1
+             || binaryImg[this.fromXY(x+1,y)] == 1
+             || binaryImg[this.fromXY(x,y-1)] == 1
+             || binaryImg[this.fromXY(x,y+1)] == 1
+                )
+            ){
+                borderImg[this.fromXY(x,y)] = 1;
+            }
+            else{
+                borderImg[this.fromXY(x,y)] = 0;
+            }
+            
+        }            
+    }
+    return borderImg;
 }
 
 static calcNeighbourCnt16(thinImag: number[], x: number, y: number) {
