@@ -58,6 +58,7 @@ class Point: public Vector2d{
 public:
   Point();
   Point(const Vector2d &v);
+  Point(const Vector2dInt &v);
   int hit(const Vector2d &cursor) const;
 };
 

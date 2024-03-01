@@ -126,19 +126,14 @@
       if (tiles[i].tileIdx == 14) {
         let outline: FeatureLine[] = [];
         M = getInverseTransformation(tiles[i].M, tiles[i].origin);
-        console.log(toSVG(getTransformation(tiles[i].M, tiles[i].origin)));
-        console.log(toSVG(M));
-        // console.log(tiles[i].tileIdx + " " + tiles[i].origin.x + " " + tiles[i].origin.y);
         voronoiCells
           .filter((c) => c.tileIdx == tiles[i].tileIdx)
           .forEach((c) => {
-            // console.log(c)
             c.edgeIndices.forEach((idxE) => {
               if (
                 voronoiEdges[idxE].isPrimary &&
                 !voronoiEdges[idxE].isBetweenSameColorCells
               ) {
-                // console.log(voronoiEdges[idxE])
                 let featureLine: FeatureLine = {
                   startPoint: {
                     x: voronoiEdges[idxE].va.x,
@@ -192,23 +187,20 @@
       matrixVector.push_back(M!.e);
       matrixVector.push_back(M!.f);
 
-      // let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height,
-      //   imageDataVector,
-      //   skelletonLinesVector,
-      //   outlineLinesVector,
-      //   matrixVector);
+      let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height,
+        imageDataVector,
+        skelletonLinesVector,
+        outlineLinesVector,
+        matrixVector);
 
-      // // console.log("result.size " + result.size());
-      // for (let i = 0; i < result.size(); i++) {
-      //   // let e: number = result.get(i);
-      //   backgroundImageData.data[i] = result.get(i);
-      // }
+      // console.log("result.size " + result.size());
+      for (let i = 0; i < result.size(); i++) {
+        // let e: number = result.get(i);
+        backgroundImageData.data[i] = result.get(i);
+      }
 
-      // console.log(backgroundImageData.data);
+      console.log(backgroundImageData.data);
       backgroundImage = imagedataToImage(backgroundImageData);
-
-      console.log(skelletonLinesVector.get(3));
-
 
       let morphedOutline = wasmMorph.getMorphOutline(
         backgroundImageData.width,
@@ -1043,8 +1035,6 @@
     {/each}
     {#each outlines as outline}
       {#each outline as fl, idx}
-      <!-- {#if idx <= 1}       -->
-
         <path
           id={"outline_" + idx}
           d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl
@@ -1053,12 +1043,10 @@
           stroke-width="1"
           fill="none"
         ></path>
-        <!-- {/if} -->
 
       {/each}
     {/each}
     {#each morphedSiteSegments as fl, idx}
-    <!-- {#if idx <= 1}       -->
       <g transform={toSVG(getTransformation(tiles[15].M, tiles[15].origin))}>
         <path
         id={"outlineMorphed_" + idx}
@@ -1068,7 +1056,6 @@
         fill="none"
         ></path>
       </g>
-      <!-- {/if} -->
     {/each}
   </svg>
   <div class="lastErrorContainer max-w-96">

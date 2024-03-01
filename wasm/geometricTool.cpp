@@ -203,6 +203,11 @@ Point::Point(const Vector2d &v){
   y = v.y;
 }
 
+Point::Point(const Vector2dInt &v){
+  x = v.x;
+  y = v.y;
+}
+
 int Point::hit(const Vector2d &cursor) const{
   return(Sqr(x - cursor.x) + Sqr(y - cursor.y) < Sqr(HIT_RADIUS));
 }
