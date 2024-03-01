@@ -14,6 +14,11 @@ Vector2d::Vector2d(const Vector2d &v){
   set(v);
 }
 
+Vector2dInt::Vector2dInt(const Vector2d &v){
+  x = (int)round(v.x);
+  y = (int)round(v.y);
+}
+
 //
 // Array index form of a vector
 // Routines returning an lvalue: i.e. X[i] returns addr of X[i]
@@ -176,6 +181,12 @@ Vector2d operator/(const Vector2d& v, double s)
 
 // Determine if two Vectors are identical.
 short operator==(const Vector2d& one, const Vector2d& two)
+{
+  return((one.x == two.x) && (one.y == two.y));
+}
+
+// Determine if two Vectors are identical.
+short operator==(const Vector2dInt& one, const Vector2dInt& two)
 {
   return((one.x == two.x) && (one.y == two.y));
 }

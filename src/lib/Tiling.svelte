@@ -19,7 +19,10 @@
     type DiagrammResult,
     type CellResult,
   } from "../lib/wasm/wasmVoronoi";
-  import instantiate_wasmMorph, { type FeatureLine, type MorphWasmModule } from "../lib/wasm/wasmMorph";
+  import instantiate_wasmMorph, {
+    type FeatureLine,
+    type MorphWasmModule,
+  } from "../lib/wasm/wasmMorph";
 
   import { IsohedralTiling, mul, mulSegment } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
@@ -34,7 +37,7 @@
     rotate,
   } from "transformation-matrix";
   import { ImageStoreContent, imageStore, siteStore } from "./state";
-    import { checkIntersections } from "./collisionDetection";
+  import { checkIntersections } from "./collisionDetection";
 
   let wasmVoronoi: VoronoiWasmModule;
   let wasmMorph: MorphWasmModule;
@@ -43,7 +46,7 @@
   let tiles: Tile[] = [];
   let tileSitePoints: SitePoint[] = [];
   let tileSiteSegments: SiteSegment[] = [];
-  let outlines: FeatureLine[][] = []; 
+  let outlines: FeatureLine[][] = [];
 
   let tilingSitePoints: SitePoint[] = [];
   let tilingSiteSegments: SiteSegment[] = [];
@@ -72,6 +75,8 @@
   let showOrigins: boolean = true;
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
+
+  let morphedSiteSegments: SiteSegment[] = [];
 
   const symGroups: Record<string, any> = {
     "1": "p1",
@@ -103,90 +108,144 @@
   function update() {
     updateTiling();
 
-    if(checkIntersections(tilingSiteSegments)){
-      lastError = "Collision between tiles detected, please change the paremeters (e.g. decrease Tile Size)"
-    }
-    else{
-      lastError = ""
+    if (checkIntersections(tilingSiteSegments)) {
+      lastError =
+        "Collision between tiles detected, please change the paremeters (e.g. decrease Tile Size)";
+    } else {
+      lastError = "";
       updateVoronoi();
       updateMorph();
     }
   }
 
-  function updateMorph(){
-
+  function updateMorph() {
     // Get Outline
     outlines = [];
+    let M: Matrix;
     for (let i = 0; i < tiles.length; i++) {
-      if(tiles[i].tileIdx == 14){
+      if (tiles[i].tileIdx == 14) {
         let outline: FeatureLine[] = [];
+        M = getInverseTransformation(tiles[i].M, tiles[i].origin);
+        console.log(toSVG(getTransformation(tiles[i].M, tiles[i].origin)));
+        console.log(toSVG(M));
         // console.log(tiles[i].tileIdx + " " + tiles[i].origin.x + " " + tiles[i].origin.y);
-        voronoiCells.filter(c => c.tileIdx == tiles[i].tileIdx).forEach(c => {
-          // console.log(c)
-          c.edgeIndices.forEach(idxE => {
-            if(voronoiEdges[idxE].isPrimary && !voronoiEdges[idxE].isBetweenSameColorCells){              
-              // console.log(voronoiEdges[idxE])
-              let featureLine: FeatureLine = {
-                startPoint: {x: voronoiEdges[idxE].va.x, y: voronoiEdges[idxE].va.y},
-                endPoint:{x: voronoiEdges[idxE].vb.x, y: voronoiEdges[idxE].vb.y}
-              } 
-              outline.push(featureLine);
-            }
-          })
-        });
+        voronoiCells
+          .filter((c) => c.tileIdx == tiles[i].tileIdx)
+          .forEach((c) => {
+            // console.log(c)
+            c.edgeIndices.forEach((idxE) => {
+              if (
+                voronoiEdges[idxE].isPrimary &&
+                !voronoiEdges[idxE].isBetweenSameColorCells
+              ) {
+                // console.log(voronoiEdges[idxE])
+                let featureLine: FeatureLine = {
+                  startPoint: {
+                    x: voronoiEdges[idxE].va.x,
+                    y: voronoiEdges[idxE].va.y,
+                  },
+                  endPoint: {
+                    x: voronoiEdges[idxE].vb.x,
+                    y: voronoiEdges[idxE].vb.y,
+                  },
+                };
+                outline.push(featureLine);
+              }
+            });
+          });
         outlines.push(outline);
       }
     }
-    console.log(outlines);
     outlines = outlines; // Reactive Update
 
     // Morphing
-    if(backgroundImageData != null){ 
-        console.log("do Morph");
-        
-        const imageDataVector = new wasmMorph.VectorByte();
-        backgroundImageData.data.forEach((b) => imageDataVector.push_back(b));
-        
-        
-        const srcLinesVector = new wasmMorph.VectorFeatureLine();
-        tileSiteSegments.forEach((ss) => srcLinesVector.push_back({
-          startPoint: {x: ss.x1, y: ss.y1},
-          endPoint: {x: ss.x2, y: ss.y2}
-        }))
-        
-        const morphLinesVector = new wasmMorph.VectorFeatureLine();
-        tileSiteSegments.forEach((ss) => morphLinesVector.push_back({
-          startPoint: {x: ss.x1, y: ss.y1},
-          endPoint: {x: ss.x2, y: ss.y2}
-        }))
+    if (backgroundImageData != null) {
+      console.log("do Morph");
 
-        
-        let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height, 
-          imageDataVector, 
-          srcLinesVector, 
-          morphLinesVector);     
-        
-        console.log("result.size " + result.size());
-        for (let i = 0; i < result.size(); i++) {
-          // let e: number = result.get(i);
-          backgroundImageData.data[i] = result.get(i);
-        }
-        console.log(backgroundImageData.data);
-        backgroundImage = imagedataToImage(backgroundImageData);
+      const imageDataVector = new wasmMorph.VectorByte();
+      backgroundImageData.data.forEach((b) => imageDataVector.push_back(b));
 
+      const skelletonLinesVector = new wasmMorph.VectorFeatureLine();
+      tileSiteSegments.forEach((ss) =>
+        skelletonLinesVector.push_back({
+          startPoint: { x: ss.x1 + tileCenter.x, y: ss.y1 + tileCenter.y },
+          endPoint: { x: ss.x2 + tileCenter.x, y: ss.y2 + tileCenter.y },
+        }),
+      );
+
+      const outlineLinesVector = new wasmMorph.VectorFeatureLine();
+      outlines.forEach((s) => {
+        s.forEach((ss) =>
+          outlineLinesVector.push_back({
+            startPoint: { x: ss.startPoint.x, y: ss.startPoint.y },
+            endPoint: { x: ss.endPoint.x, y: ss.endPoint.y },
+          }),
+        );
+      });
+      // console.log(outlines);
+
+      const matrixVector = new wasmMorph.VectorDouble();
+      matrixVector.push_back(M!.a);
+      matrixVector.push_back(M!.b);
+      matrixVector.push_back(M!.c);
+      matrixVector.push_back(M!.d);
+      matrixVector.push_back(M!.e);
+      matrixVector.push_back(M!.f);
+
+      // let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height,
+      //   imageDataVector,
+      //   skelletonLinesVector,
+      //   outlineLinesVector,
+      //   matrixVector);
+
+      // // console.log("result.size " + result.size());
+      // for (let i = 0; i < result.size(); i++) {
+      //   // let e: number = result.get(i);
+      //   backgroundImageData.data[i] = result.get(i);
+      // }
+
+      // console.log(backgroundImageData.data);
+      backgroundImage = imagedataToImage(backgroundImageData);
+
+      console.log(skelletonLinesVector.get(3));
+
+
+      let morphedOutline = wasmMorph.getMorphOutline(
+        backgroundImageData.width,
+        backgroundImageData.height,
+        imageDataVector,
+        skelletonLinesVector,
+        outlineLinesVector,
+        matrixVector,
+      );
+
+      for (let i = 0; i < morphedOutline.size(); i++) {
+        morphedSiteSegments.push(
+          new SiteSegment(
+            morphedOutline.get(i).startPoint.x,
+            morphedOutline.get(i).startPoint.y,
+            morphedOutline.get(i).endPoint.x,
+            morphedOutline.get(i).endPoint.y,
+            0,
+            [],
+            14,
+          ),
+        );
       }
+      morphedSiteSegments = morphedSiteSegments;
     }
+  }
 
   function imagedataToImage(imagedata: ImageData) {
-      var canvas = document.createElement('canvas');
-      var ctx = canvas.getContext('2d');
-      canvas.width = imagedata.width;
-      canvas.height = imagedata.height;
-      ctx!.putImageData(imagedata, 0, 0);
+    var canvas = document.createElement("canvas");
+    var ctx = canvas.getContext("2d");
+    canvas.width = imagedata.width;
+    canvas.height = imagedata.height;
+    ctx!.putImageData(imagedata, 0, 0);
 
-      var image = new Image();
-      image.src = canvas.toDataURL();
-      return image;
+    var image = new Image();
+    image.src = canvas.toDataURL();
+    return image;
   }
 
   function updateTiling() {
@@ -266,7 +325,7 @@
         newSitePoint.color = color;
         newSitePoint.tileIdx = tile.tileIdx;
         newSitePoint.M = M;
-        if(bbox.contains(newSitePoint.x, newSitePoint.y))
+        if (bbox.contains(newSitePoint.x, newSitePoint.y))
           tilingSitePoints.push(newSitePoint);
       }
 
@@ -283,7 +342,10 @@
         newSiteSegment.M = M;
         newSiteSegment.tileIdx = tile.tileIdx;
 
-        if(bbox.contains(newSiteSegment.x1, newSiteSegment.y1) || bbox.contains(newSiteSegment.x2, newSiteSegment.y2))
+        if (
+          bbox.contains(newSiteSegment.x1, newSiteSegment.y1) ||
+          bbox.contains(newSiteSegment.x2, newSiteSegment.y2)
+        )
           tilingSiteSegments.push(newSiteSegment);
       }
     }
@@ -491,8 +553,6 @@
       p.tileIdx,
     );
   }
-
-
 
   function addPoint(event: MouseEvent) {
     tilingSitePoints = [
@@ -715,7 +775,6 @@
     wasmVoronoi = await instantiate_wasmVoronoi();
     wasmMorph = await instantiate_wasmMorph();
 
-
     siteStore.subscribe((value: Sites) => {
       tileWidth = value.tileWidth;
       tileHeight = value.tileHeight;
@@ -772,7 +831,7 @@
     if (autoUpdate) update();
   }
 
-  function getTransformation(mat: number[], origin: Point): string {
+  function getTransformation(mat: number[], origin: Point): Matrix {
     let M: Matrix = {
       a: mat[0],
       b: mat[3],
@@ -783,19 +842,19 @@
     };
 
     // Decompose M into Translation, Rotation, Scale Matrices
-    let T: Matrix = { a: 0, b: 0, c: 0, d: 0, e: M.e, f: M.f };
+    // let T: Matrix = { a: 0, b: 0, c: 0, d: 0, e: M.e, f: M.f };
     M.e = 0; //MM.e*tilingSize;
     M.f = 0; //MM.f*tilingSize;
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
-    let R: Matrix = {
-      a: M.a / sx,
-      b: M.b / sx,
-      c: M.c / sy,
-      d: M.d / sy,
-      e: 0,
-      f: 0,
-    };
+    // let R: Matrix = {
+    //   a: M.a / sx,
+    //   b: M.b / sx,
+    //   c: M.c / sy,
+    //   d: M.d / sy,
+    //   e: 0,
+    //   f: 0,
+    // };
     let angle = Math.atan2(M.b, M.a);
 
     let Mtransform = compose(
@@ -810,28 +869,37 @@
     );
     // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y + " imageOffset: "  + imageOffset.x +" "+ imageOffset.y +  " / " + toSVG(Mtransform))
     // console.log("e: " + MM.e + " f "+ MM.f)
-    return toSVG(Mtransform);
+    return Mtransform;
   }
 
-  function getInverseTransformation(cell: Cell): string {
-    if (cell.containsPoint) {
-      // let M: number[] = tilingSitePoints[c.sourceIndex].M;
-      // M.join(", ")
-      // return "matrix(" + M.join(", ") + ")";
-      return "";
-    } else if (cell.containsSegment) {
-      let M: number[] = tilingSiteSegments[cell.sourceIndex].M;
-      let MM: Matrix = { a: M[0], b: M[3], c: M[1], d: M[4], e: M[2], f: M[5] };
+  function getInverseTransformation(mat: number[], origin: Point): Matrix {
+    let M: Matrix = {
+      a: mat[0],
+      b: mat[3],
+      c: mat[1],
+      d: mat[4],
+      e: mat[2],
+      f: mat[5],
+    };
 
-      let Mtransform = compose(
-        scale(1 / tilingSize),
-        inverse(MM),
-        scale(tileWidth / tileSize, tileHeight / tileSize),
-      );
+    // Decompose M into Translation, Rotation, Scale Matrices
+    M.e = 0;
+    M.f = 0;
+    let sx = Math.sqrt(M.a * M.a + M.b * M.b);
+    let sy = Math.sqrt(M.c * M.c + M.d * M.d);
 
-      return toSVG(Mtransform);
-    }
-    return "";
+    let angle = Math.atan2(M.b, M.a);
+    let Mtransform = compose(
+      translate(tileCenter.x - origin.x, tileCenter.y - origin.y),
+      scale(
+        300 / (sx * tilingSize * tileSize),
+        300 / (sy * tilingSize * tileSize),
+        origin.x,
+        origin.y,
+      ),
+      rotate(-angle, origin.x, origin.y),
+    );
+    return Mtransform;
   }
 
   function getPatternUrl(cell: Cell): string {
@@ -856,7 +924,7 @@
           id={"pattern_" + idx}
           patternContentUnits="userSpaceOnUse"
           patternUnits="userSpaceOnUse"
-          patternTransform={getTransformation(tile.M, tile.origin)}
+          patternTransform={toSVG(getTransformation(tile.M, tile.origin))}
           width={tileWidth}
           height={tileHeight}
         >
@@ -975,16 +1043,34 @@
     {/each}
     {#each outlines as outline}
       {#each outline as fl, idx}
+      <!-- {#if idx <= 1}       -->
+
         <path
           id={"outline_" + idx}
-          d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl.endPoint.y}"
+          d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl
+            .endPoint.y}"
           stroke="yellow"
           stroke-width="1"
           fill="none"
         ></path>
-        {/each}
+        <!-- {/if} -->
+
       {/each}
-    </svg>
+    {/each}
+    {#each morphedSiteSegments as fl, idx}
+    <!-- {#if idx <= 1}       -->
+      <g transform={toSVG(getTransformation(tiles[15].M, tiles[15].origin))}>
+        <path
+        id={"outlineMorphed_" + idx}
+        d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
+        stroke="red"
+        stroke-width="2"
+        fill="none"
+        ></path>
+      </g>
+      <!-- {/if} -->
+    {/each}
+  </svg>
   <div class="lastErrorContainer max-w-96">
     <p class="text-red-700 text-sm break-words">{lastError}</p>
   </div>

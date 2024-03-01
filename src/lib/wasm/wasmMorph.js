@@ -27,7 +27,7 @@ Module['ready'] = new Promise((resolve, reject) => {
   readyPromiseResolve = resolve;
   readyPromiseReject = reject;
 });
-["_main","getExceptionMessage","___get_exception_message","_free","_memory","__Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_","___indirect_function_table","_fflush","onRuntimeInitialized"].forEach((prop) => {
+["_main","getExceptionMessage","___get_exception_message","_free","_memory","__Z15getMorphOutlineiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","__Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","___indirect_function_table","_fflush","onRuntimeInitialized"].forEach((prop) => {
   if (!Object.getOwnPropertyDescriptor(Module['ready'], prop)) {
     Object.defineProperty(Module['ready'], prop, {
       get: () => abort('You are getting ' + prop + ' on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js'),
@@ -3602,6 +3602,8 @@ var wasmImports = {
   /** @export */
   invoke_ii: invoke_ii,
   /** @export */
+  invoke_iidd: invoke_iidd,
+  /** @export */
   invoke_iii: invoke_iii,
   /** @export */
   invoke_iiii: invoke_iiii,
@@ -3616,14 +3618,19 @@ var wasmImports = {
   /** @export */
   invoke_viii: invoke_viii,
   /** @export */
+  invoke_viiifffi: invoke_viiifffi,
+  /** @export */
   invoke_viiii: invoke_viiii,
   /** @export */
-  invoke_viiiiii: invoke_viiiiii
+  invoke_viiiiii: invoke_viiiiii,
+  /** @export */
+  invoke_viiiiiii: invoke_viiiiiii
 };
 var wasmExports = createWasm();
 var ___wasm_call_ctors = createExportWrapper('__wasm_call_ctors');
-var __Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_ = Module['__Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_'] = createExportWrapper('_Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_');
 var ___cxa_free_exception = createExportWrapper('__cxa_free_exception');
+var __Z15getMorphOutlineiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE = Module['__Z15getMorphOutlineiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE'] = createExportWrapper('_Z15getMorphOutlineiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE');
+var __Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE = Module['__Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE'] = createExportWrapper('_Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE');
 var ___getTypeName = createExportWrapper('__getTypeName');
 var ___errno_location = createExportWrapper('__errno_location');
 var _fflush = Module['_fflush'] = createExportWrapper('fflush');
@@ -3668,6 +3675,61 @@ function invoke_vii(index,a1,a2) {
   }
 }
 
+function invoke_iii(index,a1,a2) {
+  var sp = stackSave();
+  try {
+    return getWasmTableEntry(index)(a1,a2);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viii(index,a1,a2,a3) {
+  var sp = stackSave();
+  try {
+    getWasmTableEntry(index)(a1,a2,a3);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viiiiii(index,a1,a2,a3,a4,a5,a6) {
+  var sp = stackSave();
+  try {
+    getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_iidd(index,a1,a2,a3) {
+  var sp = stackSave();
+  try {
+    return getWasmTableEntry(index)(a1,a2,a3);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viiifffi(index,a1,a2,a3,a4,a5,a6,a7) {
+  var sp = stackSave();
+  try {
+    getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6,a7);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
 function invoke_viiii(index,a1,a2,a3,a4) {
   var sp = stackSave();
   try {
@@ -3690,17 +3752,6 @@ function invoke_i(index) {
   }
 }
 
-function invoke_viiiiii(index,a1,a2,a3,a4,a5,a6) {
-  var sp = stackSave();
-  try {
-    getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6);
-  } catch(e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
-  }
-}
-
 function invoke_vi(index,a1) {
   var sp = stackSave();
   try {
@@ -3712,32 +3763,21 @@ function invoke_vi(index,a1) {
   }
 }
 
-function invoke_viii(index,a1,a2,a3) {
-  var sp = stackSave();
-  try {
-    getWasmTableEntry(index)(a1,a2,a3);
-  } catch(e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_iii(index,a1,a2) {
-  var sp = stackSave();
-  try {
-    return getWasmTableEntry(index)(a1,a2);
-  } catch(e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
-  }
-}
-
 function invoke_ii(index,a1) {
   var sp = stackSave();
   try {
     return getWasmTableEntry(index)(a1);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_viiiiiii(index,a1,a2,a3,a4,a5,a6,a7) {
+  var sp = stackSave();
+  try {
+    getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6,a7);
   } catch(e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;

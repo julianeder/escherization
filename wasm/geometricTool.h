@@ -7,8 +7,6 @@
 
 
 /* Vector Descriptions and Operations */
-
-
 class Vector2d {
 public:
   double x, y;
@@ -42,6 +40,13 @@ public:
   //friend Vector3d operator%(const Vector2d& v1, const Vector2d& v2); // cross
   friend Vector2d operator/(const Vector2d& v, double s); // division by scalar
   friend short    operator==(const Vector2d& one, const Vector2d& two); // eq
+};
+
+class Vector2dInt {
+public:
+  int x, y;
+  Vector2dInt(const Vector2d &v);
+  friend short operator==(const Vector2dInt& one, const Vector2dInt& two); // eq
 };
 
 
