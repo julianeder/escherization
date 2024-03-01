@@ -242,7 +242,7 @@ bool approximatelyEqual(float a, float b, float epsilon)
 
 vector<FeatureLine> sortOutlineLines(vector<FeatureLine> &outlineLines)
 {
-  printf("outlineLines size  %zu \n", outlineLines.size());
+  // printf("outlineLines size  %zu \n", outlineLines.size());
   vector<FeatureLine> sorted;
   int i = 0;
   int cnt = 0;
@@ -484,11 +484,42 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h,
 {
   pixel **srcImgMap = pixmapFromVector(w, h, imageData);
 
-  printf("skelletonLines size  %zu \n", skelletonLines.size());
+  // printf("skelletonLines size  %zu \n", skelletonLines.size());
 
   vector<FeatureLine> outlineLinesSorted = sortOutlineLines(outlineLines);
   return projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
 }
+
+EMSCRIPTEN_KEEPALIVE vector<int> getBBox(vector<FeatureLine> outlineLines, vector<double> matrixVector){
+  int xl = std::numeric_limits<int>::max();
+  int xh = std::numeric_limits<int>::min();
+  int yl = std::numeric_limits<int>::max();
+  int yh = std::numeric_limits<int>::min();
+  for (int i = 0; i < outlineLines.size(); i++)
+  {
+    Vector2d s = transformPoint(outlineLines[i].startPoint, matrixVector);
+    Vector2d e = transformPoint(outlineLines[i].endPoint, matrixVector);
+
+    if(s.x < xl) xl = (int)floor(s.x);
+    if(s.x > xh) xh = (int)ceil( s.x);
+    if(e.x < xl) xl = (int)floor(e.x);
+    if(e.x > xh) xh = (int)ceil( e.x);
+    
+    if(s.y < yl) yl = (int)floor(s.y);
+    if(s.y > yh) yh = (int)ceil( s.y);
+    if(e.y < yl) yl = (int)floor(e.y);
+    if(e.y > yh) yh = (int)ceil( e.y);
+  }
+
+  vector<int> result;
+  result.push_back(xl);
+  result.push_back(yl);
+  result.push_back(xh);
+  result.push_back(yh);
+
+  return result;
+}
+
 
 EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h,
                                                    vector<unsigned char> imageData,
@@ -498,10 +529,20 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h,
 {
 
   // // pixel ** dstImgMap;
-  pixel **morphMap = allocPixmap(w, h);
   pixel **srcImgMap = pixmapFromVector(w, h, imageData);
 
-  printf("skelletonLines size  %zu \n", skelletonLines.size());
+  // printf("skelletonLines size  %zu \n", skelletonLines.size());
+
+  vector<int> bbox = getBBox(outlineLines, matrixVector);
+  int xl = bbox[0];
+  int yl = bbox[1];
+  int xh = bbox[2];
+  int yh = bbox[3];
+
+  printf("xl %d xh %d yl %d yh %d\n",xl, xh, yl, yh);
+  
+  pixel **morphMap = allocPixmap(xh-xl, yh-yl);
+
 
   vector<FeatureLine> outlineLinesSorted = sortOutlineLines(outlineLines);
   vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
@@ -525,37 +566,40 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h,
   // printf("morphMap %d %d %d %d \n", morphMap[0][0].r, morphMap[0][0].g, morphMap[0][0].b, morphMap[0][0].a);
 
   // printf("map1 %d %d %d %d \n", srcImgMap[0][0].r, srcImgMap[0][0].g, srcImgMap[0][0].b, srcImgMap[0][0].a);
-  Vector2d uv_out;
-  Vector2d uv_in;
+  Vector2d uv_src;
+  Vector2d uv_dst;
   pixel interColor;
 
 
-  for (int i = 0; i < h; i++)
+  for (int i = yl; i < yh; i++)
   {
-    for (int j = 0; j < w; j++)
+    for (int j = xl; j < xh; j++)
     {
-      uv_in.x = j;
-      uv_in.y = i;
+      uv_dst.x = j;
+      uv_dst.y = i;
 
       // warping
-      warp(uv_in, srcLines, dstLines, p, a, b, uv_out);
+      warp(uv_dst, srcLines, dstLines, p, a, b, uv_src);
 
-      if (uv_out.x < 0)
-        uv_out.x = 0;
-      if (uv_out.x > w - 1)
-        uv_out.x = w - 1;
-      if (uv_out.y < 0)
-        uv_out.y = 0;
-      if (uv_out.y > h - 1)
-        uv_out.y = h - 1;
+      if (uv_src.x < 0)
+        uv_src.x = 0;
+      if (uv_src.x > w-1)
+        uv_src.x = w - 1;
+      if (uv_src.y < 0)
+        uv_src.y = 0;
+      if (uv_src.y > h - 1)
+        uv_src.y = h - 1;
 
       pixel bilin;
-      bilinear(srcImgMap, uv_out.y, uv_out.x, bilin);
+      bilinear(srcImgMap, uv_src.y, uv_src.x, bilin);
 
-      morphMap[i][j].r = bilin.r;
-      morphMap[i][j].g = bilin.g;
-      morphMap[i][j].b = bilin.b;
-      morphMap[i][j].a = bilin.a;
+      if(i == yl && j == xl)
+      printf("(%f %f) -> (%f %f) \n", uv_src.x, uv_src.y, uv_dst.x, uv_dst.y);
+
+      morphMap[i-yl][j-xl].r = bilin.r;
+      morphMap[i-yl][j-xl].g = bilin.g;
+      morphMap[i-yl][j-xl].b = bilin.b;
+      morphMap[i-yl][j-xl].a = bilin.a;
     }
   }
   vector<unsigned char> result = vectorFromPixmap(w, h, morphMap);
@@ -573,6 +617,7 @@ EMSCRIPTEN_BINDINGS(myvoronoi)
 {
   register_vector<unsigned char>("VectorByte");
   register_vector<double>("VectorDouble");
+  register_vector<int>("VectorInt");
   register_vector<FeatureLine>("VectorFeatureLine");
 
   value_object<Point>("Point")
@@ -585,4 +630,5 @@ EMSCRIPTEN_BINDINGS(myvoronoi)
 
   emscripten::function("doMorph", &doMorph);
   emscripten::function("getMorphOutline", &getMorphOutline);
+  emscripten::function("getBBox", &getBBox);
 }

@@ -76,7 +76,8 @@
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
 
-  let morphedSiteSegments: SiteSegment[] = [];
+  let morphedSiteSegments: SiteSegment[] = []; // Debug only
+  let morphedBBox: number[] = [];
 
   const symGroups: Record<string, any> = {
     "1": "p1",
@@ -187,20 +188,18 @@
       matrixVector.push_back(M!.e);
       matrixVector.push_back(M!.f);
 
-      let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height,
-        imageDataVector,
-        skelletonLinesVector,
+
+      let bbox = wasmMorph.getBBox(
         outlineLinesVector,
-        matrixVector);
+        matrixVector
+      );
 
-      // console.log("result.size " + result.size());
-      for (let i = 0; i < result.size(); i++) {
-        // let e: number = result.get(i);
-        backgroundImageData.data[i] = result.get(i);
+      morphedBBox = [];
+      for (let i = 0; i < bbox.size(); i++) {
+        morphedBBox.push(bbox.get(i));
       }
-
-      console.log(backgroundImageData.data);
-      backgroundImage = imagedataToImage(backgroundImageData);
+      morphedBBox = morphedBBox;
+      console.log("update bbox calc");
 
       let morphedOutline = wasmMorph.getMorphOutline(
         backgroundImageData.width,
@@ -225,6 +224,21 @@
         );
       }
       morphedSiteSegments = morphedSiteSegments;
+
+      let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height,
+        imageDataVector,
+        skelletonLinesVector,
+        outlineLinesVector,
+        matrixVector);
+
+      // console.log("result.size " + result.size());
+      for (let i = 0; i < result.size(); i++) {
+        // let e: number = result.get(i);
+        backgroundImageData.data[i] = result.get(i);
+      }
+
+      // console.log(backgroundImageData.data);
+      backgroundImage = imagedataToImage(backgroundImageData);
     }
   }
 
@@ -770,6 +784,8 @@
     siteStore.subscribe((value: Sites) => {
       tileWidth = value.tileWidth;
       tileHeight = value.tileHeight;
+      morphedBBox = [0,0,tileWidth,tileHeight];
+      console.log("update bbox store");
       tileSitePoints = value.sitePoints;
       tileSiteSegments = value.siteSegments;
       tileCenter = value.tileCenter;
@@ -823,7 +839,7 @@
     if (autoUpdate) update();
   }
 
-  function getTransformation(mat: number[], origin: Point): Matrix {
+  function getTransformation(mat: number[], origin: Point, includeMorphedBBox: boolean = false): Matrix {
     let M: Matrix = {
       a: mat[0],
       b: mat[3],
@@ -849,6 +865,13 @@
     // };
     let angle = Math.atan2(M.b, M.a);
 
+    let tx: number = -tileCenter.x + origin.x;
+    let ty: number = -tileCenter.y + origin.y;
+    if(includeMorphedBBox){
+      tx = tx + morphedBBox[0];
+      ty = ty + morphedBBox[1];
+    }
+
     let Mtransform = compose(
       rotate(angle, origin.x, origin.y),
       scale(
@@ -857,7 +880,7 @@
         origin.x,
         origin.y,
       ),
-      translate(-tileCenter.x + origin.x, -tileCenter.y + origin.y),
+      translate(tx, ty),
     );
     // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y + " imageOffset: "  + imageOffset.x +" "+ imageOffset.y +  " / " + toSVG(Mtransform))
     // console.log("e: " + MM.e + " f "+ MM.f)
@@ -916,16 +939,16 @@
           id={"pattern_" + idx}
           patternContentUnits="userSpaceOnUse"
           patternUnits="userSpaceOnUse"
-          patternTransform={toSVG(getTransformation(tile.M, tile.origin))}
-          width={tileWidth}
-          height={tileHeight}
+          patternTransform={toSVG(getTransformation(tile.M, tile.origin, true))}
+          width={morphedBBox[2] - morphedBBox[0]}
+          height={morphedBBox[3] - morphedBBox[1]}
         >
           <image
             href={backgroundImage?.src}
             x={0}
             y={0}
-            width={tileWidth}
-            height={tileHeight}
+            width={morphedBBox[2] - morphedBBox[0]}
+            height={morphedBBox[3] - morphedBBox[1]}
           />
         </pattern>
       {/each}

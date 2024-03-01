@@ -27,7 +27,7 @@ Module['ready'] = new Promise((resolve, reject) => {
   readyPromiseResolve = resolve;
   readyPromiseReject = reject;
 });
-["_main","getExceptionMessage","___get_exception_message","_free","_memory","__Z15getMorphOutlineiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","__Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","___indirect_function_table","_fflush","onRuntimeInitialized"].forEach((prop) => {
+["_main","getExceptionMessage","___get_exception_message","_free","_memory","__Z15getMorphOutlineiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","__Z7getBBoxNSt3__26vectorI11FeatureLineNS_9allocatorIS1_EEEENS0_IdNS2_IdEEEE","__Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","___indirect_function_table","_fflush","onRuntimeInitialized"].forEach((prop) => {
   if (!Object.getOwnPropertyDescriptor(Module['ready'], prop)) {
     Object.defineProperty(Module['ready'], prop, {
       get: () => abort('You are getting ' + prop + ' on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js'),
@@ -3632,6 +3632,7 @@ var wasmExports = createWasm();
 var ___wasm_call_ctors = createExportWrapper('__wasm_call_ctors');
 var ___cxa_free_exception = createExportWrapper('__cxa_free_exception');
 var __Z15getMorphOutlineiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE = Module['__Z15getMorphOutlineiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE'] = createExportWrapper('_Z15getMorphOutlineiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE');
+var __Z7getBBoxNSt3__26vectorI11FeatureLineNS_9allocatorIS1_EEEENS0_IdNS2_IdEEEE = Module['__Z7getBBoxNSt3__26vectorI11FeatureLineNS_9allocatorIS1_EEEENS0_IdNS2_IdEEEE'] = createExportWrapper('_Z7getBBoxNSt3__26vectorI11FeatureLineNS_9allocatorIS1_EEEENS0_IdNS2_IdEEEE');
 var __Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE = Module['__Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE'] = createExportWrapper('_Z7doMorphiiNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE');
 var ___getTypeName = createExportWrapper('__getTypeName');
 var ___errno_location = createExportWrapper('__errno_location');
