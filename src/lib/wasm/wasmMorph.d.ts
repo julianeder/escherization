@@ -50,7 +50,7 @@ export interface MorphWasmModule {
   VectorInt: {new(): VectorInt};
   VectorFeatureLine: {new(): VectorFeatureLine};
   getBBox(_0: VectorFeatureLine, _1: VectorDouble): VectorInt;
-  doMorph(_0: number, _1: number, _2: VectorByte, _3: VectorFeatureLine, _4: VectorFeatureLine, _5: VectorDouble): VectorByte;
   getMorphOutline(_0: number, _1: number, _2: VectorByte, _3: VectorFeatureLine, _4: VectorFeatureLine, _5: VectorDouble): VectorFeatureLine;
+  doMorph(_0: number, _1: number, _2: number, _3: number, _4: number, _5: VectorByte, _6: VectorFeatureLine, _7: VectorFeatureLine, _8: VectorDouble): VectorByte;
 }
 export default function instantiate_wasmMorph(mod?: any): Promise<MorphWasmModule>; 

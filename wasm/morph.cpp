@@ -28,9 +28,9 @@ string inputFileDest;
 string outputFile;
 // the parameter of the weight
 string pStr, aStr, bStr, tStr;
-float p = 0;
-float a = 1;
-float b = 2;
+// float p = 0;
+// float a = 1;
+// float b = 2;
 
 //--------------------------------------------------------------------------
 //------------------------allocPixmap---------------------------------------
@@ -51,7 +51,10 @@ pixel **allocPixmap(int w, int h)
   {
     for (int col = 0; col < w; col++)
     {
-      map[row][col].r = map[row][col].g = map[row][col].b = map[row][col].a = 255;
+      map[row][col].r = 255; 
+      map[row][col].g = 0;
+      map[row][col].b = 0;
+      map[row][col].a = 255;
     }
     // printf("row\n");
   }
@@ -273,11 +276,11 @@ vector<FeatureLine> sortOutlineLines(vector<FeatureLine> &outlineLines)
 
 bool isBlack(Vector2dInt c, pixel **srcImgMap, int w, int h)
 {
-  if (c.x < 0 || c.x > w)
+  if (c.x < 0 || c.x >= w)
     return true;
-  if (c.y < 0 || c.y > h)
+  if (c.y < 0 || c.y >= h)
     return true;
-
+  // printf("c %d %d\n",c.x, c.y);
   pixel pix = srcImgMap[c.y][c.x];
   return pix.r == 0 && pix.g == 0 && pix.b == 0 && pix.a == 255;
 }
@@ -521,7 +524,7 @@ EMSCRIPTEN_KEEPALIVE vector<int> getBBox(vector<FeatureLine> outlineLines, vecto
 }
 
 
-EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h,
+EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float a, float b,
                                                    vector<unsigned char> imageData,
                                                    vector<FeatureLine> skelletonLines,
                                                    vector<FeatureLine> outlineLines,
@@ -581,25 +584,43 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h,
       // warping
       warp(uv_dst, srcLines, dstLines, p, a, b, uv_src);
 
-      if (uv_src.x < 0)
+      bool outside = false;
+      if (uv_src.x < 0){
         uv_src.x = 0;
-      if (uv_src.x > w-1)
+        outside = true;
+      }
+      if (uv_src.x > w-1){
         uv_src.x = w - 1;
-      if (uv_src.y < 0)
+        outside = true;
+      }
+      if (uv_src.y < 0){
         uv_src.y = 0;
-      if (uv_src.y > h - 1)
+        outside = true;
+      }
+      if (uv_src.y > h - 1){
         uv_src.y = h - 1;
+        outside = true;
+      }
 
       pixel bilin;
       bilinear(srcImgMap, uv_src.y, uv_src.x, bilin);
 
       if(i == yl && j == xl)
-      printf("(%f %f) -> (%f %f) \n", uv_src.x, uv_src.y, uv_dst.x, uv_dst.y);
+        printf("(%f %f) -> (%f %f) \n", uv_src.x, uv_src.y, uv_dst.x, uv_dst.y);
+      if(i == yh-1 && j == xh-1)
+        printf("(%f %f) -> (%f %f) \n", uv_src.x, uv_src.y, uv_dst.x, uv_dst.y);
 
-      morphMap[i-yl][j-xl].r = bilin.r;
-      morphMap[i-yl][j-xl].g = bilin.g;
-      morphMap[i-yl][j-xl].b = bilin.b;
-      morphMap[i-yl][j-xl].a = bilin.a;
+      if(outside){
+        morphMap[i-yl][j-xl].r = 255;
+        morphMap[i-yl][j-xl].g = 0;
+        morphMap[i-yl][j-xl].b = 0;
+        morphMap[i-yl][j-xl].a = 255;
+      }else{
+        morphMap[i-yl][j-xl].r = bilin.r;
+        morphMap[i-yl][j-xl].g = bilin.g;
+        morphMap[i-yl][j-xl].b = bilin.b;
+        morphMap[i-yl][j-xl].a = bilin.a;
+      }
     }
   }
   vector<unsigned char> result = vectorFromPixmap(w, h, morphMap);

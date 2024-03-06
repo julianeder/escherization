@@ -36,7 +36,7 @@
     translate,
     rotate,
   } from "transformation-matrix";
-  import { ImageStoreContent, imageStore, siteStore } from "./state";
+  import { canvasSize, ImageStoreContent, imageStore, siteStore } from "./state";
   import { checkIntersections } from "./collisionDetection";
 
   let wasmVoronoi: VoronoiWasmModule;
@@ -57,7 +57,7 @@
   let voronoiCells: Cell[] = [];
   let tilingSize: number = 100;
   let tileSize: number = 1;
-  let tileCenter: Point;
+  let tileCenter: Point = new Point(150,150);
   let imageOffset: Point;
 
   let backgroundImage: HTMLImageElement | null;
@@ -77,7 +77,7 @@
   let showBackgroundImage: boolean = true;
 
   let morphedSiteSegments: SiteSegment[] = []; // Debug only
-  let morphedBBox: number[] = [];
+  let morphedBBox: number[] = [-40,-17,306,343];
 
   const symGroups: Record<string, any> = {
     "1": "p1",
@@ -106,6 +106,11 @@
   let color2: string = "#59da5980";
   let color3: string = "#c3c63580";
 
+  let doMorph: boolean = true;
+  let p: number = 0;
+  let a: number = 1;
+  let b: number = 2;
+
   function update() {
     updateTiling();
 
@@ -124,7 +129,7 @@
     outlines = [];
     let M: Matrix;
     for (let i = 0; i < tiles.length; i++) {
-      if (tiles[i].tileIdx == 14) {
+      if (tiles[i].tileIdx == 14) {       
         let outline: FeatureLine[] = [];
         M = getInverseTransformation(tiles[i].M, tiles[i].origin);
         voronoiCells
@@ -155,7 +160,7 @@
     outlines = outlines; // Reactive Update
 
     // Morphing
-    if (backgroundImageData != null) {
+    if (doMorph && backgroundImageData != null) {
       console.log("do Morph");
 
       const imageDataVector = new wasmMorph.VectorByte();
@@ -188,11 +193,7 @@
       matrixVector.push_back(M!.e);
       matrixVector.push_back(M!.f);
 
-
-      let bbox = wasmMorph.getBBox(
-        outlineLinesVector,
-        matrixVector
-      );
+      let bbox = wasmMorph.getBBox(outlineLinesVector, matrixVector);
 
       morphedBBox = [];
       for (let i = 0; i < bbox.size(); i++) {
@@ -225,20 +226,31 @@
       }
       morphedSiteSegments = morphedSiteSegments;
 
-      let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height,
+      console.log(p + " " + a + " " + b + " ");
+      let result = wasmMorph.doMorph(
+        backgroundImageData.width,
+        backgroundImageData.height,
+        p,
+        a,
+        b,
         imageDataVector,
         skelletonLinesVector,
         outlineLinesVector,
-        matrixVector);
+        matrixVector,
+      );
 
       // console.log("result.size " + result.size());
+      let morphedBackgroundImageData: ImageData = new ImageData(
+        tileWidth,
+        tileHeight,
+      );
       for (let i = 0; i < result.size(); i++) {
         // let e: number = result.get(i);
-        backgroundImageData.data[i] = result.get(i);
+        morphedBackgroundImageData.data[i] = result.get(i);
       }
 
       // console.log(backgroundImageData.data);
-      backgroundImage = imagedataToImage(backgroundImageData);
+      backgroundImage = imagedataToImage(morphedBackgroundImageData);
     }
   }
 
@@ -339,7 +351,7 @@
         let newSiteSegment: SiteSegment = scaleSegment(
           mulSegment(
             M,
-            scaleSegment(tileSiteSegments[j], tileSize / 300, tileSize / 300),
+            scaleSegment(tileSiteSegments[j], tileSize / canvasSize.x, tileSize / canvasSize.y),
           ),
           tilingSize,
           tilingSize,
@@ -784,7 +796,7 @@
     siteStore.subscribe((value: Sites) => {
       tileWidth = value.tileWidth;
       tileHeight = value.tileHeight;
-      morphedBBox = [0,0,tileWidth,tileHeight];
+      morphedBBox = [0, 0, tileWidth, tileHeight];
       console.log("update bbox store");
       tileSitePoints = value.sitePoints;
       tileSiteSegments = value.siteSegments;
@@ -839,7 +851,11 @@
     if (autoUpdate) update();
   }
 
-  function getTransformation(mat: number[], origin: Point, includeMorphedBBox: boolean = false): Matrix {
+  function getTransformation(
+    mat: number[],
+    origin: Point,
+    includeMorphedBBox: boolean = false
+  ): Matrix {
     let M: Matrix = {
       a: mat[0],
       b: mat[3],
@@ -850,40 +866,43 @@
     };
 
     // Decompose M into Translation, Rotation, Scale Matrices
-    // let T: Matrix = { a: 0, b: 0, c: 0, d: 0, e: M.e, f: M.f };
     M.e = 0; //MM.e*tilingSize;
     M.f = 0; //MM.f*tilingSize;
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
-    // let R: Matrix = {
-    //   a: M.a / sx,
-    //   b: M.b / sx,
-    //   c: M.c / sy,
-    //   d: M.d / sy,
-    //   e: 0,
-    //   f: 0,
-    // };
+    sx = (sx * tilingSize * tileSize) / tileWidth;
+    sy = (sy * tilingSize * tileSize) / tileHeight;
+
     let angle = Math.atan2(M.b, M.a);
 
     let tx: number = -tileCenter.x + origin.x;
     let ty: number = -tileCenter.y + origin.y;
-    if(includeMorphedBBox){
+    if (includeMorphedBBox) {
+      // console.log("tileCenter.y " + tileCenter.y + " origin.y " + origin.y)
+      // console.log("t " + tx + " " + ty)
+      // console.log("morph offset " + morphedBBox[0] + " " + morphedBBox[1])
       tx = tx + morphedBBox[0];
       ty = ty + morphedBBox[1];
     }
+    // console.log("tx: " + tx +" ty "+ ty +" sx:  " + sx +" sy "+ sy +  " angle " + angle)
 
     let Mtransform = compose(
       rotate(angle, origin.x, origin.y),
       scale(
-        (sx * tilingSize * tileSize) / 300,
-        (sy * tilingSize * tileSize) / 300,
+        sx,
+        sy,
         origin.x,
         origin.y,
       ),
       translate(tx, ty),
     );
-    // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y + " imageOffset: "  + imageOffset.x +" "+ imageOffset.y +  " / " + toSVG(Mtransform))
+    // console.log(M)
+    // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y +  " / " + toSVG(Mtransform))
     // console.log("e: " + MM.e + " f "+ MM.f)
+    
+    // if (includeMorphedBBox && tileIdx == 14)
+    //   console.log(Mtransform)
+
     return Mtransform;
   }
 
@@ -907,8 +926,8 @@
     let Mtransform = compose(
       translate(tileCenter.x - origin.x, tileCenter.y - origin.y),
       scale(
-        300 / (sx * tilingSize * tileSize),
-        300 / (sy * tilingSize * tileSize),
+        canvasSize.x / (sx * tilingSize * tileSize),
+        canvasSize.y / (sy * tilingSize * tileSize),
         origin.x,
         origin.y,
       ),
@@ -936,7 +955,7 @@
     <defs>
       {#each tiles as tile, idx}
         <pattern
-          id={"pattern_" + idx}
+          id={"pattern_" + tile.tileIdx}
           patternContentUnits="userSpaceOnUse"
           patternUnits="userSpaceOnUse"
           patternTransform={toSVG(getTransformation(tile.M, tile.origin, true))}
@@ -962,6 +981,7 @@
       stroke-width="1"
       fill="rgb(248 250 252)"
     />
+    
     {#each voronoiCells as c}
       {#if showBackground && isCellPathConsistant(c)}
         {#if showBackgroundImage}
@@ -1066,25 +1086,82 @@
           stroke-width="1"
           fill="none"
         ></path>
-
       {/each}
     {/each}
     {#each morphedSiteSegments as fl, idx}
       <g transform={toSVG(getTransformation(tiles[15].M, tiles[15].origin))}>
         <path
-        id={"outlineMorphed_" + idx}
-        d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
-        stroke="red"
-        stroke-width="2"
-        fill="none"
+          id={"outlineMorphed_" + idx}
+          d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
+          stroke="red"
+          stroke-width="2"
+          fill="none"
         ></path>
       </g>
     {/each}
+    <g
+      transform={toSVG(getTransformation([1, 0, 1.732050807563, 0, 1, 2], {x: 173.2050807563, y: 200}, true))}>
+      <rect
+      x="0"
+      y="0"
+      width={346}
+      height={360}
+      stroke="rgb(255 0 0)"
+      stroke-width="1"
+      fill="none"
+      />
+    </g>
   </svg>
   <div class="lastErrorContainer max-w-96">
     <p class="text-red-700 text-sm break-words">{lastError}</p>
   </div>
   <!-- <div class="grid grid-rows-4 content-start"> -->
+  <p class="text-xl font-sans text-center text-sky-400 p-4">Morph Settings</p>
+  <div class="bg-slate-100 flex items-center justify-center h-10">
+    <label class="p-2">
+      <input type="checkbox" bind:checked={doMorph} />
+      Morph
+    </label>
+  </div>
+  <div class="grid grid-cols-4">
+    <p class="">p</p>
+    <div class="col-span-3 min-w-72">
+      <Range
+        min={0}
+        max={100}
+        stepSize={0.01}
+        initialValue={p}
+        decimalPlaces={2}
+        on:change={(e) => (p = Number(e.detail.value))}
+      />
+    </div>
+  </div>
+  <div class="grid grid-cols-4">
+    <p class="">a</p>
+    <div class="col-span-3 min-w-72">
+      <Range
+        min={1}
+        max={300}
+        stepSize={0.01}
+        initialValue={a}
+        decimalPlaces={2}
+        on:change={(e) => (a = Number(e.detail.value))}
+      />
+    </div>
+  </div>
+  <div class="grid grid-cols-4">
+    <p class="">b</p>
+    <div class="col-span-3 min-w-72">
+      <Range
+        min={50}
+        max={200}
+        stepSize={0.01}
+        initialValue={b}
+        decimalPlaces={2}
+        on:change={(e) => (b = Number(e.detail.value))}
+      />
+    </div>
+  </div>
   <p class="text-xl font-sans text-center text-sky-400 p-4">Tiling Settings</p>
   <div class="grid grid-cols-4">
     <p class="">Tile Size [%]</p>
