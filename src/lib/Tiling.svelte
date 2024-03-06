@@ -36,7 +36,12 @@
     translate,
     rotate,
   } from "transformation-matrix";
-  import { canvasSize, ImageStoreContent, imageStore, siteStore } from "./state";
+  import {
+    canvasSize,
+    ImageStoreContent,
+    imageStore,
+    siteStore,
+  } from "./state";
   import { checkIntersections } from "./collisionDetection";
 
   let wasmVoronoi: VoronoiWasmModule;
@@ -57,7 +62,7 @@
   let voronoiCells: Cell[] = [];
   let tilingSize: number = 100;
   let tileSize: number = 1;
-  let tileCenter: Point = new Point(150,150);
+  let tileCenter: Point = new Point(150, 150);
   let imageOffset: Point;
 
   let backgroundImage: HTMLImageElement | null;
@@ -77,7 +82,7 @@
   let showBackgroundImage: boolean = true;
 
   let morphedSiteSegments: SiteSegment[] = []; // Debug only
-  let morphedBBox: number[] = [-40,-17,306,343];
+  let morphedBBox: number[] = [-40, -17, 306, 343];
 
   const symGroups: Record<string, any> = {
     "1": "p1",
@@ -110,6 +115,7 @@
   let p: number = 0;
   let a: number = 1;
   let b: number = 2;
+  let t: number = 1;
 
   function update() {
     updateTiling();
@@ -129,7 +135,7 @@
     outlines = [];
     let M: Matrix;
     for (let i = 0; i < tiles.length; i++) {
-      if (tiles[i].tileIdx == 14) {       
+      if (tiles[i].tileIdx == 14) {
         let outline: FeatureLine[] = [];
         M = getInverseTransformation(tiles[i].M, tiles[i].origin);
         voronoiCells
@@ -160,97 +166,105 @@
     outlines = outlines; // Reactive Update
 
     // Morphing
-    if (doMorph && backgroundImageData != null) {
-      console.log("do Morph");
+    if (backgroundImageData != null) {
+      if (doMorph) {
+        console.log("do Morph");
 
-      const imageDataVector = new wasmMorph.VectorByte();
-      backgroundImageData.data.forEach((b) => imageDataVector.push_back(b));
+        const imageDataVector = new wasmMorph.VectorByte();
+        backgroundImageData.data.forEach((b) => imageDataVector.push_back(b));
 
-      const skelletonLinesVector = new wasmMorph.VectorFeatureLine();
-      tileSiteSegments.forEach((ss) =>
-        skelletonLinesVector.push_back({
-          startPoint: { x: ss.x1 + tileCenter.x, y: ss.y1 + tileCenter.y },
-          endPoint: { x: ss.x2 + tileCenter.x, y: ss.y2 + tileCenter.y },
-        }),
-      );
-
-      const outlineLinesVector = new wasmMorph.VectorFeatureLine();
-      outlines.forEach((s) => {
-        s.forEach((ss) =>
-          outlineLinesVector.push_back({
-            startPoint: { x: ss.startPoint.x, y: ss.startPoint.y },
-            endPoint: { x: ss.endPoint.x, y: ss.endPoint.y },
+        const skelletonLinesVector = new wasmMorph.VectorFeatureLine();
+        tileSiteSegments.forEach((ss) =>
+          skelletonLinesVector.push_back({
+            startPoint: { x: ss.x1 + tileCenter.x, y: ss.y1 + tileCenter.y },
+            endPoint: { x: ss.x2 + tileCenter.x, y: ss.y2 + tileCenter.y },
           }),
         );
-      });
-      // console.log(outlines);
 
-      const matrixVector = new wasmMorph.VectorDouble();
-      matrixVector.push_back(M!.a);
-      matrixVector.push_back(M!.b);
-      matrixVector.push_back(M!.c);
-      matrixVector.push_back(M!.d);
-      matrixVector.push_back(M!.e);
-      matrixVector.push_back(M!.f);
+        const outlineLinesVector = new wasmMorph.VectorFeatureLine();
+        outlines.forEach((s) => {
+          s.forEach((ss) =>
+            outlineLinesVector.push_back({
+              startPoint: { x: ss.startPoint.x, y: ss.startPoint.y },
+              endPoint: { x: ss.endPoint.x, y: ss.endPoint.y },
+            }),
+          );
+        });
+        // console.log(outlines);
 
-      let bbox = wasmMorph.getBBox(outlineLinesVector, matrixVector);
+        const matrixVector = new wasmMorph.VectorDouble();
+        matrixVector.push_back(M!.a);
+        matrixVector.push_back(M!.b);
+        matrixVector.push_back(M!.c);
+        matrixVector.push_back(M!.d);
+        matrixVector.push_back(M!.e);
+        matrixVector.push_back(M!.f);
 
-      morphedBBox = [];
-      for (let i = 0; i < bbox.size(); i++) {
-        morphedBBox.push(bbox.get(i));
-      }
-      morphedBBox = morphedBBox;
-      console.log("update bbox calc");
+        let bbox = wasmMorph.getBBox(outlineLinesVector, matrixVector);
 
-      let morphedOutline = wasmMorph.getMorphOutline(
-        backgroundImageData.width,
-        backgroundImageData.height,
-        imageDataVector,
-        skelletonLinesVector,
-        outlineLinesVector,
-        matrixVector,
-      );
+        morphedBBox = [];
+        for (let i = 0; i < bbox.size(); i++) {
+          morphedBBox.push(bbox.get(i));
+        }
+        morphedBBox = morphedBBox;
+        console.log("update bbox calc");
 
-      for (let i = 0; i < morphedOutline.size(); i++) {
-        morphedSiteSegments.push(
-          new SiteSegment(
-            morphedOutline.get(i).startPoint.x,
-            morphedOutline.get(i).startPoint.y,
-            morphedOutline.get(i).endPoint.x,
-            morphedOutline.get(i).endPoint.y,
-            0,
-            [],
-            14,
-          ),
+        let morphedOutline = wasmMorph.getMorphOutline(
+          backgroundImageData.width,
+          backgroundImageData.height,
+          t,
+          imageDataVector,
+          skelletonLinesVector,
+          outlineLinesVector,
+          matrixVector,
         );
+
+        // morphedSiteSegments = [];
+        for (let i = 0; i < morphedOutline.size(); i++) {
+          morphedSiteSegments.push(
+            new SiteSegment(
+              morphedOutline.get(i).startPoint.x,
+              morphedOutline.get(i).startPoint.y,
+              morphedOutline.get(i).endPoint.x,
+              morphedOutline.get(i).endPoint.y,
+              0,
+              [],
+              14,
+            ),
+          );
+        }
+        morphedSiteSegments = morphedSiteSegments;
+
+        console.log(p + " " + a + " " + b + " ");
+        let result = wasmMorph.doMorph(
+          backgroundImageData.width,
+          backgroundImageData.height,
+          p,
+          a,
+          b,
+          t,
+          imageDataVector,
+          skelletonLinesVector,
+          outlineLinesVector,
+          matrixVector,
+        );
+
+        // console.log("result.size " + result.size());
+        let morphedBackgroundImageData: ImageData = new ImageData(
+          morphedBBox[2] - morphedBBox[0],
+          morphedBBox[3] - morphedBBox[1],
+        );
+        for (let i = 0; i < result.size(); i++) {
+          // let e: number = result.get(i);
+          morphedBackgroundImageData.data[i] = result.get(i);
+        }
+
+        // console.log(backgroundImageData.data);
+        backgroundImage = imagedataToImage(morphedBackgroundImageData);
+      } else {
+        backgroundImage = imagedataToImage(backgroundImageData);
+        morphedBBox = [0, 0, tileWidth, tileHeight];
       }
-      morphedSiteSegments = morphedSiteSegments;
-
-      console.log(p + " " + a + " " + b + " ");
-      let result = wasmMorph.doMorph(
-        backgroundImageData.width,
-        backgroundImageData.height,
-        p,
-        a,
-        b,
-        imageDataVector,
-        skelletonLinesVector,
-        outlineLinesVector,
-        matrixVector,
-      );
-
-      // console.log("result.size " + result.size());
-      let morphedBackgroundImageData: ImageData = new ImageData(
-        tileWidth,
-        tileHeight,
-      );
-      for (let i = 0; i < result.size(); i++) {
-        // let e: number = result.get(i);
-        morphedBackgroundImageData.data[i] = result.get(i);
-      }
-
-      // console.log(backgroundImageData.data);
-      backgroundImage = imagedataToImage(morphedBackgroundImageData);
     }
   }
 
@@ -351,7 +365,11 @@
         let newSiteSegment: SiteSegment = scaleSegment(
           mulSegment(
             M,
-            scaleSegment(tileSiteSegments[j], tileSize / canvasSize.x, tileSize / canvasSize.y),
+            scaleSegment(
+              tileSiteSegments[j],
+              tileSize / canvasSize.x,
+              tileSize / canvasSize.y,
+            ),
           ),
           tilingSize,
           tilingSize,
@@ -854,7 +872,7 @@
   function getTransformation(
     mat: number[],
     origin: Point,
-    includeMorphedBBox: boolean = false
+    includeMorphedBBox: boolean = false,
   ): Matrix {
     let M: Matrix = {
       a: mat[0],
@@ -888,18 +906,13 @@
 
     let Mtransform = compose(
       rotate(angle, origin.x, origin.y),
-      scale(
-        sx,
-        sy,
-        origin.x,
-        origin.y,
-      ),
+      scale(sx, sy, origin.x, origin.y),
       translate(tx, ty),
     );
     // console.log(M)
     // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y +  " / " + toSVG(Mtransform))
     // console.log("e: " + MM.e + " f "+ MM.f)
-    
+
     // if (includeMorphedBBox && tileIdx == 14)
     //   console.log(Mtransform)
 
@@ -981,7 +994,7 @@
       stroke-width="1"
       fill="rgb(248 250 252)"
     />
-    
+
     {#each voronoiCells as c}
       {#if showBackground && isCellPathConsistant(c)}
         {#if showBackgroundImage}
@@ -1100,15 +1113,22 @@
       </g>
     {/each}
     <g
-      transform={toSVG(getTransformation([1, 0, 1.732050807563, 0, 1, 2], {x: 173.2050807563, y: 200}, true))}>
+      transform={toSVG(
+        getTransformation(
+          [1, 0, 1.732050807563, 0, 1, 2],
+          { x: 173.2050807563, y: 200 },
+          true,
+        ),
+      )}
+    >
       <rect
-      x="0"
-      y="0"
-      width={346}
-      height={360}
-      stroke="rgb(255 0 0)"
-      stroke-width="1"
-      fill="none"
+        x="0"
+        y="0"
+        width={346}
+        height={360}
+        stroke="rgb(255 0 0)"
+        stroke-width="1"
+        fill="none"
       />
     </g>
   </svg>
@@ -1122,6 +1142,19 @@
       <input type="checkbox" bind:checked={doMorph} />
       Morph
     </label>
+  </div>
+  <div class="grid grid-cols-4">
+    <p class="">t</p>
+    <div class="col-span-3 min-w-72">
+      <Range
+        min={0}
+        max={100}
+        stepSize={0.01}
+        initialValue={t}
+        decimalPlaces={2}
+        on:change={(e) => (t = Number(e.detail.value))}
+      />
+    </div>
   </div>
   <div class="grid grid-cols-4">
     <p class="">p</p>

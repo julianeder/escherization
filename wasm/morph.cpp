@@ -51,9 +51,9 @@ pixel **allocPixmap(int w, int h)
   {
     for (int col = 0; col < w; col++)
     {
-      map[row][col].r = 255; 
-      map[row][col].g = 0;
-      map[row][col].b = 0;
+      map[row][col].r = 0; 
+      map[row][col].g = 255;
+      map[row][col].b = 255;
       map[row][col].a = 255;
     }
     // printf("row\n");
@@ -87,15 +87,15 @@ pixel **pixmapFromVector(int w, int h, vector<unsigned char> imageData)
 vector<unsigned char> vectorFromPixmap(int w, int h, pixel **map)
 {
   vector<unsigned char> result;
-  for (int row = 0; row < h; row++)
+  for (int y = 0; y < h; y++)
   {
-    for (int col = 0; col < w; col++)
+    for (int x = 0; x < w; x++)
     {
       // result->push_back((map[row][col].r + 100) % 255);
-      result.push_back(map[row][col].r);
-      result.push_back(map[row][col].g);
-      result.push_back(map[row][col].b);
-      result.push_back(map[row][col].a);
+      result.push_back(map[y][x].r);
+      result.push_back(map[y][x].g);
+      result.push_back(map[y][x].b);
+      result.push_back(map[y][x].a);
     }
     // printf("row %zu \n", result->size());
   }
@@ -105,15 +105,20 @@ vector<unsigned char> vectorFromPixmap(int w, int h, pixel **map)
 //--------------------------------------------------------------------------------------------------
 //--------------------------line interpolating function---------------------------------------------
 //--------------------------------------------------------------------------------------------------
-void lineInterpolate(const vector<FeatureLine> &sourceLines,
-                     const vector<FeatureLine> &destLines, vector<FeatureLine> &interLines, float t)
+void lineInterpolate(const vector<FeatureLine> sourceLines,
+                     const vector<FeatureLine> destLines, vector<FeatureLine> &interLines, float t)
 {
-  interLines.reserve(sourceLines.size());
+  // interLines->reserve(sourceLines->size());
   int i;
   for (i = 0; i < sourceLines.size(); i++)
   {
-    interLines[i].startPoint = (1 - t) * (sourceLines[i].startPoint) + t * (destLines[i].startPoint);
-    interLines[i].endPoint = (1 - t) * (sourceLines[i].endPoint) + t * (destLines[i].endPoint);
+    FeatureLine f(
+      (1 - t) * (sourceLines[i].startPoint) + t * (destLines[i].startPoint),
+      (1 - t) * (sourceLines[i].endPoint) + t * (destLines[i].endPoint)
+    );
+    interLines.push_back(f);
+    // (*interLines)[i].startPoint = (1 - t) * ((*sourceLines[i]).startPoint) + t * ((*destLines[i]).startPoint);
+    // (*interLines)[i].endPoint = (1 - t) * ((*sourceLines[i]).endPoint) + t * ((*destLines[i]).endPoint);
   }
 }
 //---------------------------------------------------------------------------
@@ -197,7 +202,7 @@ void warp(const Vector2d &uv_in,
 //--------------------------------------------------------------------------------------------------
 //--------------------------bilinear interpolation--------------------------------------------------
 //--------------------------------------------------------------------------------------------------
-void bilinear(pixel **&Im, float row, float col, pixel &pix)
+pixel bilinear(pixel **&Im, float row, float col)
 {
   int cm, cn, fm, fn;
   double alpha, beta;
@@ -209,34 +214,36 @@ void bilinear(pixel **&Im, float row, float col, pixel &pix)
   alpha = ceil(row) - row;
   beta = ceil(col) - col;
 
+  pixel pix;
   pix.r = (unsigned int)(alpha * beta * Im[fm][fn].r + (1 - alpha) * beta * Im[cm][fn].r + alpha * (1 - beta) * Im[fm][cn].r + (1 - alpha) * (1 - beta) * Im[cm][cn].r);
   pix.g = (unsigned int)(alpha * beta * Im[fm][fn].g + (1 - alpha) * beta * Im[cm][fn].g + alpha * (1 - beta) * Im[fm][cn].g + (1 - alpha) * (1 - beta) * Im[cm][cn].g);
   pix.b = (unsigned int)(alpha * beta * Im[fm][fn].b + (1 - alpha) * beta * Im[cm][fn].b + alpha * (1 - beta) * Im[fm][cn].b + (1 - alpha) * (1 - beta) * Im[cm][cn].b);
   pix.a = 255;
+  return pix;
 }
 //---------------------------------------------------------------------------
 
-//--------------------------------------------------------------------------------------------------
-//--------------------------color interpolation function--------------------------------------------
-//--------------------------------------------------------------------------------------------------
-void ColorInterPolate(const Vector2d &Src_P,
-                      // const Vector2d &Dest_P,
-                      // float t, 
-                      pixel **&imgSrc,
-                      // pixel **&imgDest, 
-                      pixel &rgb)
-{
-  pixel srcColor; //, destColor;
+// //--------------------------------------------------------------------------------------------------
+// //--------------------------color interpolation function--------------------------------------------
+// //--------------------------------------------------------------------------------------------------
+// void ColorInterPolate(const Vector2d &Src_P,
+//                       // const Vector2d &Dest_P,
+//                       // float t, 
+//                       pixel **&imgSrc,
+//                       // pixel **&imgDest, 
+//                       pixel &rgb)
+// {
+//   pixel srcColor; //, destColor;
 
-  // bilinear(imgSrc, Src_P.x, Src_P.y, srcColor);
-  // bilinear(imgDest, Dest_P.x, Dest_P.y, destColor);
-  bilinear(imgSrc, Src_P.y, Src_P.x, srcColor);
-  // bilinear(imgDest, Dest_P.y, Dest_P.x, destColor);
+//   // bilinear(imgSrc, Src_P.x, Src_P.y, srcColor);
+//   // bilinear(imgDest, Dest_P.x, Dest_P.y, destColor);
+//   bilinear(imgSrc, Src_P.y, Src_P.x, srcColor);
+//   // bilinear(imgDest, Dest_P.y, Dest_P.x, destColor);
 
-  rgb.b = srcColor.b; // * (1 - t) + destColor.b * t;
-  rgb.g = srcColor.g; // * (1 - t) + destColor.g * t;
-  rgb.r = srcColor.r; // * (1 - t) + destColor.r * t;
-}
+//   rgb.b = srcColor.b; // * (1 - t) + destColor.b * t;
+//   rgb.g = srcColor.g; // * (1 - t) + destColor.g * t;
+//   rgb.r = srcColor.r; // * (1 - t) + destColor.r * t;
+// }
 
 bool approximatelyEqual(float a, float b, float epsilon)
 {
@@ -354,7 +361,7 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
 
       s.x = outlineLines[i].startPoint.x;
       s.y = outlineLines[i].startPoint.y;
-      s = transformPoint(s, M);
+      // s = transformPoint(s, M); // M: tilingSpace -> imageSpace
       e.x = skelletonLines[j].startPoint.x;
       e.y = skelletonLines[j].startPoint.y;
       float d_s_s = (s.x - e.x) * (s.x - e.x) + (s.y - e.y) * (s.y - e.y);
@@ -365,7 +372,7 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
 
       s.x = outlineLines[i].endPoint.x;
       s.y = outlineLines[i].endPoint.y;
-      s = transformPoint(s, M);
+      // s = transformPoint(s, M);
       e.x = skelletonLines[j].startPoint.x;
       e.y = skelletonLines[j].startPoint.y;
 
@@ -407,7 +414,7 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
     {
       s.x = outlineLines[i].startPoint.x;
       s.y = outlineLines[i].startPoint.y;
-      s = transformPoint(s, M);
+      // s = transformPoint(s, M);
       e.x = skelletonLines[idx_s_closest].startPoint.x;
       e.y = skelletonLines[idx_s_closest].startPoint.y;
       d.x = e.x - s.x;
@@ -417,7 +424,7 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
     {
       s.x = outlineLines[i].startPoint.x;
       s.y = outlineLines[i].startPoint.y;
-      s = transformPoint(s, M);
+      // s = transformPoint(s, M);
       e.x = skelletonLines[idx_s_closest].endPoint.x;
       e.y = skelletonLines[idx_s_closest].endPoint.y;
       d.x = e.x - s.x;
@@ -437,7 +444,7 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
     {
       s.x = outlineLines[i].endPoint.x;
       s.y = outlineLines[i].endPoint.y;
-      s = transformPoint(s, M);
+      // s = transformPoint(s, M);
       e.x = skelletonLines[idx_e_closest].startPoint.x;
       e.y = skelletonLines[idx_e_closest].startPoint.y;
       d.x = e.x - s.x;
@@ -447,7 +454,7 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
     {
       s.x = outlineLines[i].endPoint.x;
       s.y = outlineLines[i].endPoint.y;
-      s = transformPoint(s, M);
+      // s = transformPoint(s, M);
       e.x = skelletonLines[idx_e_closest].endPoint.x;
       e.y = skelletonLines[idx_e_closest].endPoint.y;
       d.x = e.x - s.x;
@@ -474,12 +481,20 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
   return result;
 }
 
+void transformAll(vector<FeatureLine> &outlineLines, vector<double> M){
+    for (int i = 0; i < outlineLines.size(); i++){
+      outlineLines[i].startPoint = transformPoint(outlineLines[i].startPoint, M);
+      outlineLines[i].endPoint = transformPoint(outlineLines[i].endPoint, M);
+    }
+
+}
+
 //---------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------------------------------
 //--------------------------morph-------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------------
-EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h,
+EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
                                                          vector<unsigned char> imageData,
                                                          vector<FeatureLine> skelletonLines,
                                                          vector<FeatureLine> outlineLines,
@@ -490,7 +505,13 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h,
   // printf("skelletonLines size  %zu \n", skelletonLines.size());
 
   vector<FeatureLine> outlineLinesSorted = sortOutlineLines(outlineLines);
-  return projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
+  transformAll(outlineLinesSorted, matrixVector);
+  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h); //Projects To ImageSpace
+  vector<FeatureLine> dstLines;
+
+  lineInterpolate(outlineLinesSorted, outlineLinesMorphed,  dstLines,  t);
+
+  return dstLines;
 }
 
 EMSCRIPTEN_KEEPALIVE vector<int> getBBox(vector<FeatureLine> outlineLines, vector<double> matrixVector){
@@ -524,7 +545,7 @@ EMSCRIPTEN_KEEPALIVE vector<int> getBBox(vector<FeatureLine> outlineLines, vecto
 }
 
 
-EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float a, float b,
+EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float a, float b, float t,
                                                    vector<unsigned char> imageData,
                                                    vector<FeatureLine> skelletonLines,
                                                    vector<FeatureLine> outlineLines,
@@ -541,26 +562,34 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
   int yl = bbox[1];
   int xh = bbox[2];
   int yh = bbox[3];
-
+  int w_dest = xh-xl;
+  int h_dest = yh-yl;
+  
   printf("xl %d xh %d yl %d yh %d\n",xl, xh, yl, yh);
   
-  pixel **morphMap = allocPixmap(xh-xl, yh-yl);
+
+
+  pixel **morphMap = allocPixmap(w_dest, h_dest);
 
 
   vector<FeatureLine> outlineLinesSorted = sortOutlineLines(outlineLines);
-  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
+  transformAll(outlineLinesSorted, matrixVector);
+  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h); //Projects To ImageSpace
 
   // the featureline of sourceImage, destImage and the morphImage
   vector<FeatureLine> srcLines;
   vector<FeatureLine> dstLines;
-  // // vector<FeatureLine> dstLines;
+  // vector<FeatureLine> interLines;
+
+  srcLines.insert( srcLines.end(), outlineLinesSorted.begin(), outlineLinesSorted.end() );
+  lineInterpolate(outlineLinesSorted, outlineLinesMorphed,  dstLines,  t);
+  printf("dstLines %zu \n", dstLines.size());
 
   // Prepare Feature Vectors
-  srcLines.insert( srcLines.end(), skelletonLines.begin(), skelletonLines.end() );
-  srcLines.insert( srcLines.end(), outlineLinesSorted.begin(), outlineLinesSorted.end() );
+  // srcLines.insert( srcLines.end(), skelletonLines.begin(), skelletonLines.end() );
   
-  dstLines.insert( dstLines.end(), skelletonLines.begin(), skelletonLines.end() );
-  dstLines.insert( dstLines.end(), outlineLinesMorphed.begin(), outlineLinesMorphed.end() );
+  // dstLines.insert( dstLines.end(), skelletonLines.begin(), skelletonLines.end() );
+  // dstLines.insert( dstLines.end(), interLines.begin(), interLines.end() );
 
   // printf("px0 %d %d %d %d \n", imageData[0], imageData[1], imageData[2], imageData[3]);
   // printf("w h %d %d %zu \n", w, h, imageData.size());
@@ -602,34 +631,39 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
         outside = true;
       }
 
-      pixel bilin;
-      bilinear(srcImgMap, uv_src.y, uv_src.x, bilin);
 
-      if(i == yl && j == xl)
-        printf("(%f %f) -> (%f %f) \n", uv_src.x, uv_src.y, uv_dst.x, uv_dst.y);
-      if(i == yh-1 && j == xh-1)
-        printf("(%f %f) -> (%f %f) \n", uv_src.x, uv_src.y, uv_dst.x, uv_dst.y);
 
       if(outside){
         morphMap[i-yl][j-xl].r = 255;
-        morphMap[i-yl][j-xl].g = 0;
+        morphMap[i-yl][j-xl].g = 255;
         morphMap[i-yl][j-xl].b = 0;
         morphMap[i-yl][j-xl].a = 255;
       }else{
+        
+        pixel bilin = bilinear(srcImgMap, uv_src.y, uv_src.x);
+
         morphMap[i-yl][j-xl].r = bilin.r;
         morphMap[i-yl][j-xl].g = bilin.g;
         morphMap[i-yl][j-xl].b = bilin.b;
         morphMap[i-yl][j-xl].a = bilin.a;
       }
+
+      // if(i == yl && j == xl)
+      //   printf("(%f %f) -> (%f %f) \n", uv_src.x, uv_src.y, uv_dst.x, uv_dst.y);
+      // if(i == yh-1 && j == xh-1)
+      //   printf("(%f %f) -> (%f %f) \n", uv_src.x, uv_src.y, uv_dst.x, uv_dst.y);
     }
   }
-  vector<unsigned char> result = vectorFromPixmap(w, h, morphMap);
+
+
+
+  vector<unsigned char> result = vectorFromPixmap(w_dest, h_dest, morphMap);
 
   // printf("result %d %d %d %d \n", result[0], result[1], result[2], result[3]);
   // clear the previous pixmap
   delete[] srcImgMap;
   delete[] morphMap;
-
+  
   return result;
 }
 
