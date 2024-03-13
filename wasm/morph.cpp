@@ -502,11 +502,10 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
 {
   pixel **srcImgMap = pixmapFromVector(w, h, imageData);
 
-  // printf("skelletonLines size  %zu \n", skelletonLines.size());
-
   vector<FeatureLine> outlineLinesSorted = sortOutlineLines(outlineLines);
   transformAll(outlineLinesSorted, matrixVector);
-  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h); //Projects To ImageSpace
+  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
+  
   vector<FeatureLine> dstLines;
 
   lineInterpolate(outlineLinesSorted, outlineLinesMorphed,  dstLines,  t);
@@ -567,23 +566,20 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
   
   printf("xl %d xh %d yl %d yh %d\n",xl, xh, yl, yh);
   
-
-
   pixel **morphMap = allocPixmap(w_dest, h_dest);
 
 
   vector<FeatureLine> outlineLinesSorted = sortOutlineLines(outlineLines);
   transformAll(outlineLinesSorted, matrixVector);
-  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h); //Projects To ImageSpace
+  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
 
   // the featureline of sourceImage, destImage and the morphImage
   vector<FeatureLine> srcLines;
   vector<FeatureLine> dstLines;
   // vector<FeatureLine> interLines;
 
-  srcLines.insert( srcLines.end(), outlineLinesSorted.begin(), outlineLinesSorted.end() );
-  lineInterpolate(outlineLinesSorted, outlineLinesMorphed,  dstLines,  t);
-  printf("dstLines %zu \n", dstLines.size());
+  dstLines.insert( dstLines.end(), outlineLinesSorted.begin(), outlineLinesSorted.end() );
+  lineInterpolate(outlineLinesSorted, outlineLinesMorphed,  srcLines,  t);
 
   // Prepare Feature Vectors
   // srcLines.insert( srcLines.end(), skelletonLines.begin(), skelletonLines.end() );

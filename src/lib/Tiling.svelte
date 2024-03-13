@@ -934,13 +934,15 @@
     M.f = 0;
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
+    sx = tileWidth / (sx * tilingSize * tileSize); // canvasSize.x statt tileWidth ?
+    sy = tileHeight / (sy * tilingSize * tileSize); // canvasSize.y statt tileHeight ?
 
     let angle = Math.atan2(M.b, M.a);
     let Mtransform = compose(
       translate(tileCenter.x - origin.x, tileCenter.y - origin.y),
       scale(
-        canvasSize.x / (sx * tilingSize * tileSize),
-        canvasSize.y / (sy * tilingSize * tileSize),
+        sx,
+        sy,
         origin.x,
         origin.y,
       ),
@@ -1135,6 +1137,20 @@
   <div class="lastErrorContainer max-w-96">
     <p class="text-red-700 text-sm break-words">{lastError}</p>
   </div>
+  <div class="grid grid-cols-4">
+    <button
+    class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded col-span-2"
+    on:click={() => {
+      update();
+    }}>Update</button
+    >
+    <div class="bg-slate-100 flex items-center justify-center col-span-2">
+      <label class="p-2">
+        <input type="checkbox" bind:checked={autoUpdate} />
+        Auto Update
+      </label>
+    </div>
+  </div>
   <!-- <div class="grid grid-rows-4 content-start"> -->
   <p class="text-xl font-sans text-center text-sky-400 p-4">Morph Settings</p>
   <div class="bg-slate-100 flex items-center justify-center h-10">
@@ -1246,18 +1262,7 @@
     >
       &gt;</button
     >
-    <button
-      class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded col-span-2"
-      on:click={() => {
-        update();
-      }}>Update</button
-    >
-    <div class="bg-slate-100 flex items-center justify-center col-span-2">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={autoUpdate} />
-        Auto Update
-      </label>
-    </div>
+    
   </div>
   <div class="tilingParams">
     {#each tilingParams as p, idx}
