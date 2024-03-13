@@ -124,7 +124,7 @@
                     // ctx.fillStyle = ctx.createPattern(image, 'repeat');
                     // ctx.fillRect(0, 0, width, height);
                     update();
-                    console.log("w h" + imageData?.width + " " + imageData?.height);
+                    // console.log("w h" + imageData?.width + " " + imageData?.height);
                     imageStore.set({image: image, imageData: imageData});
                 });
             image.src = inputImage;

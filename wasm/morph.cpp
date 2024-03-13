@@ -52,8 +52,8 @@ pixel **allocPixmap(int w, int h)
     for (int col = 0; col < w; col++)
     {
       map[row][col].r = 0; 
-      map[row][col].g = 255;
-      map[row][col].b = 255;
+      map[row][col].g = 0;
+      map[row][col].b = 0;
       map[row][col].a = 255;
     }
     // printf("row\n");
@@ -266,8 +266,9 @@ vector<FeatureLine> sortOutlineLines(vector<FeatureLine> &outlineLines)
       // printf("%f == %f && %f == %f \n", outlineLines[i].endPoint.x, outlineLines[j].startPoint.x,
       // outlineLines[i].endPoint.y, outlineLines[j].startPoint.y);
       // printf("j e  %f %f \n", outlineLines[j].endPoint.x, outlineLines[j].endPoint.y);
-      if (approximatelyEqual(outlineLines[i].endPoint.x, outlineLines[j].startPoint.x, 1e-2f) && approximatelyEqual(outlineLines[i].endPoint.y, outlineLines[j].startPoint.y, 1e-2f))
+      if (approximatelyEqual(outlineLines[i].endPoint.x, outlineLines[j].startPoint.x, 1e-3f) && approximatelyEqual(outlineLines[i].endPoint.y, outlineLines[j].startPoint.y, 1e-3f))
       {
+        // printf("i %d j %d \n", i, j);
         found = true;
         sorted.push_back(outlineLines[i]);
         i = j;
@@ -502,15 +503,30 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
 {
   pixel **srcImgMap = pixmapFromVector(w, h, imageData);
 
+  // printf("outlineLines\n");
+  // for (int i = 0; i < outlineLines.size(); i++)
+  // {
+  //   printf("%d %f %f %f %f\n", i, outlineLines[i].startPoint.x, outlineLines[i].startPoint.y, outlineLines[i].endPoint.x, outlineLines[i].endPoint.y);
+  // }
+
+
   vector<FeatureLine> outlineLinesSorted = sortOutlineLines(outlineLines);
+  
+  // printf("sorted\n");
+  // for (int i = 0; i < outlineLinesSorted.size(); i++)
+  // {
+  //   printf("%d %f %f %f %f\n", i, outlineLinesSorted[i].startPoint.x, outlineLinesSorted[i].startPoint.y, outlineLinesSorted[i].endPoint.x, outlineLinesSorted[i].endPoint.y);
+  // }
+  
+  
   transformAll(outlineLinesSorted, matrixVector);
   vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
   
-  vector<FeatureLine> dstLines;
+  vector<FeatureLine> srcLines;
 
-  lineInterpolate(outlineLinesSorted, outlineLinesMorphed,  dstLines,  t);
+  lineInterpolate(outlineLinesSorted, outlineLinesMorphed,  srcLines,  t);
 
-  return dstLines;
+  return srcLines;
 }
 
 EMSCRIPTEN_KEEPALIVE vector<int> getBBox(vector<FeatureLine> outlineLines, vector<double> matrixVector){
@@ -564,7 +580,7 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
   int w_dest = xh-xl;
   int h_dest = yh-yl;
   
-  printf("xl %d xh %d yl %d yh %d\n",xl, xh, yl, yh);
+  // printf("xl %d xh %d yl %d yh %d\n",xl, xh, yl, yh);
   
   pixel **morphMap = allocPixmap(w_dest, h_dest);
 
@@ -576,28 +592,16 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
   // the featureline of sourceImage, destImage and the morphImage
   vector<FeatureLine> srcLines;
   vector<FeatureLine> dstLines;
-  // vector<FeatureLine> interLines;
+  
+  srcLines.insert( srcLines.end(), skelletonLines.begin(), skelletonLines.end() );
+  dstLines.insert( dstLines.end(), skelletonLines.begin(), skelletonLines.end() );
 
   dstLines.insert( dstLines.end(), outlineLinesSorted.begin(), outlineLinesSorted.end() );
   lineInterpolate(outlineLinesSorted, outlineLinesMorphed,  srcLines,  t);
 
-  // Prepare Feature Vectors
-  // srcLines.insert( srcLines.end(), skelletonLines.begin(), skelletonLines.end() );
-  
-  // dstLines.insert( dstLines.end(), skelletonLines.begin(), skelletonLines.end() );
-  // dstLines.insert( dstLines.end(), interLines.begin(), interLines.end() );
-
-  // printf("px0 %d %d %d %d \n", imageData[0], imageData[1], imageData[2], imageData[3]);
-  // printf("w h %d %d %zu \n", w, h, imageData.size());
-  // assign to new IMAGE
-
-  // printf("morphMap %d %d %d %d \n", morphMap[0][0].r, morphMap[0][0].g, morphMap[0][0].b, morphMap[0][0].a);
-
-  // printf("map1 %d %d %d %d \n", srcImgMap[0][0].r, srcImgMap[0][0].g, srcImgMap[0][0].b, srcImgMap[0][0].a);
   Vector2d uv_src;
   Vector2d uv_dst;
   pixel interColor;
-
 
   for (int i = yl; i < yh; i++)
   {
@@ -630,8 +634,8 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
 
 
       if(outside){
-        morphMap[i-yl][j-xl].r = 255;
-        morphMap[i-yl][j-xl].g = 255;
+        morphMap[i-yl][j-xl].r = 0;
+        morphMap[i-yl][j-xl].g = 0;
         morphMap[i-yl][j-xl].b = 0;
         morphMap[i-yl][j-xl].a = 255;
       }else{

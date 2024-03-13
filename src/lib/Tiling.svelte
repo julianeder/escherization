@@ -51,7 +51,7 @@
   let tiles: Tile[] = [];
   let tileSitePoints: SitePoint[] = [];
   let tileSiteSegments: SiteSegment[] = [];
-  let outlines: FeatureLine[][] = [];
+  let outlines: FeatureLine[] = [];
 
   let tilingSitePoints: SitePoint[] = [];
   let tilingSiteSegments: SiteSegment[] = [];
@@ -80,8 +80,10 @@
   let showOrigins: boolean = true;
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
+  let showDebugMorphLines: boolean = false;
 
   let morphedSiteSegments: SiteSegment[] = []; // Debug only
+  let mostCenterTile: Tile;
   let morphedBBox: number[] = [-40, -17, 306, 343];
 
   const symGroups: Record<string, any> = {
@@ -130,14 +132,31 @@
     }
   }
 
+  function GetMostCenterTileIdx(tiles: Tile[]): Tile {
+    let svgCenter: Point = new Point((bbox.xh-bbox.xl) / 2, (bbox.yh-bbox.yl) / 2);
+    let sqrDist = Number.MAX_VALUE;    
+    let idx = -1;
+    for (let i = 0; i < tiles.length; i++) {
+      let sd = (tiles[i].origin.x - svgCenter.x) * (tiles[i].origin.x - svgCenter.x) + (tiles[i].origin.y - svgCenter.y) * (tiles[i].origin.y - svgCenter.y);
+      if(sd < sqrDist){
+        idx = i;
+        sqrDist = sd;
+      }
+    }
+    // console.log(idx  + " " + Math.sqrt(sqrDist));
+    return tiles[idx];
+  }
+
   function updateMorph() {
+
+    mostCenterTile = GetMostCenterTileIdx(tiles);
+
     // Get Outline
     outlines = [];
-    let M: Matrix;
+    let Minv: Matrix;
     for (let i = 0; i < tiles.length; i++) {
-      if (tiles[i].tileIdx == 14) {
-        let outline: FeatureLine[] = [];
-        M = getInverseTransformation(tiles[i].M, tiles[i].origin);
+      if (tiles[i].tileIdx == mostCenterTile.tileIdx) {
+        Minv = getInverseTransformation(tiles[i].M, tiles[i].origin);
         voronoiCells
           .filter((c) => c.tileIdx == tiles[i].tileIdx)
           .forEach((c) => {
@@ -156,11 +175,10 @@
                     y: voronoiEdges[idxE].vb.y,
                   },
                 };
-                outline.push(featureLine);
+                outlines.push(featureLine);
               }
             });
           });
-        outlines.push(outline);
       }
     }
     outlines = outlines; // Reactive Update
@@ -168,7 +186,6 @@
     // Morphing
     if (backgroundImageData != null) {
       if (doMorph) {
-        console.log("do Morph");
 
         const imageDataVector = new wasmMorph.VectorByte();
         backgroundImageData.data.forEach((b) => imageDataVector.push_back(b));
@@ -182,60 +199,59 @@
         );
 
         const outlineLinesVector = new wasmMorph.VectorFeatureLine();
-        outlines.forEach((s) => {
-          s.forEach((ss) =>
-            outlineLinesVector.push_back({
-              startPoint: { x: ss.startPoint.x, y: ss.startPoint.y },
-              endPoint: { x: ss.endPoint.x, y: ss.endPoint.y },
-            }),
-          );
-        });
+        outlines.forEach((s) => 
+          outlineLinesVector.push_back({
+            startPoint: { x: s.startPoint.x, y: s.startPoint.y },
+            endPoint: { x: s.endPoint.x, y: s.endPoint.y },
+          }));
         // console.log(outlines);
 
-        const matrixVector = new wasmMorph.VectorDouble();
-        matrixVector.push_back(M!.a);
-        matrixVector.push_back(M!.b);
-        matrixVector.push_back(M!.c);
-        matrixVector.push_back(M!.d);
-        matrixVector.push_back(M!.e);
-        matrixVector.push_back(M!.f);
+        const mInvVector = new wasmMorph.VectorDouble();
+        mInvVector.push_back(Minv!.a);
+        mInvVector.push_back(Minv!.b);
+        mInvVector.push_back(Minv!.c);
+        mInvVector.push_back(Minv!.d);
+        mInvVector.push_back(Minv!.e);
+        mInvVector.push_back(Minv!.f);
 
-        let bbox = wasmMorph.getBBox(outlineLinesVector, matrixVector);
+        let bbox = wasmMorph.getBBox(outlineLinesVector, mInvVector);
 
         morphedBBox = [];
         for (let i = 0; i < bbox.size(); i++) {
           morphedBBox.push(bbox.get(i));
         }
         morphedBBox = morphedBBox;
-        console.log("update bbox calc");
 
-        let morphedOutline = wasmMorph.getMorphOutline(
-          backgroundImageData.width,
-          backgroundImageData.height,
-          t,
-          imageDataVector,
-          skelletonLinesVector,
-          outlineLinesVector,
-          matrixVector,
-        );
 
-        // morphedSiteSegments = [];
-        for (let i = 0; i < morphedOutline.size(); i++) {
-          morphedSiteSegments.push(
-            new SiteSegment(
-              morphedOutline.get(i).startPoint.x,
-              morphedOutline.get(i).startPoint.y,
-              morphedOutline.get(i).endPoint.x,
-              morphedOutline.get(i).endPoint.y,
-              0,
-              [],
-              14,
-            ),
+        if(showDebugMorphLines){
+          let morphedOutline = wasmMorph.getMorphOutline(
+            backgroundImageData.width,
+            backgroundImageData.height,
+            t,
+            imageDataVector,
+            skelletonLinesVector,
+            outlineLinesVector,
+            mInvVector,
           );
-        }
-        morphedSiteSegments = morphedSiteSegments;
 
-        console.log(p + " " + a + " " + b + " ");
+          morphedSiteSegments = [];
+          for (let i = 0; i < morphedOutline.size(); i++) {
+            morphedSiteSegments.push(
+              new SiteSegment(
+                morphedOutline.get(i).startPoint.x,
+                morphedOutline.get(i).startPoint.y,
+                morphedOutline.get(i).endPoint.x,
+                morphedOutline.get(i).endPoint.y,
+                0,
+                [],
+                14,
+              ),
+            );
+          }
+          morphedSiteSegments = morphedSiteSegments;
+          // console.log(morphedSiteSegments);
+        }
+
         let result = wasmMorph.doMorph(
           backgroundImageData.width,
           backgroundImageData.height,
@@ -246,7 +262,7 @@
           imageDataVector,
           skelletonLinesVector,
           outlineLinesVector,
-          matrixVector,
+          mInvVector,
         );
 
         // console.log("result.size " + result.size());
@@ -815,7 +831,6 @@
       tileWidth = value.tileWidth;
       tileHeight = value.tileHeight;
       morphedBBox = [0, 0, tileWidth, tileHeight];
-      console.log("update bbox store");
       tileSitePoints = value.sitePoints;
       tileSiteSegments = value.siteSegments;
       tileCenter = value.tileCenter;
@@ -1091,8 +1106,8 @@
         ></circle>
       {/if}
     {/each}
-    {#each outlines as outline}
-      {#each outline as fl, idx}
+    {#if showDebugMorphLines}
+      {#each outlines as fl, idx}
         <path
           id={"outline_" + idx}
           d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl
@@ -1102,19 +1117,20 @@
           fill="none"
         ></path>
       {/each}
-    {/each}
-    {#each morphedSiteSegments as fl, idx}
-      <g transform={toSVG(getTransformation(tiles[15].M, tiles[15].origin))}>
-        <path
-          id={"outlineMorphed_" + idx}
-          d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
-          stroke="red"
-          stroke-width="2"
-          fill="none"
-        ></path>
-      </g>
-    {/each}
-    <g
+      {#each morphedSiteSegments as fl, idx}
+        <g transform={toSVG(getTransformation(mostCenterTile.M, mostCenterTile.origin))}>
+          <path
+            id={"outlineMorphed_" + idx}
+            d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
+            stroke="red"
+            stroke-width="2"
+            fill="none"
+          ></path>
+        </g>
+      {/each}
+    {/if}
+
+    <!-- <g
       transform={toSVG(
         getTransformation(
           [1, 0, 1.732050807563, 0, 1, 2],
@@ -1132,7 +1148,7 @@
         stroke-width="1"
         fill="none"
       />
-    </g>
+    </g> -->
   </svg>
   <div class="lastErrorContainer max-w-96">
     <p class="text-red-700 text-sm break-words">{lastError}</p>
@@ -1328,6 +1344,12 @@
       <label class="p-2">
         <input type="checkbox" bind:checked={showBackgroundImage} />
         Show Background Image
+      </label>
+    </div>
+    <div class="bg-slate-100 flex items-center justify-center h-10">
+      <label class="p-2">
+        <input type="checkbox" bind:checked={showDebugMorphLines} />
+        Show Debug Morph Lines 
       </label>
     </div>
   </div>
