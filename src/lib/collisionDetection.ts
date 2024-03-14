@@ -6,8 +6,7 @@ export function checkIntersections(siteSegments: SiteSegment[]): boolean {
         for (let j = 0; j < siteSegments.length; j++) {
             if (i != j) {
                 if (intersects(siteSegments[i], siteSegments[j])) {
-                    // console.log("intersect " + i + " " + j);
-                    intersects(siteSegments[i], siteSegments[j]);
+                    console.log("intersect " + siteSegments[i].toString() + " " + siteSegments[j].toString());
                     intersect = true;
                     break;
                 }
@@ -26,5 +25,19 @@ function intersects(a: SiteSegment, b: SiteSegment): boolean {
     let u: number =
         -((a.x1 - a.x2) * (a.y1 - b.y1) - (a.y1 - a.y2) * (a.x1 - b.x1)) /
         ((a.x1 - a.x2) * (b.y1 - b.y2) - (a.y1 - a.y2) * (b.x1 - b.x2));
-    return 0 < t && t < 1 && 0 < u && u < 1;
+    
+    let intersect = 0 < t && t < 1 && 0 < u && u < 1;
+    
+    // due to rounding errors same endpoints sometimes are not detected
+    if(intersect){
+        if((a.x1 == b.x1 && a.y1 == b.y1)
+        || (a.x1 == b.x1 && a.y2 == b.y2)
+        || (a.x2 == b.x2 && a.y1 == b.y1)
+        || (a.x2 == b.x2 && a.y2 == b.y2)
+        ){
+            console.log("intersect is at endpoint")
+            return false;
+        }
+    }
+    return intersect;
 }

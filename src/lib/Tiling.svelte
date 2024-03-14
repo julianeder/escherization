@@ -121,6 +121,8 @@
 
   let updatePromise: Promise<void> | null = null;
 
+  let mousePoint: Point = {x:-1, y:-1};
+
   async function update(): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       setTimeout(() => {
@@ -992,6 +994,11 @@
     });
   });
 
+  function handleMousemove(event: any) {
+		mousePoint.x = event.offsetX;
+		mousePoint.y = event.offsetY;
+	}
+
 </script>
 
 <div class="grid grid-cols-2">
@@ -1006,6 +1013,7 @@
       viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
       xmlns="http://www.w3.org/2000/svg"
       on:click={addPoint}
+      on:mousemove={handleMousemove}
     >
       <rect
       x="0"
@@ -1184,6 +1192,9 @@
       {/await}
 
     </svg>
+
+    <p> {"Mouse: (" + mousePoint.x  + "," + mousePoint.y + ")"}</p>
+
     <div class="grid grid-cols-2 gap-4">
       <button
       class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded max-h-12"
