@@ -61,7 +61,7 @@ export class Vectorization {
         let { thinImagRGB, crossings, ends } = Vectorization.detectEndsAndCrossings(thinImag, imageData);
 
 
-        let n: Node = Vectorization.vectorize(thinImag, crossings, ends);
+        let n: Node | null = Vectorization.vectorize(thinImag, crossings, ends);
         
         Vectorization.visualizeTreeRec(n, thinImagRGB);
         Vectorization.visualizePoints(crossings, thinImagRGB, [0,255,255]);
@@ -348,28 +348,40 @@ export class Vectorization {
         thinImag: number[],
         crossings: Array<Point>,
         ends: Array<Point>,
-    ): Node {
-        let curNode = new Node(ends[0], null, []);
-        thinImag[Vectorization.fromXY(curNode.point!.x, curNode.point!.y)] = 4; // Set Visited
+    ): Node | null {
+        let curNode: Node | null= null;
+        if(ends.length <= 0){
+            for(let i: number = 0; i < thinImag.length; i++){
+                if(thinImag[i] != 0){
+                    curNode = new Node(new Point(this.fromI(i).x, this.fromI(i).y), null, []);
+                    break;
+                }
+            }
+            if(curNode == null)
+                return null;
+        }else{
+            curNode = new Node(ends[0], null, []);
+        }
+        thinImag[Vectorization.fromXY(curNode!.point!.x, curNode!.point!.y)] = 4; // Set Visited
         let neigh: Array<Point> = Vectorization.get1Neighbours(
             thinImag,
-            curNode.point!.x,
-            curNode.point!.y,
+            curNode!.point!.x,
+            curNode!.point!.y,
         );
         neigh.forEach((n: Point) => {
             if (thinImag[Vectorization.fromXY(n.x, n.y)] < 4) {
                 // Skip already Visited
                 Vectorization.vectorizeRec(
-                    curNode,
+                    curNode!,
                     n,
-                    [curNode.point!],
+                    [curNode!.point!],
                     thinImag,
                     crossings,
                     ends,
                 );
             }
         });
-        return curNode;
+        return curNode!;
     }
 
     // thinImag --- Legend
@@ -442,9 +454,15 @@ export class Vectorization {
                     return keep;
                 });
             }
+            
+            if(ends.length == 0 && neigh.length == 2){ // Special Case where the input is O-shaped
+                if(thinImag[Vectorization.fromXY(neigh[0].x, neigh[0].y)] == 4 && thinImag[Vectorization.fromXY(neigh[1].x, neigh[1].y)] == 4){
+                    let node = new Node(curPos, curNode, pixel);
+                }
+            }
+
             neigh.forEach((n: Point) => {
-                if (thinImag[Vectorization.fromXY(n.x, n.y)] < 4) {
-                    // Skip already Visited
+                if (thinImag[Vectorization.fromXY(n.x, n.y)] < 4) { // Skip already Visited
                     Vectorization.vectorizeRec(curNode, n, pixel, thinImag, crossings, ends);
                 } 
                 else if (thinImag[Vectorization.fromXY(n.x, n.y)] == 5 && pixel.length > 1) { // detect loops but not if we just started the run and are still next to our parent node                    
@@ -452,6 +470,7 @@ export class Vectorization {
                     curNode.loops.push(node);
                 }
             });
+            
         }
     }
 
@@ -475,9 +494,11 @@ export class Vectorization {
     }
 
     static segemntsFromTreeRec(
-        n: Node,
+        n: Node | null,
         segments: Array<SiteSegment>,
     ): Array<SiteSegment> {
+        if(n == null) return [];
+
         n.children.forEach((c) => {
             let s = new SiteSegment(
                 n.point!.x,
@@ -514,7 +535,9 @@ export class Vectorization {
         return segments;
     }
 
-    static visualizeTreeRec(n: Node, thinImagRGB: number[]) {
+    static visualizeTreeRec(n: Node | null, thinImagRGB: number[]) {
+        if(n == null) return;
+
         let col = Vectorization.getRandomColor();
         n.pixel.forEach((p) => {
             thinImagRGB[Vectorization.fromXY(p.x, p.y) * 4] = col[0];
@@ -543,7 +566,8 @@ export class Vectorization {
         });
     }
 
-    static subdivideTreeRec(n: Node) {
+    static subdivideTreeRec(n: Node | null) {
+        if(n == null) return;
         n.children.forEach((c) => {
             // if(c.sitePoint!.x == 186 && c.sitePoint!.y == 104)
             //     console.log(n.children);
