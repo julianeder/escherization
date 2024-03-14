@@ -656,10 +656,21 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
   }
 
 
+  // int cnt = 0;
+  // for(int i = 0; i < yh-yl; i++){
+  //   for(int j = 0; j < xh-xl; j++){
+      
+  //     if(morphMap[i][j].r != 0 || morphMap[i][j].g != 0 || morphMap[i][j].b != 0){
+  //       printf("result %d %d %d %d %d \n", i,  morphMap[i][j].r, morphMap[i][j].g, morphMap[i][j].b, morphMap[i][j].a);
+  //       cnt ++;
+  //     }
+  //     if(cnt > 10)
+  //       break;
+  //   }
+  // }
 
   vector<unsigned char> result = vectorFromPixmap(w_dest, h_dest, morphMap);
 
-  // printf("result %d %d %d %d \n", result[0], result[1], result[2], result[3]);
   // clear the previous pixmap
   delete[] srcImgMap;
   delete[] morphMap;

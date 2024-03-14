@@ -119,17 +119,32 @@
   let b: number = 2;
   let t: number = 1;
 
-  function update() {
-    updateTiling();
+  let updatePromise: Promise<void> | null = null;
 
-    if (checkIntersections(tilingSiteSegments)) {
-      lastError =
-        "Collision between tiles detected, please change the paremeters (e.g. decrease Tile Size)";
-    } else {
-      lastError = "";
-      updateVoronoi();
-      updateMorph();
-    }
+  async function update(): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      setTimeout(() => {
+        try{
+
+          updateTiling();
+          
+          if (checkIntersections(tilingSiteSegments)) {
+            lastError =
+            "Collision between tiles detected, please change the paremeters (e.g. decrease Tile Size)";
+          } else {
+            lastError = "";
+            updateVoronoi();
+            updateMorph();
+          }
+        }catch(e){
+          lastError = e;
+          reject(e);
+          throw e;
+        }
+        
+        resolve();
+      })
+    })
   }
 
   function GetMostCenterTileIdx(tiles: Tile[]): Tile {
@@ -274,8 +289,8 @@
           // let e: number = result.get(i);
           morphedBackgroundImageData.data[i] = result.get(i);
         }
+        console.log(morphedBackgroundImageData.data);
 
-        // console.log(backgroundImageData.data);
         backgroundImage = imagedataToImage(morphedBackgroundImageData);
       } else {
         backgroundImage = imagedataToImage(backgroundImageData);
@@ -481,7 +496,7 @@
           ) {
             console.log(
               "CP " +
-                i +
+                i + " " + j +
                 ": " +
                 e.controll_points.get(j) +
                 " " +
@@ -789,14 +804,16 @@
   function onTilingPlus() {
     tilingIdx = (tilingIdx + 1) % availableTilings.length;
 
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
   }
 
   function onTilingMinus() {
     tilingIdx = tilingIdx - 1;
     if (tilingIdx < 0) tilingIdx = availableTilings.length - 1;
 
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
   }
 
   function onParamChanged(newValue: number, idx: number) {
@@ -804,7 +821,8 @@
       tilingParams[idx] = newValue;
     }
 
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
   }
 
   function onResetParams() {
@@ -820,56 +838,9 @@
     tilingSize = 100;
     tileSize = 1;
 
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
   }
-
-  onMount(async () => {
-    wasmVoronoi = await instantiate_wasmVoronoi();
-    wasmMorph = await instantiate_wasmMorph();
-
-    siteStore.subscribe((value: Sites) => {
-      tileWidth = value.tileWidth;
-      tileHeight = value.tileHeight;
-      morphedBBox = [0, 0, tileWidth, tileHeight];
-      tileSitePoints = value.sitePoints;
-      tileSiteSegments = value.siteSegments;
-      tileCenter = value.tileCenter;
-      imageOffset = value.imageOffset;
-
-      if (autoUpdate) update();
-    });
-
-    imageStore.subscribe((value: ImageStoreContent) => {
-      backgroundImage = value.image;
-      backgroundImageData = value.imageData;
-      // console.log(backgroundImage);
-      // if (autoUpdate) update();
-    });
-
-    tilingSitePoints = [
-      new SitePoint(100, 50),
-      new SitePoint(300, 50),
-      new SitePoint(100, 250),
-      new SitePoint(300, 250),
-      new SitePoint(200, 150),
-    ];
-    tilingSiteSegments = [
-      // new SiteSegment(2, 2, 498, 2),
-      // new SiteSegment(498, 2, 498, 298),
-      // new SiteSegment(498, 298, 2, 298),
-      // new SiteSegment(2, 298, 2, 2),
-      // new SiteSegment(100, 100, 100, 200),
-      // new SiteSegment(200, 100, 200, 200),
-    ];
-    siteStore.set({
-      sitePoints: tilingSitePoints,
-      siteSegments: tilingSiteSegments,
-      tileWidth: tileWidth,
-      tileHeight: tileHeight,
-      tileCenter: tileCenter,
-      imageOffset: imageOffset,
-    });
-  });
 
   function color1Changed(rgba: any) {
     console.log(rgba);
@@ -877,11 +848,13 @@
 
   function onTilingSizeChanged(newValue: number) {
     tilingSize = newValue;
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
   }
   function onTileSizeChanged(newValue: number) {
     tileSize = newValue / 100;
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
   }
 
   function getTransformation(
@@ -969,40 +942,72 @@
   function getPatternUrl(cell: Cell): string {
     return "url(#pattern_" + cell.tileIdx + ")";
   }
+
+  onMount(async () => {
+    wasmVoronoi = await instantiate_wasmVoronoi();
+    wasmMorph = await instantiate_wasmMorph();
+
+    siteStore.subscribe((value: Sites) => {
+      tileWidth = value.tileWidth;
+      tileHeight = value.tileHeight;
+      morphedBBox = [0, 0, tileWidth, tileHeight];
+      tileSitePoints = value.sitePoints;
+      tileSiteSegments = value.siteSegments;
+      tileCenter = value.tileCenter;
+      imageOffset = value.imageOffset;
+
+      if (autoUpdate) 
+        updatePromise = update();
+    });
+
+    imageStore.subscribe((value: ImageStoreContent) => {
+      backgroundImage = value.image;
+      backgroundImageData = value.imageData;
+      // console.log(backgroundImage);
+      // if (autoUpdate)  updatePromise = update();
+    });
+
+    tileSitePoints = [
+      new SitePoint(100, 50),
+      new SitePoint(300, 50),
+      new SitePoint(100, 250),
+      new SitePoint(300, 250),
+      new SitePoint(200, 150),
+    ];
+    tilingSiteSegments = [
+      // new SiteSegment(2, 2, 498, 2),
+      // new SiteSegment(498, 2, 498, 298),
+      // new SiteSegment(498, 298, 2, 298),
+      // new SiteSegment(2, 298, 2, 2),
+      // new SiteSegment(100, 100, 100, 200),
+      // new SiteSegment(200, 100, 200, 200),
+    ];
+    siteStore.set({
+      sitePoints: tilingSitePoints,
+      siteSegments: tilingSiteSegments,
+      tileWidth: tileWidth,
+      tileHeight: tileHeight,
+      tileCenter: tileCenter,
+      imageOffset: imageOffset,
+    });
+  });
+
 </script>
 
-<div class="grid grid-cols-1 justify-items-center gap-4">
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <svg
-    id="voronoiSvg"
-    width={bbox.xh}
-    height={bbox.yh}
-    viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
-    xmlns="http://www.w3.org/2000/svg"
-    on:click={addPoint}
-  >
-    <defs>
-      {#each tiles as tile, idx}
-        <pattern
-          id={"pattern_" + tile.tileIdx}
-          patternContentUnits="userSpaceOnUse"
-          patternUnits="userSpaceOnUse"
-          patternTransform={toSVG(getTransformation(tile.M, tile.origin, true))}
-          width={morphedBBox[2] - morphedBBox[0]}
-          height={morphedBBox[3] - morphedBBox[1]}
-        >
-          <image
-            href={backgroundImage?.src}
-            x={0}
-            y={0}
-            width={morphedBBox[2] - morphedBBox[0]}
-            height={morphedBBox[3] - morphedBBox[1]}
-          />
-        </pattern>
-      {/each}
-    </defs>
-    <rect
+<div class="grid grid-cols-2">
+
+  <div class="grid grid-cols-1 justify-items-center">
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <svg
+      id="voronoiSvg"
+      width={bbox.xh}
+      height={bbox.yh}
+      viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
+      xmlns="http://www.w3.org/2000/svg"
+      on:click={addPoint}
+    >
+      <rect
       x="0"
       y="0"
       width={bbox.xh}
@@ -1010,355 +1015,392 @@
       stroke="rgb(2 132 199)"
       stroke-width="1"
       fill="rgb(248 250 252)"
-    />
+      />
+      {#await updatePromise}
+        <text x="250" y="220" text-anchor="middle" class="svgText">Loading...</text>		
+      {:then planet}
 
-    {#each voronoiCells as c}
-      {#if showBackground && isCellPathConsistant(c)}
-        {#if showBackgroundImage}
-          <path
-            id="cell {c.sourceIndex}"
-            d={getCellPath(c)}
-            stroke="black"
-            stroke-width="0"
-            fill={getPatternUrl(c)}
-          ></path>
-        {:else}
-          <path
-            id="cell {c.sourceIndex}"
-            d={getCellPath(c)}
-            stroke="black"
-            stroke-width="0"
-            fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
-          ></path>
-        {/if}
-      {/if}
-    {/each}
-    {#if showSkeleton}
-      {#each tilingSitePoints as siteP, idx}
-        <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="red"
-        ></circle>
-      {/each}
-      {#each tilingSiteSegments as siteS, idx}
-        <path
-          id="segment {idx + tilingSitePoints.length}"
-          d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-          stroke="red"
-          stroke-width="1"
-          fill="none"
-        ></path>
-        <circle
-          id="segment {idx + tilingSitePoints.length}"
-          cx={siteS.x1}
-          cy={siteS.y1}
-          r="2"
-          fill="red"
-        ></circle>
-        <circle
-          id="segment {idx + tilingSitePoints.length}"
-          cx={siteS.x2}
-          cy={siteS.y2}
-          r="2"
-          fill="red"
-        ></circle>
-      {/each}
-    {/if}
-    {#each voronoiEdges as e, idx}
-      {#if e.isValid && !e.isBetweenSameColorCells && showBorder}
-        <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
-        <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
-        {#if e.isCurved && e.controlPoints.length == 3}
-          <path
-            id={"edge_" + idx}
-            d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
-              .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
-              .x} {e.controlPoints[2].y}"
-            stroke="blue"
-            stroke-width="1"
-            fill="none"
-          ></path>
-        {:else if e.isPrimary}
-          <path
-            id={"edge_" + idx}
-            d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-            stroke="blue"
-            stroke-width="1"
-            fill="none"
-          ></path>
-        {:else if showSecondary}
-          <path
-            id={"edge_" + idx}
-            d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-            stroke="green"
-            stroke-width="1"
-            fill="none"
-          ></path>
-        {/if}
-      {/if}
-    {/each}
-    {#each tiles as tile, idx}
-      {#if showOrigins}
-        <circle
-          id="origin {idx}"
-          cx={tile.origin.x}
-          cy={tile.origin.y}
-          r="5"
-          fill="pink"
-        ></circle>
-      {/if}
-    {/each}
-    {#if showDebugMorphLines}
-      {#each outlines as fl, idx}
-        <path
-          id={"outline_" + idx}
-          d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl
-            .endPoint.y}"
-          stroke="yellow"
-          stroke-width="1"
-          fill="none"
-        ></path>
-      {/each}
-      {#each morphedSiteSegments as fl, idx}
-        <g transform={toSVG(getTransformation(mostCenterTile.M, mostCenterTile.origin))}>
-          <path
-            id={"outlineMorphed_" + idx}
-            d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
-            stroke="red"
-            stroke-width="2"
-            fill="none"
-          ></path>
-        </g>
-      {/each}
-    {/if}
+        <defs>
+          {#each tiles as tile, idx}
+            <pattern
+              id={"pattern_" + tile.tileIdx}
+              patternContentUnits="userSpaceOnUse"
+              patternUnits="userSpaceOnUse"
+              patternTransform={toSVG(getTransformation(tile.M, tile.origin, true))}
+              width={morphedBBox[2] - morphedBBox[0]}
+              height={morphedBBox[3] - morphedBBox[1]}
+            >
+              <image
+                href={backgroundImage?.src}
+                x={0}
+                y={0}
+                width={morphedBBox[2] - morphedBBox[0]}
+                height={morphedBBox[3] - morphedBBox[1]}
+              />
+            </pattern>
+          {/each}
+        </defs>
 
-    <!-- <g
-      transform={toSVG(
-        getTransformation(
-          [1, 0, 1.732050807563, 0, 1, 2],
-          { x: 173.2050807563, y: 200 },
-          true,
-        ),
-      )}
-    >
-      <rect
-        x="0"
-        y="0"
-        width={346}
-        height={360}
-        stroke="rgb(255 0 0)"
-        stroke-width="1"
-        fill="none"
-      />
-    </g> -->
-  </svg>
-  <div class="lastErrorContainer max-w-96">
-    <p class="text-red-700 text-sm break-words">{lastError}</p>
-  </div>
-  <div class="grid grid-cols-4">
-    <button
-    class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded col-span-2"
-    on:click={() => {
-      update();
-    }}>Update</button
-    >
-    <div class="bg-slate-100 flex items-center justify-center col-span-2">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={autoUpdate} />
-        Auto Update
-      </label>
-    </div>
-  </div>
-  <!-- <div class="grid grid-rows-4 content-start"> -->
-  <p class="text-xl font-sans text-center text-sky-400 p-4">Morph Settings</p>
-  <div class="bg-slate-100 flex items-center justify-center h-10">
-    <label class="p-2">
-      <input type="checkbox" bind:checked={doMorph} />
-      Morph
-    </label>
-  </div>
-  <div class="grid grid-cols-4">
-    <p class="">t</p>
-    <div class="col-span-3 min-w-72">
-      <Range
-        min={0}
-        max={100}
-        stepSize={0.01}
-        initialValue={t}
-        decimalPlaces={2}
-        on:change={(e) => (t = Number(e.detail.value))}
-      />
-    </div>
-  </div>
-  <div class="grid grid-cols-4">
-    <p class="">p</p>
-    <div class="col-span-3 min-w-72">
-      <Range
-        min={0}
-        max={100}
-        stepSize={0.01}
-        initialValue={p}
-        decimalPlaces={2}
-        on:change={(e) => (p = Number(e.detail.value))}
-      />
-    </div>
-  </div>
-  <div class="grid grid-cols-4">
-    <p class="">a</p>
-    <div class="col-span-3 min-w-72">
-      <Range
-        min={1}
-        max={300}
-        stepSize={0.01}
-        initialValue={a}
-        decimalPlaces={2}
-        on:change={(e) => (a = Number(e.detail.value))}
-      />
-    </div>
-  </div>
-  <div class="grid grid-cols-4">
-    <p class="">b</p>
-    <div class="col-span-3 min-w-72">
-      <Range
-        min={50}
-        max={200}
-        stepSize={0.01}
-        initialValue={b}
-        decimalPlaces={2}
-        on:change={(e) => (b = Number(e.detail.value))}
-      />
-    </div>
-  </div>
-  <p class="text-xl font-sans text-center text-sky-400 p-4">Tiling Settings</p>
-  <div class="grid grid-cols-4">
-    <p class="">Tile Size [%]</p>
-    <div class="col-span-3 min-w-72">
-      <Range
-        min={50}
-        max={300}
-        stepSize={1}
-        initialValue={tileSize * 100}
-        decimalPlaces={0}
-        on:change={(e) => onTileSizeChanged(e.detail.value)}
-      />
-    </div>
-  </div>
-  <div class="grid grid-cols-4">
-    <p class="">Tiling Size [%]</p>
-    <div class="col-span-3 min-w-72">
-      <Range
-        min={50}
-        max={300}
-        stepSize={1}
-        initialValue={tilingSize}
-        decimalPlaces={0}
-        on:change={(e) => onTilingSizeChanged(e.detail.value)}
-      />
-    </div>
-  </div>
-  <div class="tilingCtrl grid grid-cols-8 gap-4">
-    <button
-      class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
-      on:click={() => {
-        onTilingMinus();
-      }}
-    >
-      &lt;</button
-    >
-    <div class="bg-slate-100 flex items-center justify-center col-span-2">
-      <p class="text-center">
-        IH {availableTilings[tilingIdx]} / {symGroups[
-          availableTilings[tilingIdx]
-        ]}
-      </p>
-    </div>
-    <button
-      class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
-      on:click={() => {
-        onTilingPlus();
-      }}
-    >
-      &gt;</button
-    >
-    
-  </div>
-  <div class="tilingParams">
-    {#each tilingParams as p, idx}
-      <div class="tilingParam flex flex-row gap-4">
-        <p class="basis-1/12">p {idx}</p>
-        <div class="min-w-72">
-          <Range
-            id={idx}
-            min={1}
-            max={200}
-            stepSize={0.1}
-            initialValue={p}
-            decimalPlaces={2}
-            on:change={(e) => onParamChanged(e.detail.value, idx)}
+
+        {#each voronoiCells as c}
+          {#if showBackground && isCellPathConsistant(c)}
+            {#if showBackgroundImage}
+              <path
+                id="cell {c.sourceIndex}"
+                d={getCellPath(c)}
+                stroke="black"
+                stroke-width="0"
+                fill={getPatternUrl(c)}
+              ></path>
+            {:else}
+              <path
+                id="cell {c.sourceIndex}"
+                d={getCellPath(c)}
+                stroke="black"
+                stroke-width="0"
+                fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
+              ></path>
+            {/if}
+          {/if}
+        {/each}
+        {#if showSkeleton}
+          {#each tilingSitePoints as siteP, idx}
+            <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="red"
+            ></circle>
+          {/each}
+          {#each tilingSiteSegments as siteS, idx}
+            <path
+              id="segment {idx + tilingSitePoints.length}"
+              d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
+              stroke="red"
+              stroke-width="1"
+              fill="none"
+            ></path>
+            <circle
+              id="segment {idx + tilingSitePoints.length}"
+              cx={siteS.x1}
+              cy={siteS.y1}
+              r="2"
+              fill="red"
+            ></circle>
+            <circle
+              id="segment {idx + tilingSitePoints.length}"
+              cx={siteS.x2}
+              cy={siteS.y2}
+              r="2"
+              fill="red"
+            ></circle>
+          {/each}
+        {/if}
+        {#each voronoiEdges as e, idx}
+          {#if e.isValid && !e.isBetweenSameColorCells && showBorder}
+            <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
+            <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
+            {#if e.isCurved && e.controlPoints.length == 3}
+              <path
+                id={"edge_" + idx}
+                d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
+                  .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
+                  .x} {e.controlPoints[2].y}"
+                stroke="blue"
+                stroke-width="1"
+                fill="none"
+              ></path>
+            {:else if e.isPrimary}
+              <path
+                id={"edge_" + idx}
+                d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+                stroke="blue"
+                stroke-width="1"
+                fill="none"
+              ></path>
+            {:else if showSecondary}
+              <path
+                id={"edge_" + idx}
+                d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+                stroke="green"
+                stroke-width="1"
+                fill="none"
+              ></path>
+            {/if}
+          {/if}
+        {/each}
+        {#each tiles as tile, idx}
+          {#if showOrigins}
+            <circle
+              id="origin {idx}"
+              cx={tile.origin.x}
+              cy={tile.origin.y}
+              r="5"
+              fill="pink"
+            ></circle>
+          {/if}
+        {/each}
+        {#if showDebugMorphLines}
+          {#each outlines as fl, idx}
+            <path
+              id={"outline_" + idx}
+              d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl
+                .endPoint.y}"
+              stroke="yellow"
+              stroke-width="1"
+              fill="none"
+            ></path>
+          {/each}
+          {#each morphedSiteSegments as fl, idx}
+            <g transform={toSVG(getTransformation(mostCenterTile.M, mostCenterTile.origin))}>
+              <path
+                id={"outlineMorphed_" + idx}
+                d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
+                stroke="red"
+                stroke-width="2"
+                fill="none"
+              ></path>
+            </g>
+          {/each}
+        {/if}
+        <!-- <g
+          transform={toSVG(
+            getTransformation(
+              [1, 0, 1.732050807563, 0, 1, 2],
+              { x: 173.2050807563, y: 200 },
+              true,
+            ),
+          )}
+        >
+          <rect
+            x="0"
+            y="0"
+            width={346}
+            height={360}
+            stroke="rgb(255 0 0)"
+            stroke-width="1"
+            fill="none"
           />
-        </div>
+        </g> -->
+      
+      {:catch someError}
+        <text x="250" y="250" text-anchor="middle" class="svgText">Error: {someError.message}.</text>
+      {/await}
+
+    </svg>
+    <div class="grid grid-cols-2 gap-4">
+      <button
+      class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded max-h-12"
+      on:click={() => updatePromise = update()}
+      >Update</button
+      >
+      <div class="bg-slate-100 flex items-center justify-center max-h-12">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={autoUpdate} />
+          Auto Update
+        </label>
       </div>
-    {/each}
-  </div>
-  <div class="actionButtons grid grid-cols-2 gap-4 max-h-10">
-    <button
-      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
-      on:click={() => {
-        onResetParams();
-      }}
-    >
-      Reset Params
-    </button>
-    <button
-      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
-      on:click={() => {
-        downloadSVG();
-      }}>Download SVG</button
-    >
-  </div>
-  <p class="text-xl font-sans text-center text-sky-400 p-4">Display Settings</p>
-  <div class="displaySettings grid grid-cols-3 gap-4">
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showBorder} />
-        Show Border
-      </label>
     </div>
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showSkeleton} />
-        Show Skeleton
-      </label>
-    </div>
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showOrigins} />
-        Show Origins
-      </label>
-    </div>
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showBackground} />
-        Show Background
-      </label>
-    </div>
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showBackgroundImage} />
-        Show Background Image
-      </label>
-    </div>
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showDebugMorphLines} />
-        Show Debug Morph Lines 
-      </label>
+    <div class="lastErrorContainer max-w-96 max-h-24">
+      <p class="text-red-700 text-sm break-words">{lastError}</p>
     </div>
   </div>
-  <div class="colorSettings grid grid-cols-3 gap-4 min-h-80">
-    <ColorPicker bind:hex={color1} label="Color 1" />
-    <ColorPicker bind:hex={color2} label="Color 2" />
-    <ColorPicker bind:hex={color3} label="Color 3" />
+  <div class="grid grid-cols-1 justify-items-center gap-2">
+
+    <!-- <div class="grid grid-rows-4 content-start"> -->
+
+    <p class="text-xl font-sans text-center text-sky-400 p-4">Tiling Settings</p>
+    <div class="grid grid-cols-4">
+      <p class="">Tile Size [%]</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={50}
+          max={300}
+          stepSize={1}
+          initialValue={tileSize * 100}
+          decimalPlaces={0}
+          on:change={(e) => onTileSizeChanged(e.detail.value)}
+        />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">Tiling Size [%]</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={50}
+          max={300}
+          stepSize={1}
+          initialValue={tilingSize}
+          decimalPlaces={0}
+          on:change={(e) => onTilingSizeChanged(e.detail.value)}
+        />
+      </div>
+    </div>
+    <div class="tilingCtrl grid grid-cols-4 gap-4 min-h-10">
+      <button
+        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded min-w-10"
+        on:click={() => {
+          onTilingMinus();
+        }}
+      >
+        &lt;</button
+      >
+      <div class="bg-slate-100 flex items-center justify-center col-span-2">
+        <p class="text-center">
+          IH {availableTilings[tilingIdx]} / {symGroups[
+            availableTilings[tilingIdx]
+          ]}
+        </p>
+      </div>
+      <button
+        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded min-w-10"
+        on:click={() => {
+          onTilingPlus();
+        }}
+      >
+        &gt;</button
+      >
+      
+    </div>
+    <div class="tilingParams">
+      {#each tilingParams as p, idx}
+        <div class="tilingParam flex flex-row gap-4">
+          <p class="basis-1/12">p {idx}</p>
+          <div class="min-w-72">
+            <Range
+              id={idx}
+              min={1}
+              max={200}
+              stepSize={0.1}
+              initialValue={p}
+              decimalPlaces={2}
+              on:change={(e) => onParamChanged(e.detail.value, idx)}
+            />
+          </div>
+        </div>
+      {/each}
+    </div>
+    <div class="actionButtons grid grid-cols-2 gap-4 max-h-10">
+      <button
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+        on:click={() => {
+          onResetParams();
+        }}
+      >
+        Reset Params
+      </button>
+      <button
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+        on:click={() => {
+          downloadSVG();
+        }}>Download SVG</button
+      >
+    </div>
+    <p class="text-xl font-sans text-center text-sky-400 p-4">Morph Settings</p>
+    <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
+      <label class="p-2">
+        <input type="checkbox" bind:checked={doMorph} />
+        Morph
+      </label>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">t</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={0}
+          max={100}
+          stepSize={0.01}
+          initialValue={t}
+          decimalPlaces={2}
+          on:change={(e) => (t = Number(e.detail.value))}
+        />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">p</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={0}
+          max={100}
+          stepSize={0.01}
+          initialValue={p}
+          decimalPlaces={2}
+          on:change={(e) => (p = Number(e.detail.value))}
+        />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">a</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={1}
+          max={300}
+          stepSize={0.01}
+          initialValue={a}
+          decimalPlaces={2}
+          on:change={(e) => (a = Number(e.detail.value))}
+        />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">b</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={50}
+          max={200}
+          stepSize={0.01}
+          initialValue={b}
+          decimalPlaces={2}
+          on:change={(e) => (b = Number(e.detail.value))}
+        />
+      </div>
+    </div>
+    <p class="text-xl font-sans text-center text-sky-400 p-4">Display Settings</p>
+    <div class="displaySettings grid grid-cols-3 gap-4 mr-4 ml-4">
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showBorder} />
+          Show Border
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showSkeleton} />
+          Show Skeleton
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showOrigins} />
+          Show Origins
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showBackground} />
+          Show Background
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showBackgroundImage} />
+          Show Background Image
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showDebugMorphLines} />
+          Show Debug Morph Lines 
+        </label>
+      </div>
+    </div>
+    <div class="colorSettings grid grid-cols-3 gap-4 min-h-12">
+      <ColorPicker bind:hex={color1} label="Color 1" />
+      <ColorPicker bind:hex={color2} label="Color 2" />
+      <ColorPicker bind:hex={color3} label="Color 3" />
+    </div>
   </div>
 </div>
 
 <style>
+  .svgText{
+      font: 20px;
+      fill: rgb(29 78 216);
+    }
 </style>
