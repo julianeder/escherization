@@ -19,7 +19,10 @@
     type DiagrammResult,
     type CellResult,
   } from "../lib/wasm/wasmVoronoi";
-  import instantiate_wasmMorph, { type FeatureLine, type MorphWasmModule } from "../lib/wasm/wasmMorph";
+  import instantiate_wasmMorph, {
+    type FeatureLine,
+    type MorphWasmModule,
+  } from "../lib/wasm/wasmMorph";
 
   import { IsohedralTiling, mul, mulSegment } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
@@ -33,8 +36,13 @@
     translate,
     rotate,
   } from "transformation-matrix";
-  import { ImageStoreContent, imageStore, siteStore } from "./state";
-    import { checkIntersections } from "./collisionDetection";
+  import {
+    canvasSize,
+    ImageStoreContent,
+    imageStore,
+    siteStore,
+  } from "./state";
+  import { checkIntersections } from "./collisionDetection";
 
   let wasmVoronoi: VoronoiWasmModule;
   let wasmMorph: MorphWasmModule;
@@ -43,7 +51,7 @@
   let tiles: Tile[] = [];
   let tileSitePoints: SitePoint[] = [];
   let tileSiteSegments: SiteSegment[] = [];
-  let outlines: FeatureLine[][] = []; 
+  let outlines: FeatureLine[] = [];
 
   let tilingSitePoints: SitePoint[] = [];
   let tilingSiteSegments: SiteSegment[] = [];
@@ -54,7 +62,7 @@
   let voronoiCells: Cell[] = [];
   let tilingSize: number = 100;
   let tileSize: number = 1;
-  let tileCenter: Point;
+  let tileCenter: Point = new Point(150, 150);
   let imageOffset: Point;
 
   let backgroundImage: HTMLImageElement | null;
@@ -72,6 +80,11 @@
   let showOrigins: boolean = true;
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
+  let showDebugMorphLines: boolean = false;
+
+  let morphedSiteSegments: SiteSegment[] = []; // Debug only
+  let mostCenterTile: Tile;
+  let morphedBBox: number[] = [-40, -17, 306, 343];
 
   const symGroups: Record<string, any> = {
     "1": "p1",
@@ -100,93 +113,204 @@
   let color2: string = "#59da5980";
   let color3: string = "#c3c63580";
 
-  function update() {
-    updateTiling();
+  let doMorph: boolean = true;
+  let p: number = 0;
+  let a: number = 1;
+  let b: number = 2;
+  let t: number = 1;
 
-    if(checkIntersections(tilingSiteSegments)){
-      lastError = "Collision between tiles detected, please change the paremeters (e.g. decrease Tile Size)"
-    }
-    else{
-      lastError = ""
-      updateVoronoi();
-      updateMorph();
-    }
+  let updatePromise: Promise<void> | null = null;
+
+  let mousePoint: Point = {x:-1, y:-1};
+
+  async function update(): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      setTimeout(() => {
+        try{
+
+          updateTiling();
+          
+          if (checkIntersections(tilingSiteSegments)) {
+            lastError =
+            "Collision between tiles detected, please change the paremeters (e.g. decrease Tile Size)";
+          } else {
+            lastError = "";
+            updateVoronoi();
+            updateMorph();
+          }
+        }catch(e){
+          lastError = e;
+          reject(e);
+          throw e;
+        }
+        
+        resolve();
+      })
+    })
   }
 
-  function updateMorph(){
+  function GetMostCenterTileIdx(tiles: Tile[]): Tile {
+    let svgCenter: Point = new Point((bbox.xh-bbox.xl) / 2, (bbox.yh-bbox.yl) / 2);
+    let sqrDist = Number.MAX_VALUE;    
+    let idx = -1;
+    for (let i = 0; i < tiles.length; i++) {
+      let sd = (tiles[i].origin.x - svgCenter.x) * (tiles[i].origin.x - svgCenter.x) + (tiles[i].origin.y - svgCenter.y) * (tiles[i].origin.y - svgCenter.y);
+      if(sd < sqrDist){
+        idx = i;
+        sqrDist = sd;
+      }
+    }
+    // console.log(idx  + " " + Math.sqrt(sqrDist));
+    return tiles[idx];
+  }
+
+  function updateMorph() {
+
+    mostCenterTile = GetMostCenterTileIdx(tiles);
 
     // Get Outline
     outlines = [];
+    let Minv: Matrix;
     for (let i = 0; i < tiles.length; i++) {
-      if(tiles[i].tileIdx == 14){
-        let outline: FeatureLine[] = [];
-        // console.log(tiles[i].tileIdx + " " + tiles[i].origin.x + " " + tiles[i].origin.y);
-        voronoiCells.filter(c => c.tileIdx == tiles[i].tileIdx).forEach(c => {
-          // console.log(c)
-          c.edgeIndices.forEach(idxE => {
-            if(voronoiEdges[idxE].isPrimary && !voronoiEdges[idxE].isBetweenSameColorCells){              
-              // console.log(voronoiEdges[idxE])
-              let featureLine: FeatureLine = {
-                startPoint: {x: voronoiEdges[idxE].va.x, y: voronoiEdges[idxE].va.y},
-                endPoint:{x: voronoiEdges[idxE].vb.x, y: voronoiEdges[idxE].vb.y}
-              } 
-              outline.push(featureLine);
-            }
-          })
-        });
-        outlines.push(outline);
+      if (tiles[i].tileIdx == mostCenterTile.tileIdx) {
+        Minv = getInverseTransformation(tiles[i].M, tiles[i].origin);
+        voronoiCells
+          .filter((c) => c.tileIdx == tiles[i].tileIdx)
+          .forEach((c) => {
+            c.edgeIndices.forEach((idxE) => {
+              if (
+                voronoiEdges[idxE].isPrimary &&
+                !voronoiEdges[idxE].isBetweenSameColorCells
+              ) {
+                let featureLine: FeatureLine = {
+                  startPoint: {
+                    x: voronoiEdges[idxE].va.x,
+                    y: voronoiEdges[idxE].va.y,
+                  },
+                  endPoint: {
+                    x: voronoiEdges[idxE].vb.x,
+                    y: voronoiEdges[idxE].vb.y,
+                  },
+                };
+                outlines.push(featureLine);
+              }
+            });
+          });
       }
     }
-    console.log(outlines);
     outlines = outlines; // Reactive Update
 
     // Morphing
-    if(backgroundImageData != null){ 
-        console.log("do Morph");
-        
+    if (backgroundImageData != null) {
+      if (doMorph) {
+
         const imageDataVector = new wasmMorph.VectorByte();
         backgroundImageData.data.forEach((b) => imageDataVector.push_back(b));
-        
-        
-        const srcLinesVector = new wasmMorph.VectorFeatureLine();
-        tileSiteSegments.forEach((ss) => srcLinesVector.push_back({
-          startPoint: {x: ss.x1, y: ss.y1},
-          endPoint: {x: ss.x2, y: ss.y2}
-        }))
-        
-        const morphLinesVector = new wasmMorph.VectorFeatureLine();
-        tileSiteSegments.forEach((ss) => morphLinesVector.push_back({
-          startPoint: {x: ss.x1, y: ss.y1},
-          endPoint: {x: ss.x2, y: ss.y2}
-        }))
 
-        
-        let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height, 
-          imageDataVector, 
-          srcLinesVector, 
-          morphLinesVector);     
-        
-        console.log("result.size " + result.size());
+        const skelletonLinesVector = new wasmMorph.VectorFeatureLine();
+        tileSiteSegments.forEach((ss) =>
+          skelletonLinesVector.push_back({
+            startPoint: { x: ss.x1 + tileCenter.x, y: ss.y1 + tileCenter.y },
+            endPoint: { x: ss.x2 + tileCenter.x, y: ss.y2 + tileCenter.y },
+          }),
+        );
+
+        const outlineLinesVector = new wasmMorph.VectorFeatureLine();
+        outlines.forEach((s) => 
+          outlineLinesVector.push_back({
+            startPoint: { x: s.startPoint.x, y: s.startPoint.y },
+            endPoint: { x: s.endPoint.x, y: s.endPoint.y },
+          }));
+        // console.log(outlines);
+
+        const mInvVector = new wasmMorph.VectorDouble();
+        mInvVector.push_back(Minv!.a);
+        mInvVector.push_back(Minv!.b);
+        mInvVector.push_back(Minv!.c);
+        mInvVector.push_back(Minv!.d);
+        mInvVector.push_back(Minv!.e);
+        mInvVector.push_back(Minv!.f);
+
+        let bbox = wasmMorph.getBBox(outlineLinesVector, mInvVector);
+
+        morphedBBox = [];
+        for (let i = 0; i < bbox.size(); i++) {
+          morphedBBox.push(bbox.get(i));
+        }
+        morphedBBox = morphedBBox;
+
+
+        if(showDebugMorphLines){
+          let morphedOutline = wasmMorph.getMorphOutline(
+            backgroundImageData.width,
+            backgroundImageData.height,
+            t,
+            imageDataVector,
+            skelletonLinesVector,
+            outlineLinesVector,
+            mInvVector,
+          );
+
+          morphedSiteSegments = [];
+          for (let i = 0; i < morphedOutline.size(); i++) {
+            morphedSiteSegments.push(
+              new SiteSegment(
+                morphedOutline.get(i).startPoint.x,
+                morphedOutline.get(i).startPoint.y,
+                morphedOutline.get(i).endPoint.x,
+                morphedOutline.get(i).endPoint.y,
+                0,
+                [],
+                14,
+              ),
+            );
+          }
+          morphedSiteSegments = morphedSiteSegments;
+          // console.log(morphedSiteSegments);
+        }
+
+        let result = wasmMorph.doMorph(
+          backgroundImageData.width,
+          backgroundImageData.height,
+          p,
+          a,
+          b,
+          t,
+          imageDataVector,
+          skelletonLinesVector,
+          outlineLinesVector,
+          mInvVector,
+        );
+
+        // console.log("result.size " + result.size());
+        let morphedBackgroundImageData: ImageData = new ImageData(
+          morphedBBox[2] - morphedBBox[0],
+          morphedBBox[3] - morphedBBox[1],
+        );
         for (let i = 0; i < result.size(); i++) {
           // let e: number = result.get(i);
-          backgroundImageData.data[i] = result.get(i);
+          morphedBackgroundImageData.data[i] = result.get(i);
         }
-        console.log(backgroundImageData.data);
-        backgroundImage = imagedataToImage(backgroundImageData);
+        console.log(morphedBackgroundImageData.data);
 
+        backgroundImage = imagedataToImage(morphedBackgroundImageData);
+      } else {
+        backgroundImage = imagedataToImage(backgroundImageData);
+        morphedBBox = [0, 0, tileWidth, tileHeight];
       }
     }
+  }
 
   function imagedataToImage(imagedata: ImageData) {
-      var canvas = document.createElement('canvas');
-      var ctx = canvas.getContext('2d');
-      canvas.width = imagedata.width;
-      canvas.height = imagedata.height;
-      ctx!.putImageData(imagedata, 0, 0);
+    var canvas = document.createElement("canvas");
+    var ctx = canvas.getContext("2d");
+    canvas.width = imagedata.width;
+    canvas.height = imagedata.height;
+    ctx!.putImageData(imagedata, 0, 0);
 
-      var image = new Image();
-      image.src = canvas.toDataURL();
-      return image;
+    var image = new Image();
+    image.src = canvas.toDataURL();
+    return image;
   }
 
   function updateTiling() {
@@ -266,7 +390,7 @@
         newSitePoint.color = color;
         newSitePoint.tileIdx = tile.tileIdx;
         newSitePoint.M = M;
-        if(bbox.contains(newSitePoint.x, newSitePoint.y))
+        if (bbox.contains(newSitePoint.x, newSitePoint.y))
           tilingSitePoints.push(newSitePoint);
       }
 
@@ -274,7 +398,11 @@
         let newSiteSegment: SiteSegment = scaleSegment(
           mulSegment(
             M,
-            scaleSegment(tileSiteSegments[j], tileSize / 300, tileSize / 300),
+            scaleSegment(
+              tileSiteSegments[j],
+              tileSize / canvasSize.x,
+              tileSize / canvasSize.y,
+            ),
           ),
           tilingSize,
           tilingSize,
@@ -283,7 +411,10 @@
         newSiteSegment.M = M;
         newSiteSegment.tileIdx = tile.tileIdx;
 
-        if(bbox.contains(newSiteSegment.x1, newSiteSegment.y1) || bbox.contains(newSiteSegment.x2, newSiteSegment.y2))
+        if (
+          bbox.contains(newSiteSegment.x1, newSiteSegment.y1) ||
+          bbox.contains(newSiteSegment.x2, newSiteSegment.y2)
+        )
           tilingSiteSegments.push(newSiteSegment);
       }
     }
@@ -367,7 +498,7 @@
           ) {
             console.log(
               "CP " +
-                i +
+                i + " " + j +
                 ": " +
                 e.controll_points.get(j) +
                 " " +
@@ -491,8 +622,6 @@
       p.tileIdx,
     );
   }
-
-
 
   function addPoint(event: MouseEvent) {
     tilingSitePoints = [
@@ -677,14 +806,16 @@
   function onTilingPlus() {
     tilingIdx = (tilingIdx + 1) % availableTilings.length;
 
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
   }
 
   function onTilingMinus() {
     tilingIdx = tilingIdx - 1;
     if (tilingIdx < 0) tilingIdx = availableTilings.length - 1;
 
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
   }
 
   function onParamChanged(newValue: number, idx: number) {
@@ -692,7 +823,8 @@
       tilingParams[idx] = newValue;
     }
 
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
   }
 
   function onResetParams() {
@@ -708,33 +840,136 @@
     tilingSize = 100;
     tileSize = 1;
 
-    if (autoUpdate) update();
+    if (autoUpdate) 
+      updatePromise = update();
+  }
+
+  function color1Changed(rgba: any) {
+    console.log(rgba);
+  }
+
+  function onTilingSizeChanged(newValue: number) {
+    tilingSize = newValue;
+    if (autoUpdate) 
+      updatePromise = update();
+  }
+  function onTileSizeChanged(newValue: number) {
+    tileSize = newValue / 100;
+    if (autoUpdate) 
+      updatePromise = update();
+  }
+
+  function getTransformation(
+    mat: number[],
+    origin: Point,
+    includeMorphedBBox: boolean = false,
+  ): Matrix {
+    let M: Matrix = {
+      a: mat[0],
+      b: mat[3],
+      c: mat[1],
+      d: mat[4],
+      e: mat[2],
+      f: mat[5],
+    };
+
+    // Decompose M into Translation, Rotation, Scale Matrices
+    M.e = 0; //MM.e*tilingSize;
+    M.f = 0; //MM.f*tilingSize;
+    let sx = Math.sqrt(M.a * M.a + M.b * M.b);
+    let sy = Math.sqrt(M.c * M.c + M.d * M.d);
+    sx = (sx * tilingSize * tileSize) / tileWidth;
+    sy = (sy * tilingSize * tileSize) / tileHeight;
+
+    let angle = Math.atan2(M.b, M.a);
+
+    let tx: number = -tileCenter.x + origin.x;
+    let ty: number = -tileCenter.y + origin.y;
+    if (includeMorphedBBox) {
+      // console.log("tileCenter.y " + tileCenter.y + " origin.y " + origin.y)
+      // console.log("t " + tx + " " + ty)
+      // console.log("morph offset " + morphedBBox[0] + " " + morphedBBox[1])
+      tx = tx + morphedBBox[0];
+      ty = ty + morphedBBox[1];
+    }
+    // console.log("tx: " + tx +" ty "+ ty +" sx:  " + sx +" sy "+ sy +  " angle " + angle)
+
+    let Mtransform = compose(
+      rotate(angle, origin.x, origin.y),
+      scale(sx, sy, origin.x, origin.y),
+      translate(tx, ty),
+    );
+    // console.log(M)
+    // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y +  " / " + toSVG(Mtransform))
+    // console.log("e: " + MM.e + " f "+ MM.f)
+
+    // if (includeMorphedBBox && tileIdx == 14)
+    //   console.log(Mtransform)
+
+    return Mtransform;
+  }
+
+  function getInverseTransformation(mat: number[], origin: Point): Matrix {
+    let M: Matrix = {
+      a: mat[0],
+      b: mat[3],
+      c: mat[1],
+      d: mat[4],
+      e: mat[2],
+      f: mat[5],
+    };
+
+    // Decompose M into Translation, Rotation, Scale Matrices
+    M.e = 0;
+    M.f = 0;
+    let sx = Math.sqrt(M.a * M.a + M.b * M.b);
+    let sy = Math.sqrt(M.c * M.c + M.d * M.d);
+    sx = tileWidth / (sx * tilingSize * tileSize); // canvasSize.x statt tileWidth ?
+    sy = tileHeight / (sy * tilingSize * tileSize); // canvasSize.y statt tileHeight ?
+
+    let angle = Math.atan2(M.b, M.a);
+    let Mtransform = compose(
+      translate(tileCenter.x - origin.x, tileCenter.y - origin.y),
+      scale(
+        sx,
+        sy,
+        origin.x,
+        origin.y,
+      ),
+      rotate(-angle, origin.x, origin.y),
+    );
+    return Mtransform;
+  }
+
+  function getPatternUrl(cell: Cell): string {
+    return "url(#pattern_" + cell.tileIdx + ")";
   }
 
   onMount(async () => {
     wasmVoronoi = await instantiate_wasmVoronoi();
     wasmMorph = await instantiate_wasmMorph();
 
-
     siteStore.subscribe((value: Sites) => {
       tileWidth = value.tileWidth;
       tileHeight = value.tileHeight;
+      morphedBBox = [0, 0, tileWidth, tileHeight];
       tileSitePoints = value.sitePoints;
       tileSiteSegments = value.siteSegments;
       tileCenter = value.tileCenter;
       imageOffset = value.imageOffset;
 
-      if (autoUpdate) update();
+      if (autoUpdate) 
+        updatePromise = update();
     });
 
     imageStore.subscribe((value: ImageStoreContent) => {
       backgroundImage = value.image;
       backgroundImageData = value.imageData;
       // console.log(backgroundImage);
-      // if (autoUpdate) update();
+      // if (autoUpdate)  updatePromise = update();
     });
 
-    tilingSitePoints = [
+    tileSitePoints = [
       new SitePoint(100, 50),
       new SitePoint(300, 50),
       new SitePoint(100, 250),
@@ -759,118 +994,28 @@
     });
   });
 
-  function color1Changed(rgba: any) {
-    console.log(rgba);
-  }
+  function handleMousemove(event: any) {
+		mousePoint.x = event.offsetX;
+		mousePoint.y = event.offsetY;
+	}
 
-  function onTilingSizeChanged(newValue: number) {
-    tilingSize = newValue;
-    if (autoUpdate) update();
-  }
-  function onTileSizeChanged(newValue: number) {
-    tileSize = newValue / 100;
-    if (autoUpdate) update();
-  }
-
-  function getTransformation(mat: number[], origin: Point): string {
-    let M: Matrix = {
-      a: mat[0],
-      b: mat[3],
-      c: mat[1],
-      d: mat[4],
-      e: mat[2],
-      f: mat[5],
-    };
-
-    // Decompose M into Translation, Rotation, Scale Matrices
-    let T: Matrix = { a: 0, b: 0, c: 0, d: 0, e: M.e, f: M.f };
-    M.e = 0; //MM.e*tilingSize;
-    M.f = 0; //MM.f*tilingSize;
-    let sx = Math.sqrt(M.a * M.a + M.b * M.b);
-    let sy = Math.sqrt(M.c * M.c + M.d * M.d);
-    let R: Matrix = {
-      a: M.a / sx,
-      b: M.b / sx,
-      c: M.c / sy,
-      d: M.d / sy,
-      e: 0,
-      f: 0,
-    };
-    let angle = Math.atan2(M.b, M.a);
-
-    let Mtransform = compose(
-      rotate(angle, origin.x, origin.y),
-      scale(
-        (sx * tilingSize * tileSize) / 300,
-        (sy * tilingSize * tileSize) / 300,
-        origin.x,
-        origin.y,
-      ),
-      translate(-tileCenter.x + origin.x, -tileCenter.y + origin.y),
-    );
-    // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y + " imageOffset: "  + imageOffset.x +" "+ imageOffset.y +  " / " + toSVG(Mtransform))
-    // console.log("e: " + MM.e + " f "+ MM.f)
-    return toSVG(Mtransform);
-  }
-
-  function getInverseTransformation(cell: Cell): string {
-    if (cell.containsPoint) {
-      // let M: number[] = tilingSitePoints[c.sourceIndex].M;
-      // M.join(", ")
-      // return "matrix(" + M.join(", ") + ")";
-      return "";
-    } else if (cell.containsSegment) {
-      let M: number[] = tilingSiteSegments[cell.sourceIndex].M;
-      let MM: Matrix = { a: M[0], b: M[3], c: M[1], d: M[4], e: M[2], f: M[5] };
-
-      let Mtransform = compose(
-        scale(1 / tilingSize),
-        inverse(MM),
-        scale(tileWidth / tileSize, tileHeight / tileSize),
-      );
-
-      return toSVG(Mtransform);
-    }
-    return "";
-  }
-
-  function getPatternUrl(cell: Cell): string {
-    return "url(#pattern_" + cell.tileIdx + ")";
-  }
 </script>
 
-<div class="grid grid-cols-1 justify-items-center gap-4">
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <svg
-    id="voronoiSvg"
-    width={bbox.xh}
-    height={bbox.yh}
-    viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
-    xmlns="http://www.w3.org/2000/svg"
-    on:click={addPoint}
-  >
-    <defs>
-      {#each tiles as tile, idx}
-        <pattern
-          id={"pattern_" + idx}
-          patternContentUnits="userSpaceOnUse"
-          patternUnits="userSpaceOnUse"
-          patternTransform={getTransformation(tile.M, tile.origin)}
-          width={tileWidth}
-          height={tileHeight}
-        >
-          <image
-            href={backgroundImage?.src}
-            x={0}
-            y={0}
-            width={tileWidth}
-            height={tileHeight}
-          />
-        </pattern>
-      {/each}
-    </defs>
-    <rect
+<div class="grid grid-cols-2">
+
+  <div class="grid grid-cols-1 justify-items-center">
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <svg
+      id="voronoiSvg"
+      width={bbox.xh}
+      height={bbox.yh}
+      viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
+      xmlns="http://www.w3.org/2000/svg"
+      on:click={addPoint}
+      on:mousemove={handleMousemove}
+    >
+      <rect
       x="0"
       y="0"
       width={bbox.xh}
@@ -878,254 +1023,395 @@
       stroke="rgb(2 132 199)"
       stroke-width="1"
       fill="rgb(248 250 252)"
-    />
-    {#each voronoiCells as c}
-      {#if showBackground && isCellPathConsistant(c)}
-        {#if showBackgroundImage}
-          <path
-            id="cell {c.sourceIndex}"
-            d={getCellPath(c)}
-            stroke="black"
-            stroke-width="0"
-            fill={getPatternUrl(c)}
-          ></path>
-        {:else}
-          <path
-            id="cell {c.sourceIndex}"
-            d={getCellPath(c)}
-            stroke="black"
-            stroke-width="0"
-            fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
-          ></path>
-        {/if}
-      {/if}
-    {/each}
-    {#if showSkeleton}
-      {#each tilingSitePoints as siteP, idx}
-        <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="red"
-        ></circle>
-      {/each}
-      {#each tilingSiteSegments as siteS, idx}
-        <path
-          id="segment {idx + tilingSitePoints.length}"
-          d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-          stroke="red"
-          stroke-width="1"
-          fill="none"
-        ></path>
-        <circle
-          id="segment {idx + tilingSitePoints.length}"
-          cx={siteS.x1}
-          cy={siteS.y1}
-          r="2"
-          fill="red"
-        ></circle>
-        <circle
-          id="segment {idx + tilingSitePoints.length}"
-          cx={siteS.x2}
-          cy={siteS.y2}
-          r="2"
-          fill="red"
-        ></circle>
-      {/each}
-    {/if}
-    {#each voronoiEdges as e, idx}
-      {#if e.isValid && !e.isBetweenSameColorCells && showBorder}
-        <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
-        <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
-        {#if e.isCurved && e.controlPoints.length == 3}
-          <path
-            id={"edge_" + idx}
-            d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
-              .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
-              .x} {e.controlPoints[2].y}"
-            stroke="blue"
-            stroke-width="1"
-            fill="none"
-          ></path>
-        {:else if e.isPrimary}
-          <path
-            id={"edge_" + idx}
-            d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-            stroke="blue"
-            stroke-width="1"
-            fill="none"
-          ></path>
-        {:else if showSecondary}
-          <path
-            id={"edge_" + idx}
-            d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-            stroke="green"
-            stroke-width="1"
-            fill="none"
-          ></path>
-        {/if}
-      {/if}
-    {/each}
-    {#each tiles as tile, idx}
-      {#if showOrigins}
-        <circle
-          id="origin {idx}"
-          cx={tile.origin.x}
-          cy={tile.origin.y}
-          r="5"
-          fill="pink"
-        ></circle>
-      {/if}
-    {/each}
-    {#each outlines as outline}
-      {#each outline as fl, idx}
-        <path
-          id={"outline_" + idx}
-          d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl.endPoint.y}"
-          stroke="yellow"
-          stroke-width="1"
-          fill="none"
-        ></path>
+      />
+      {#await updatePromise}
+        <text x="250" y="220" text-anchor="middle" class="svgText">Loading...</text>		
+      {:then planet}
+
+        <defs>
+          {#each tiles as tile, idx}
+            <pattern
+              id={"pattern_" + tile.tileIdx}
+              patternContentUnits="userSpaceOnUse"
+              patternUnits="userSpaceOnUse"
+              patternTransform={toSVG(getTransformation(tile.M, tile.origin, true))}
+              width={morphedBBox[2] - morphedBBox[0]}
+              height={morphedBBox[3] - morphedBBox[1]}
+            >
+              <image
+                href={backgroundImage?.src}
+                x={0}
+                y={0}
+                width={morphedBBox[2] - morphedBBox[0]}
+                height={morphedBBox[3] - morphedBBox[1]}
+              />
+            </pattern>
+          {/each}
+        </defs>
+
+
+        {#each voronoiCells as c}
+          {#if showBackground && isCellPathConsistant(c)}
+            {#if showBackgroundImage}
+              <path
+                id="cell {c.sourceIndex}"
+                d={getCellPath(c)}
+                stroke="black"
+                stroke-width="0"
+                fill={getPatternUrl(c)}
+              ></path>
+            {:else}
+              <path
+                id="cell {c.sourceIndex}"
+                d={getCellPath(c)}
+                stroke="black"
+                stroke-width="0"
+                fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
+              ></path>
+            {/if}
+          {/if}
         {/each}
-      {/each}
-    </svg>
-  <div class="lastErrorContainer max-w-96">
-    <p class="text-red-700 text-sm break-words">{lastError}</p>
-  </div>
-  <!-- <div class="grid grid-rows-4 content-start"> -->
-  <p class="text-xl font-sans text-center text-sky-400 p-4">Tiling Settings</p>
-  <div class="grid grid-cols-4">
-    <p class="">Tile Size [%]</p>
-    <div class="col-span-3 min-w-72">
-      <Range
-        min={50}
-        max={300}
-        stepSize={1}
-        initialValue={tileSize * 100}
-        decimalPlaces={0}
-        on:change={(e) => onTileSizeChanged(e.detail.value)}
-      />
-    </div>
-  </div>
-  <div class="grid grid-cols-4">
-    <p class="">Tiling Size [%]</p>
-    <div class="col-span-3 min-w-72">
-      <Range
-        min={50}
-        max={300}
-        stepSize={1}
-        initialValue={tilingSize}
-        decimalPlaces={0}
-        on:change={(e) => onTilingSizeChanged(e.detail.value)}
-      />
-    </div>
-  </div>
-  <div class="tilingCtrl grid grid-cols-8 gap-4">
-    <button
-      class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
-      on:click={() => {
-        onTilingMinus();
-      }}
-    >
-      &lt;</button
-    >
-    <div class="bg-slate-100 flex items-center justify-center col-span-2">
-      <p class="text-center">
-        IH {availableTilings[tilingIdx]} / {symGroups[
-          availableTilings[tilingIdx]
-        ]}
-      </p>
-    </div>
-    <button
-      class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded"
-      on:click={() => {
-        onTilingPlus();
-      }}
-    >
-      &gt;</button
-    >
-    <button
-      class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded col-span-2"
-      on:click={() => {
-        update();
-      }}>Update</button
-    >
-    <div class="bg-slate-100 flex items-center justify-center col-span-2">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={autoUpdate} />
-        Auto Update
-      </label>
-    </div>
-  </div>
-  <div class="tilingParams">
-    {#each tilingParams as p, idx}
-      <div class="tilingParam flex flex-row gap-4">
-        <p class="basis-1/12">p {idx}</p>
-        <div class="min-w-72">
-          <Range
-            id={idx}
-            min={1}
-            max={200}
-            stepSize={0.1}
-            initialValue={p}
-            decimalPlaces={2}
-            on:change={(e) => onParamChanged(e.detail.value, idx)}
+        {#if showSkeleton}
+          {#each tilingSitePoints as siteP, idx}
+            <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="red"
+            ></circle>
+          {/each}
+          {#each tilingSiteSegments as siteS, idx}
+            <path
+              id="segment {idx + tilingSitePoints.length}"
+              d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
+              stroke="red"
+              stroke-width="1"
+              fill="none"
+            ></path>
+            <circle
+              id="segment {idx + tilingSitePoints.length}"
+              cx={siteS.x1}
+              cy={siteS.y1}
+              r="2"
+              fill="red"
+            ></circle>
+            <circle
+              id="segment {idx + tilingSitePoints.length}"
+              cx={siteS.x2}
+              cy={siteS.y2}
+              r="2"
+              fill="red"
+            ></circle>
+          {/each}
+        {/if}
+        {#each voronoiEdges as e, idx}
+          {#if e.isValid && !e.isBetweenSameColorCells && showBorder}
+            <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
+            <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
+            {#if e.isCurved && e.controlPoints.length == 3}
+              <path
+                id={"edge_" + idx}
+                d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
+                  .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
+                  .x} {e.controlPoints[2].y}"
+                stroke="blue"
+                stroke-width="1"
+                fill="none"
+              ></path>
+            {:else if e.isPrimary}
+              <path
+                id={"edge_" + idx}
+                d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+                stroke="blue"
+                stroke-width="1"
+                fill="none"
+              ></path>
+            {:else if showSecondary}
+              <path
+                id={"edge_" + idx}
+                d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+                stroke="green"
+                stroke-width="1"
+                fill="none"
+              ></path>
+            {/if}
+          {/if}
+        {/each}
+        {#each tiles as tile, idx}
+          {#if showOrigins}
+            <circle
+              id="origin {idx}"
+              cx={tile.origin.x}
+              cy={tile.origin.y}
+              r="5"
+              fill="pink"
+            ></circle>
+          {/if}
+        {/each}
+        {#if showDebugMorphLines}
+          {#each outlines as fl, idx}
+            <path
+              id={"outline_" + idx}
+              d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl
+                .endPoint.y}"
+              stroke="yellow"
+              stroke-width="1"
+              fill="none"
+            ></path>
+          {/each}
+          {#each morphedSiteSegments as fl, idx}
+            <g transform={toSVG(getTransformation(mostCenterTile.M, mostCenterTile.origin))}>
+              <path
+                id={"outlineMorphed_" + idx}
+                d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
+                stroke="red"
+                stroke-width="2"
+                fill="none"
+              ></path>
+            </g>
+          {/each}
+        {/if}
+        <!-- <g
+          transform={toSVG(
+            getTransformation(
+              [1, 0, 1.732050807563, 0, 1, 2],
+              { x: 173.2050807563, y: 200 },
+              true,
+            ),
+          )}
+        >
+          <rect
+            x="0"
+            y="0"
+            width={346}
+            height={360}
+            stroke="rgb(255 0 0)"
+            stroke-width="1"
+            fill="none"
           />
-        </div>
+        </g> -->
+      
+      {:catch someError}
+        <text x="250" y="250" text-anchor="middle" class="svgText">Error: {someError.message}.</text>
+      {/await}
+
+    </svg>
+
+    <p> {"Mouse: (" + mousePoint.x  + "," + mousePoint.y + ")"}</p>
+
+    <div class="grid grid-cols-2 gap-4">
+      <button
+      class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded max-h-12"
+      on:click={() => updatePromise = update()}
+      >Update</button
+      >
+      <div class="bg-slate-100 flex items-center justify-center max-h-12">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={autoUpdate} />
+          Auto Update
+        </label>
       </div>
-    {/each}
-  </div>
-  <div class="actionButtons grid grid-cols-2 gap-4 max-h-10">
-    <button
-      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
-      on:click={() => {
-        onResetParams();
-      }}
-    >
-      Reset Params
-    </button>
-    <button
-      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
-      on:click={() => {
-        downloadSVG();
-      }}>Download SVG</button
-    >
-  </div>
-  <p class="text-xl font-sans text-center text-sky-400 p-4">Display Settings</p>
-  <div class="displaySettings grid grid-cols-3 gap-4">
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showBorder} />
-        Show Border
-      </label>
     </div>
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showSkeleton} />
-        Show Skeleton
-      </label>
-    </div>
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showOrigins} />
-        Show Origins
-      </label>
-    </div>
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showBackground} />
-        Show Background
-      </label>
-    </div>
-    <div class="bg-slate-100 flex items-center justify-center h-10">
-      <label class="p-2">
-        <input type="checkbox" bind:checked={showBackgroundImage} />
-        Show Background Image
-      </label>
+    <div class="lastErrorContainer max-w-96 max-h-24">
+      <p class="text-red-700 text-sm break-words">{lastError}</p>
     </div>
   </div>
-  <div class="colorSettings grid grid-cols-3 gap-4 min-h-80">
-    <ColorPicker bind:hex={color1} label="Color 1" />
-    <ColorPicker bind:hex={color2} label="Color 2" />
-    <ColorPicker bind:hex={color3} label="Color 3" />
+  <div class="grid grid-cols-1 justify-items-center gap-2">
+
+    <!-- <div class="grid grid-rows-4 content-start"> -->
+
+    <p class="text-xl font-sans text-center text-sky-400 p-4">Tiling Settings</p>
+    <div class="grid grid-cols-4">
+      <p class="">Tile Size [%]</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={50}
+          max={300}
+          stepSize={1}
+          initialValue={tileSize * 100}
+          decimalPlaces={0}
+          on:change={(e) => onTileSizeChanged(e.detail.value)}
+        />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">Tiling Size [%]</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={50}
+          max={300}
+          stepSize={1}
+          initialValue={tilingSize}
+          decimalPlaces={0}
+          on:change={(e) => onTilingSizeChanged(e.detail.value)}
+        />
+      </div>
+    </div>
+    <div class="tilingCtrl grid grid-cols-4 gap-4 min-h-10">
+      <button
+        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded min-w-10"
+        on:click={() => {
+          onTilingMinus();
+        }}
+      >
+        &lt;</button
+      >
+      <div class="bg-slate-100 flex items-center justify-center col-span-2">
+        <p class="text-center">
+          IH {availableTilings[tilingIdx]} / {symGroups[
+            availableTilings[tilingIdx]
+          ]}
+        </p>
+      </div>
+      <button
+        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded min-w-10"
+        on:click={() => {
+          onTilingPlus();
+        }}
+      >
+        &gt;</button
+      >
+      
+    </div>
+    <div class="tilingParams">
+      {#each tilingParams as p, idx}
+        <div class="tilingParam flex flex-row gap-4">
+          <p class="basis-1/12">p {idx}</p>
+          <div class="min-w-72">
+            <Range
+              id={idx}
+              min={1}
+              max={200}
+              stepSize={0.1}
+              initialValue={p}
+              decimalPlaces={2}
+              on:change={(e) => onParamChanged(e.detail.value, idx)}
+            />
+          </div>
+        </div>
+      {/each}
+    </div>
+    <div class="actionButtons grid grid-cols-2 gap-4 max-h-10">
+      <button
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+        on:click={() => {
+          onResetParams();
+        }}
+      >
+        Reset Params
+      </button>
+      <button
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+        on:click={() => {
+          downloadSVG();
+        }}>Download SVG</button
+      >
+    </div>
+    <p class="text-xl font-sans text-center text-sky-400 p-4">Morph Settings</p>
+    <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
+      <label class="p-2">
+        <input type="checkbox" bind:checked={doMorph} />
+        Morph
+      </label>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">t</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={0}
+          max={100}
+          stepSize={0.01}
+          initialValue={t}
+          decimalPlaces={2}
+          on:change={(e) => (t = Number(e.detail.value))}
+        />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">p</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={0}
+          max={100}
+          stepSize={0.01}
+          initialValue={p}
+          decimalPlaces={2}
+          on:change={(e) => (p = Number(e.detail.value))}
+        />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">a</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={1}
+          max={300}
+          stepSize={0.01}
+          initialValue={a}
+          decimalPlaces={2}
+          on:change={(e) => (a = Number(e.detail.value))}
+        />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">b</p>
+      <div class="col-span-3 min-w-72">
+        <Range
+          min={50}
+          max={200}
+          stepSize={0.01}
+          initialValue={b}
+          decimalPlaces={2}
+          on:change={(e) => (b = Number(e.detail.value))}
+        />
+      </div>
+    </div>
+    <p class="text-xl font-sans text-center text-sky-400 p-4">Display Settings</p>
+    <div class="displaySettings grid grid-cols-3 gap-4 mr-4 ml-4">
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showBorder} />
+          Show Border
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showSkeleton} />
+          Show Skeleton
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showOrigins} />
+          Show Origins
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showBackground} />
+          Show Background
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showBackgroundImage} />
+          Show Background Image
+        </label>
+      </div>
+      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+        <label class="p-2">
+          <input type="checkbox" bind:checked={showDebugMorphLines} />
+          Show Debug Morph Lines 
+        </label>
+      </div>
+    </div>
+    <div class="colorSettings grid grid-cols-3 gap-4 min-h-12">
+      <ColorPicker bind:hex={color1} label="Color 1" />
+      <ColorPicker bind:hex={color2} label="Color 2" />
+      <ColorPicker bind:hex={color3} label="Color 3" />
+    </div>
   </div>
 </div>
 
 <style>
+  .svgText{
+      font: 20px;
+      fill: rgb(29 78 216);
+    }
 </style>

@@ -108,28 +108,30 @@
     function handleFileUpload(e: any) {
         sitePoints = [];
         let imageFile = e.target?.files[0];
-        let reader = new FileReader();
-        reader.readAsDataURL(imageFile);
-        reader.onload = (e) => {
-            inputImage = e.target?.result;
+        if(imageFile){
+            let reader = new FileReader();
+            reader.readAsDataURL(imageFile);
+            reader.onload = (e) => {
+                inputImage = e.target?.result;
 
-            let image: HTMLImageElement = new Image();
-            image.onload = () =>
-                Promise.resolve().then(() => {
-                    ctx = canvas.getContext("2d", {
-                        willReadFrequently: true,
+                let image: HTMLImageElement = new Image();
+                image.onload = () =>
+                    Promise.resolve().then(() => {
+                        ctx = canvas.getContext("2d", {
+                            willReadFrequently: true,
+                        });
+                        ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
+                        let imageData:ImageData | null = drawImageScaled(image);
+                        // ctx.fillStyle = ctx.createPattern(image, 'repeat');
+                        // ctx.fillRect(0, 0, width, height);
+                        update();
+                        // console.log("w h" + imageData?.width + " " + imageData?.height);
+                        imageStore.set({image: image, imageData: imageData});
                     });
-                    ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
-                    let imageData:ImageData | null = drawImageScaled(image);
-                    // ctx.fillStyle = ctx.createPattern(image, 'repeat');
-                    // ctx.fillRect(0, 0, width, height);
-                    update();
-                    console.log("w h" + imageData?.width + " " + imageData?.height);
-                    imageStore.set({image: image, imageData: imageData});
-                });
-            image.src = inputImage;
-            // let img = inputImage;
-        };
+                image.src = inputImage;
+                // let img = inputImage;
+            };
+        }
     }
 
     function drawImageScaled(img: HTMLImageElement): ImageData | null {

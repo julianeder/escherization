@@ -7,8 +7,6 @@
 
 
 /* Vector Descriptions and Operations */
-
-
 class Vector2d {
 public:
   double x, y;
@@ -44,6 +42,13 @@ public:
   friend short    operator==(const Vector2d& one, const Vector2d& two); // eq
 };
 
+class Vector2dInt {
+public:
+  int x, y;
+  Vector2dInt(const Vector2d &v);
+  friend short operator==(const Vector2dInt& one, const Vector2dInt& two); // eq
+};
+
 
 //
 // Point class is derived from Vector class and provides ability to draw
@@ -53,6 +58,7 @@ class Point: public Vector2d{
 public:
   Point();
   Point(const Vector2d &v);
+  Point(const Vector2dInt &v);
   int hit(const Vector2d &cursor) const;
 };
 

@@ -1,24 +1,32 @@
 # How to Use
 
 ## Installation
-Run:
+
+Requirements:
+- Node.js: https://nodejs.org/
+- Webbrowser: e.g. Google Chrome
+
+Clone the Repository:
 ```batch
 git clone https://gitlab.lrz.de/ge25muy/escherization.git
+```
+
+Install with node package manager (npm):
+```batch
 cd escherization
 npm install
 ```
 
 ## Development 
-In the project directory run:
+To test locally and for development (hot reloading) run:
 ```batch
 npm run dev
 ```
-Open the URL provided in the terminal in your browser:
-
+and open the URL provided in the terminal in your browser:
 http://localhost:5173/
 
 ## Production 
-In the project directory run:
+To compile the files, tn the project directory run:
 ```batch
 npm run build
 ```
