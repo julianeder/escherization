@@ -168,11 +168,17 @@ Segment retrieve_segment(const cell_type* cell, std::vector<Point> pointSites, s
 }
 
 double get_point_projection(
-      const point_type& point, const Segment& segment) {
+      const point_type& point, const Segment& segment, bool verbose = false) {
+
     double segment_vec_x = x(high(segment)) - x(low(segment));
     double segment_vec_y = y(high(segment)) - y(low(segment));
     double point_vec_x = x(point) - x(low(segment));
     double point_vec_y = y(point) - y(low(segment));
+
+    // if(verbose) printf("segment_vec_x %f segment_vec_y %f \n", segment_vec_x, segment_vec_y);
+    // if(verbose) printf("point_vec_x %f point_vec_y %f \n", point_vec_x, point_vec_y);
+
+
     double sqr_segment_length =
         segment_vec_x * segment_vec_x + segment_vec_y * segment_vec_y;
     double vec_dot = segment_vec_x * point_vec_x + segment_vec_y * point_vec_y;
@@ -192,7 +198,8 @@ static double parabola_deriv_y(double x, double a, double b) {
 void calc_control_points(
   Point& point,
   Segment& segment,
-  std::vector<point_type>* control_points)
+  std::vector<point_type>* control_points,
+  bool verbose)
 {
     // Save the first and last point.
     point_type c0 = (*control_points)[0];
@@ -204,31 +211,68 @@ void calc_control_points(
     // Apply the linear transformation to move start point of the segment to
     // the point with coordinates (0, 0) and the direction of the segment to
     // coincide the positive direction of the x-axis.
+    // v
     double segm_vec_x = high(segment).x() - low(segment).x();
     double segm_vec_y = high(segment).y() - low(segment).y();
     double sqr_segment_length = segm_vec_x * segm_vec_x + segm_vec_y * segm_vec_y;
 
     // Compute x-coordinates of the endpoints of the edge
     // in the transformed space.
-    double c0_x_proj = sqr_segment_length * // = u0
+    double c0_x_proj = sqr_segment_length * // c_{0x}'
         get_point_projection(c0, segment);
-    double c2_x_proj = sqr_segment_length * // = u2
+    double c2_x_proj = sqr_segment_length * // c_{2x}'
         get_point_projection(c2, segment);
+
+    // if(verbose) printf("sqr_segment_length %f get_point_projection(c0, segment) %f \n", sqr_segment_length, get_point_projection(c0, segment, verbose));
+
 
     // Compute parabola parameters in the transformed space.
     // Parabola has next representation:
     // f(x) = ((x-rot_x)^2 + rot_y^2) / (2.0*rot_y).
+    //f
     double point_vec_x = point.x() - low(segment).x();
     double point_vec_y = point.y() - low(segment).y();
+
+    // f_x' = (v dot f)
     double rot_x = segm_vec_x * point_vec_x + segm_vec_y * point_vec_y;
+    // f_y' = f - (v dot f)
     double rot_y = segm_vec_x * point_vec_y - segm_vec_y * point_vec_x;
 
-    double y_0_proj = parabola_y(c0_x_proj, rot_x, rot_y); // = v0
-    double y_2_proj = parabola_y(c2_x_proj, rot_x, rot_y); // = v2
+    // c_{0y}'
+    double y_0_proj = parabola_y(c0_x_proj, rot_x, rot_y); 
+    // c_{2y}'
+    double y_2_proj = parabola_y(c2_x_proj, rot_x, rot_y); 
+    
+    // if(verbose) printf("y_0_proj %f y_2_proj %f\n", y_0_proj, y_2_proj);
 
+
+    // if(verbose) printf("c0_x_proj %f c2_x_proj %f \n", c0_x_proj, c2_x_proj);
+    // if(verbose) printf("rot_x %f rot_y %f\n", rot_x, rot_y);
+
+    // special case where the line is vertical and therefore the derivative is infinity
+    // in this case the parabolar degenerates to a line and we can set the middle controllpoint (c1) to the midpoint of c0 and c2
+    if(c0_x_proj == rot_x){ 
+      // double dy_0_proj = 0;
+      // double dy_2_proj = inf;
+      // if(verbose) printf("special case \n");
+
+      double u1 = (x(c0) + x(c2)) / 2.0;
+      double v1 = (y(c0) + y(c2)) / 2.0;
+
+      c1.x(u1);
+      c1.y(v1);
+
+      control_points->push_back(c0);
+      control_points->push_back(c1);
+      control_points->push_back(c2);
+      return;
+    }
+    
+    //\dot{y}(c_{0x}')
     double dy_0_proj = parabola_deriv_y(c0_x_proj, rot_x, rot_y);
+    //\dot{y}(c_{2x}')
     double dy_2_proj = parabola_deriv_y(c2_x_proj, rot_x, rot_y);
-
+    
     // Equations
     // (v1-v0) / (u1-u0) = dy_0
     // (v2-v1) / (u2-u1) = dy_2
@@ -247,15 +291,26 @@ void calc_control_points(
     // v1 (-1 + dy_2/dy_0) = dy_2 * u2  - (dy_2/dy_0) * (-v0) - dy_2 * u0 - v2
     // v1  = (dy_2 * u2  - (dy_2/dy_0) * (-v0) - dy_2 * u0 - v2) / (dy_2/dy_0 - 1)
 
+    // if(verbose) printf("dy_0_proj %f dy_2_proj %f ((dy_2_proj/dy_0_proj) - 1) %f \n", dy_0_proj, dy_2_proj, ((dy_2_proj/dy_0_proj) - 1));
+
+    //c_{1y}'
     double v1_proj = (dy_2_proj * c2_x_proj + (dy_2_proj/dy_0_proj) * (y_0_proj) - dy_2_proj * c0_x_proj - y_2_proj) / ((dy_2_proj/dy_0_proj) - 1);
+    //c_{1x}'
     double u1_proj = (((v1_proj-y_0_proj) + dy_0_proj*c0_x_proj) / dy_0_proj);
 
+    // if(verbose) printf("u1_proj %f v1_proj %f \n", u1_proj, v1_proj);
+
+    // if(verbose) printf("sqr_segment_length %f x(low(segment)) %d \n", sqr_segment_length, x(low(segment)));
+
     // Project Back
+    //c_{1y}
     double u1 = (segm_vec_x * u1_proj - segm_vec_y * v1_proj) /
         sqr_segment_length + x(low(segment));
+    //c_{1x}
     double v1 = (segm_vec_x * v1_proj + segm_vec_y * u1_proj) /
         sqr_segment_length + y(low(segment));
 
+    // if(verbose) printf("u1 %f v1 %f \n", u1, v1);
 
     c1.x(u1);
     c1.y(v1);
@@ -447,7 +502,14 @@ bool clip_add_finite_edge(
     Segment segment = edge.cell()->contains_point() ?
       retrieve_segment(edge.twin()->cell(), pointSites, lineSites) :
       retrieve_segment(edge.cell(), pointSites, lineSites);
-    calc_control_points(point, segment, &controll_points_);
+
+    // if(result->edges.size() == 889){
+    //   printf("edgeResult->x1 %f edgeResult->y1 %f \n", edgeResult->x1, edgeResult->y1 );
+    //   printf("edgeResult->x2 %f edgeResult->y2 %f \n", edgeResult->x2, edgeResult->y2 );
+    //   printf("high.x %d high.y %d \n", high(segment).x(), high(segment).y() );
+    //   printf("low.x %d low.y %d \n", low(segment).x(), low(segment).y() );
+    // }
+    calc_control_points(point, segment, &controll_points_, result->edges.size() == 889);
     // sample_curved_edge(edge, &samples_, &controll_points_, pointSites, lineSites, bbox);
   }
   // for (size_t i = 0; i < samples_.size(); i++)
@@ -460,6 +522,15 @@ bool clip_add_finite_edge(
     edgeResult->controll_points.push_back(controll_points_[i].x());
     edgeResult->controll_points.push_back(controll_points_[i].y());
   }
+
+  // if(result->edges.size() == 889){
+  //   printf("Edge %zu \n", result->edges.size());
+  //   printf("CP size %zu \n", edgeResult->controll_points.size());
+  //   printf("is_curved %d \n", edge.is_curved());
+  //   for(int i = 0; i < controll_points_.size(); i++)
+  //     printf("CP %d: %f %f \n",i,  controll_points_[i].x(), controll_points_[i].y());
+
+  // }
 
   result->edges.push_back(*edgeResult);
   return true;
