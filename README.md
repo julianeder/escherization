@@ -35,3 +35,24 @@ To test this localy:
 ```batch
 npm run preview
 ```
+
+## Compiling Web Assembly Code
+This is only needed if you intend to change functionality in the wasm subdirectory.
+
+Inslall emscripten (otside the proeject dir) as described in: https://emscripten.org/docs/getting_started/downloads.html#installation-instructions-using-the-emsdk-recommended
+
+```batch
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+emsdk.bat install latest
+emsdk.bat activate latest
+```
+Modify the path to your instllation in wasm/setupEnv.bat
+
+Use the scripts to compile:
+- setupEnv.bat (run once before compiling)
+- buildVoronoi.bat (compile voronoi.cpp)
+- buildMorph.bat (compile morph.cpp)
+
+
+

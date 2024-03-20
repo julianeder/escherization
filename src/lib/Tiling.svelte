@@ -480,15 +480,15 @@
           valid = false;
         }
         newVoronoiVertices.push({
-          x: result.vertices.get(i),
-          y: result.vertices.get(i + 1),
+          x: result.vertices.get(i)!,
+          y: result.vertices.get(i + 1)!,
           isValid: valid,
         });
       }
 
       let newVoronoiEdges: Edge[] = [];
       for (let i = 0; i < result.edges.size(); i++) {
-        let e: EdgeResult = result.edges.get(i);
+        let e: EdgeResult = result.edges.get(i)!;
         let controlPoints: Vertex[] = [];
         let valid = true;
         for (let j = 0; j < e.controll_points.size(); j += 2) {
@@ -498,7 +498,7 @@
           ) {
             console.log(
               "CP " +
-                i + " " + j +
+                i + " " + j / 2 +
                 ": " +
                 e.controll_points.get(j) +
                 " " +
@@ -507,8 +507,8 @@
             valid = false;
           }
           const v: Vertex = {
-            x: e.controll_points.get(j),
-            y: e.controll_points.get(j + 1),
+            x: e.controll_points.get(j)!,
+            y: e.controll_points.get(j + 1)!,
             isValid: valid,
           };
           controlPoints.push(v);
@@ -546,7 +546,7 @@
 
       let newVoronoiCells: Cell[] = [];
       for (let i = 0; i < result.cells.size(); i++) {
-        let c: CellResult = result.cells.get(i);
+        let c: CellResult = result.cells.get(i)!;
         let newCell: Cell = {
           sourceIndex: c.sourceIndex,
           sourceCategory: c.sourceCategory,
@@ -559,7 +559,7 @@
         };
         newVoronoiCells.push(newCell);
         for (let j = 0; j < c.edgeIndices.size(); j++) {
-          let newIndex: number = c.edgeIndices.get(j);
+          let newIndex: number = c.edgeIndices.get(j)!;
           if (newIndex >= newVoronoiEdges.length)
             console.warn(
               "Index too high " +
@@ -1131,6 +1131,14 @@
                 fill="none"
               ></path>
             {/if}
+          {:else if !e.isValid}
+            <path
+            id={"edge_" + idx}
+            d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+            stroke="red"
+            stroke-width="1"
+            fill="none"
+          ></path>
           {/if}
         {/each}
         {#each tiles as tile, idx}

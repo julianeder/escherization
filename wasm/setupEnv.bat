@@ -1,2 +1,2 @@
-../../Implementation_Tests/emsdk/emsdk.bat activate latest
-../../Implementation_Tests/emsdk/emsdk_env.bat
+../../emsdk/emsdk/emsdk.bat activate latest
+../../emsdk/emsdk/emsdk_env.bat

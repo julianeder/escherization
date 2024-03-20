@@ -409,7 +409,7 @@ export class Vectorization {
                 (curPos.y - curNode.point!.y) *
                 (curPos.y - curNode.point!.y);
             if (squareDist > 4) {
-                let node = new Node(curPos, curNode, pixel); //here wrong px cnt
+                let node = new Node(curPos, curNode, pixel);
                 let neigh: Array<Point> = Vectorization.get1Neighbours(
                     thinImag,
                     curPos.x,
@@ -466,8 +466,18 @@ export class Vectorization {
                     Vectorization.vectorizeRec(curNode, n, pixel, thinImag, crossings, ends);
                 } 
                 else if (thinImag[Vectorization.fromXY(n.x, n.y)] == 5 && pixel.length > 1) { // detect loops but not if we just started the run and are still next to our parent node                    
-                    let node = new Node(n, curNode, pixel);
-                    curNode.loops.push(node);
+                    if(n.x == curNode.point!.x && n.y == curNode.point!.y){ //loop to self
+                        if(pixel.length >= 3){
+                            let cntPx = Math.floor(pixel.length / 2);
+                            let node = new Node(pixel[cntPx], curNode, pixel.splice(0, cntPx));
+                            curNode.loops.push(node);
+                        }
+                        //else the loop is so small we ignore it (should not happen)
+                    }else{
+                        let node = new Node(n, curNode, pixel);
+                        curNode.loops.push(node);
+                    }
+                    
                 }
             });
             

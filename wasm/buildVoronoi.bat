@@ -1,8 +1,6 @@
 @REM Example Prject: 
 @REM https://github.com/wolfmcnally/svelte-emscripten
 
-@REM copy wasmVoronoi.d.ts "../src/lib/wasm/" /Y
-
 
 call emcc ^
 -l embind ^
