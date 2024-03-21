@@ -1032,7 +1032,7 @@
 
 <div class="grid grid-cols-2">
 
-  <div class="grid grid-cols-1 justify-items-center">
+  <div class="grid grid-cols-1 justify-items-center content-start gap-4">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <svg
@@ -1212,7 +1212,7 @@
 
     </svg>
 
-    <p> {"Mouse: (" + mousePoint.x  + "," + mousePoint.y + ")"}</p>
+    <p class="min-h-8"> {"Mouse: (" + mousePoint.x  + "," + mousePoint.y + ")"}</p>
 
     <div class="grid grid-cols-2 gap-4">
       <button
@@ -1227,15 +1227,24 @@
         </label>
       </div>
     </div>
+
+    <button
+    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+    on:click={() => {
+      downloadSVG();
+    }}>Download SVG</button
+  >
+
     <div class="lastErrorContainer max-w-96 max-h-24">
       <p class="text-red-700 text-sm break-words">{lastError}</p>
     </div>
+
   </div>
-  <div class="grid grid-cols-1 justify-items-center gap-2">
+  <div class="grid grid-cols-1 justify-items-center gap-2 content-start">
 
     <!-- <div class="grid grid-rows-4 content-start"> -->
 
-    <p class="text-xl font-sans text-center text-sky-400 p-4">Tiling Settings</p>
+    <p class="text-xl font-sans text-center text-sky-400 p-2">Tiling Settings</p>
     <div class="grid grid-cols-4">
       <p class="">Tile Size [%]</p>
       <div class="col-span-3 min-w-72">
@@ -1306,29 +1315,22 @@
         </div>
       {/each}
     </div>
-    <div class="actionButtons grid grid-cols-2 gap-4 max-h-10">
       <button
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-48"
         on:click={() => {
           onResetParams();
         }}
       >
         Reset Params
       </button>
-      <button
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
-        on:click={() => {
-          downloadSVG();
-        }}>Download SVG</button
-      >
-    </div>
-    <p class="text-xl font-sans text-center text-sky-400 p-4">Morph Settings</p>
+    <p class="text-xl font-sans text-center text-sky-400 p-2">Morph Settings</p>
     <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
       <label class="p-2">
         <input type="checkbox" bind:checked={doMorph} />
         Morph
       </label>
     </div>
+    {#if doMorph}
     <div class="grid grid-cols-4">
       <p class="">t</p>
       <div class="col-span-3 min-w-72">
@@ -1381,42 +1383,43 @@
         />
       </div>
     </div>
-    <p class="text-xl font-sans text-center text-sky-400 p-4">Display Settings</p>
+    {/if}
+    <p class="text-xl font-sans text-center text-sky-400 p-2">Display Settings</p>
     <div class="displaySettings grid grid-cols-3 gap-4 mr-4 ml-4">
-      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
         <label class="p-2">
           <input type="checkbox" bind:checked={showBorder} />
-          Show Border
+          Border
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
         <label class="p-2">
           <input type="checkbox" bind:checked={showSkeleton} />
-          Show Skeleton
+          Skeleton
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
         <label class="p-2">
           <input type="checkbox" bind:checked={showOrigins} />
-          Show Origins
+          Origins
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
         <label class="p-2">
           <input type="checkbox" bind:checked={showBackground} />
-          Show Background
+          Background
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
         <label class="p-2">
           <input type="checkbox" bind:checked={showBackgroundImage} />
-          Show Background Image
+          Background Image
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-14 rounded">
+      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
         <label class="p-2">
           <input type="checkbox" bind:checked={showDebugMorphLines} />
-          Show Debug Morph Lines 
+          Debug Morph Lines 
         </label>
       </div>
     </div>

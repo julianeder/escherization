@@ -39,11 +39,11 @@
     let tileCenter = new Point(tileWidth / 2, tileHeight / 2);
 
     const initialSitePoints: SitePoint[] = [
-        new SitePoint(50, 50),
-        new SitePoint(250, 50),
-        new SitePoint(50, 250),
-        new SitePoint(250, 250),
-        new SitePoint(150, 150),
+        // new SitePoint(50, 50),
+        // new SitePoint(250, 50),
+        // new SitePoint(50, 250),
+        // new SitePoint(250, 250),
+        // new SitePoint(150, 150),
     ];
     const initialSiteSegments: SiteSegment[] = [
         //   new SiteSegment(2, 2, 498, 2),
@@ -454,7 +454,7 @@
                         <span class="material-icons md-36">open_with</span>
                     </button>
                 {/if}
-                {#if activeTool == "add"}
+                <!-- {#if activeTool == "add"}
                     <button
                         class="bg-sky-500 hover:bg-sky-300 border border-sky-600 p-2 rounded w-10 h-10 m-1"
                         on:click={() => {
@@ -474,7 +474,7 @@
                         <span class="material-icons md-36">add</span>
                         <div class="relative -top-4 left-3 text-xs">P</div>
                     </button>
-                {/if}
+                {/if} -->
                 {#if activeTool == "addSegment"}
                     <button
                         class="bg-sky-500 hover:bg-sky-300 border border-sky-600 p-2 rounded w-10 h-10 m-1"
