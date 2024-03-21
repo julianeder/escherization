@@ -193,7 +193,7 @@ void warp(const Vector2d &uv_in,
     sum_x += X * weight;
     sum_y += Y * weight;
     weightSum += weight;
-  }
+  }    
 
   uv_out.x = sum_x / weightSum;
   uv_out.y = sum_y / weightSum;
@@ -586,8 +586,30 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
 
 
   vector<FeatureLine> outlineLinesSorted = sortOutlineLines(outlineLines);
+
   transformAll(outlineLinesSorted, matrixVector);
+  transformAll(outlineLines, matrixVector);
+  // for (int i = 0; i < outlineLinesSorted.size(); i++)
+  // {
+  //   printf("sort %i %f %f %f %f\n", i, outlineLines[i].startPoint.x, outlineLines[i].endPoint.x, outlineLinesSorted[i].startPoint.x, outlineLinesSorted[i].endPoint.x);
+  // }
+  
+
   vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
+
+  // Remove lines of length zero in the result because they cause NaN problems later
+  for (int i = outlineLinesMorphed.size()-1; i >= 0; i--)
+  {
+    double lx = outlineLinesMorphed[i].startPoint.x - outlineLinesMorphed[i].endPoint.x;
+    double ly = outlineLinesMorphed[i].startPoint.y - outlineLinesMorphed[i].endPoint.y;
+    double l = lx*lx + ly*ly; //sqrt omited
+    if(l == 0){
+      outlineLinesSorted.erase(outlineLinesSorted.begin() + i);
+      outlineLinesMorphed.erase(outlineLinesMorphed.begin() + i);
+    }
+    // printf("sort %i (%f %f -> (%f %f)\n", i, outlineLinesMorphed[i].startPoint.x, outlineLinesMorphed[i].startPoint.y, outlineLinesMorphed[i].endPoint.x, outlineLinesMorphed[i].endPoint.y);
+  }
+
 
   // the featureline of sourceImage, destImage and the morphImage
   vector<FeatureLine> srcLines;
@@ -612,7 +634,7 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
 
       // warping
       warp(uv_dst, srcLines, dstLines, p, a, b, uv_src);
-
+        
       bool outside = false;
       if (uv_src.x < 0){
         uv_src.x = 0;
@@ -630,7 +652,6 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
         uv_src.y = h - 1;
         outside = true;
       }
-
 
 
       if(outside){

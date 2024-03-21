@@ -53,6 +53,9 @@
   let tileSiteSegments: SiteSegment[] = [];
   let outlines: FeatureLine[] = [];
 
+  let isUptoDate: boolean = false;
+
+
   let tilingSitePoints: SitePoint[] = [];
   let tilingSiteSegments: SiteSegment[] = [];
   let tileWidth: number = 300;
@@ -124,6 +127,7 @@
   let mousePoint: Point = {x:-1, y:-1};
 
   async function update(): Promise<void> {
+    isUptoDate = true;
     await new Promise<void>((resolve, reject) => {
       setTimeout(() => {
         try{
@@ -235,7 +239,7 @@
 
         morphedBBox = [];
         for (let i = 0; i < bbox.size(); i++) {
-          morphedBBox.push(bbox.get(i));
+          morphedBBox.push(bbox.get(i)!);
         }
         morphedBBox = morphedBBox;
 
@@ -267,7 +271,7 @@
           }
           morphedSiteSegments = morphedSiteSegments;
           // console.log(morphedSiteSegments);
-        }
+        }       
 
         let result = wasmMorph.doMorph(
           backgroundImageData.width,
@@ -291,7 +295,7 @@
           // let e: number = result.get(i);
           morphedBackgroundImageData.data[i] = result.get(i);
         }
-        console.log(morphedBackgroundImageData.data);
+        // console.log(morphedBackgroundImageData.data);
 
         backgroundImage = imagedataToImage(morphedBackgroundImageData);
       } else {
@@ -394,6 +398,11 @@
           tilingSitePoints.push(newSitePoint);
       }
 
+      // console.log(
+      //   M[0] + " " + M[1] + " " + M[2] + "\n"
+      // + M[3] + " " + M[4] + " " + M[5] + "\n"
+      // + 0 + " " + 0 + " " + 0 + "\n"
+      // );
       for (let j = 0; j < tileSiteSegments.length; j++) {
         let newSiteSegment: SiteSegment = scaleSegment(
           mulSegment(
@@ -873,16 +882,22 @@
       f: mat[5],
     };
 
+    // console.log(
+    //     M.a + " " + M.c + " " + M.e + "\n"
+    //   + M.b + " " + M.d + " " + M.f + "\n"
+    //   + 0 + " " + 0 + " " + 0 + "\n"
+    //   );
+
     // Decompose M into Translation, Rotation, Scale Matrices
     M.e = 0; //MM.e*tilingSize;
     M.f = 0; //MM.f*tilingSize;
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
-    sx = (sx * tilingSize * tileSize) / tileWidth;
-    sy = (sy * tilingSize * tileSize) / tileHeight;
+
+    // console.log("tilingSize " + tilingSize + " tileHeight " + tileHeight + " tileWidth " + tileWidth);
 
     let angle = Math.atan2(M.b, M.a);
-
+    
     let tx: number = -tileCenter.x + origin.x;
     let ty: number = -tileCenter.y + origin.y;
     if (includeMorphedBBox) {
@@ -891,6 +906,13 @@
       // console.log("morph offset " + morphedBBox[0] + " " + morphedBBox[1])
       tx = tx + morphedBBox[0];
       ty = ty + morphedBBox[1];
+
+      sx = (sx * tilingSize * tileSize) / tileWidth;
+      sy = (sy * tilingSize * tileSize) / tileHeight;
+
+    }else{
+      sx = (sx * tilingSize * tileSize) / canvasSize.x;
+      sy = (sy * tilingSize * tileSize) / canvasSize.y;
     }
     // console.log("tx: " + tx +" ty "+ ty +" sx:  " + sx +" sy "+ sy +  " angle " + angle)
 
@@ -905,6 +927,12 @@
 
     // if (includeMorphedBBox && tileIdx == 14)
     //   console.log(Mtransform)
+
+    // console.log(
+    //   Mtransform.a + " " + Mtransform.c + " " + Mtransform.e + "\n"
+    //   + Mtransform.b + " " + Mtransform.d + " " + Mtransform.f + "\n"
+    //   + 0 + " " + 0 + " " + 0 + "\n"
+    //   );
 
     return Mtransform;
   }
@@ -965,6 +993,7 @@
     imageStore.subscribe((value: ImageStoreContent) => {
       backgroundImage = value.image;
       backgroundImageData = value.imageData;
+      isUptoDate = false;
       // console.log(backgroundImage);
       // if (autoUpdate)  updatePromise = update();
     });
@@ -1026,175 +1055,157 @@
       />
       {#await updatePromise}
         <text x="250" y="220" text-anchor="middle" class="svgText">Loading...</text>		
-      {:then planet}
+      {:then}
 
-        <defs>
-          {#each tiles as tile, idx}
-            <pattern
-              id={"pattern_" + tile.tileIdx}
-              patternContentUnits="userSpaceOnUse"
-              patternUnits="userSpaceOnUse"
-              patternTransform={toSVG(getTransformation(tile.M, tile.origin, true))}
-              width={morphedBBox[2] - morphedBBox[0]}
-              height={morphedBBox[3] - morphedBBox[1]}
-            >
-              <image
-                href={backgroundImage?.src}
-                x={0}
-                y={0}
+        {#if isUptoDate}
+          
+          <defs>
+            {#each tiles as tile, idx}
+              <pattern
+                id={"pattern_" + tile.tileIdx}
+                patternContentUnits="userSpaceOnUse"
+                patternUnits="userSpaceOnUse"
+                patternTransform={toSVG(getTransformation(tile.M, tile.origin, doMorph))}
                 width={morphedBBox[2] - morphedBBox[0]}
                 height={morphedBBox[3] - morphedBBox[1]}
-              />
-            </pattern>
-          {/each}
-        </defs>
+              >
+                <image
+                  href={backgroundImage?.src}
+                  x={0}
+                  y={0}
+                  width={morphedBBox[2] - morphedBBox[0]}
+                  height={morphedBBox[3] - morphedBBox[1]}
+                />
+              </pattern>
+            {/each}
+          </defs>
 
-
-        {#each voronoiCells as c}
-          {#if showBackground && isCellPathConsistant(c)}
-            {#if showBackgroundImage}
-              <path
-                id="cell {c.sourceIndex}"
-                d={getCellPath(c)}
-                stroke="black"
-                stroke-width="0"
-                fill={getPatternUrl(c)}
-              ></path>
-            {:else}
-              <path
-                id="cell {c.sourceIndex}"
-                d={getCellPath(c)}
-                stroke="black"
-                stroke-width="0"
-                fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
-              ></path>
+          {#each voronoiCells as c}
+            {#if showBackground && isCellPathConsistant(c)}
+              {#if showBackgroundImage}
+                <path
+                  id="cell {c.sourceIndex}"
+                  d={getCellPath(c)}
+                  stroke="black"
+                  stroke-width="0"
+                  fill={getPatternUrl(c)}
+                ></path>
+              {:else}
+                <path
+                  id="cell {c.sourceIndex}"
+                  d={getCellPath(c)}
+                  stroke="black"
+                  stroke-width="0"
+                  fill={c.color == 0 ? color1 : c.color == 1 ? color2 : color3}
+                ></path>
+              {/if}
             {/if}
-          {/if}
-        {/each}
-        {#if showSkeleton}
-          {#each tilingSitePoints as siteP, idx}
-            <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="red"
-            ></circle>
           {/each}
-          {#each tilingSiteSegments as siteS, idx}
-            <path
-              id="segment {idx + tilingSitePoints.length}"
-              d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
+          {#if showSkeleton}
+            {#each tilingSitePoints as siteP, idx}
+              <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="red"
+              ></circle>
+            {/each}
+            {#each tilingSiteSegments as siteS, idx}
+              <path
+                id="segment {idx + tilingSitePoints.length}"
+                d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
+                stroke="red"
+                stroke-width="1"
+                fill="none"
+              ></path>
+              <circle
+                id="segment {idx + tilingSitePoints.length}"
+                cx={siteS.x1}
+                cy={siteS.y1}
+                r="2"
+                fill="red"
+              ></circle>
+              <circle
+                id="segment {idx + tilingSitePoints.length}"
+                cx={siteS.x2}
+                cy={siteS.y2}
+                r="2"
+                fill="red"
+              ></circle>
+            {/each}
+          {/if}
+          {#each voronoiEdges as e, idx}
+            {#if e.isValid && !e.isBetweenSameColorCells && showBorder}
+              <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
+              <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
+              {#if e.isCurved && e.controlPoints.length == 3}
+                <path
+                  id={"edge_" + idx}
+                  d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
+                    .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
+                    .x} {e.controlPoints[2].y}"
+                  stroke="blue"
+                  stroke-width="1"
+                  fill="none"
+                ></path>
+              {:else if e.isPrimary}
+                <path
+                  id={"edge_" + idx}
+                  d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+                  stroke="blue"
+                  stroke-width="1"
+                  fill="none"
+                ></path>
+              {:else if showSecondary}
+                <path
+                  id={"edge_" + idx}
+                  d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
+                  stroke="green"
+                  stroke-width="1"
+                  fill="none"
+                ></path>
+              {/if}
+            {:else if !e.isValid}
+              <path
+              id={"edge_" + idx}
+              d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
               stroke="red"
               stroke-width="1"
               fill="none"
             ></path>
-            <circle
-              id="segment {idx + tilingSitePoints.length}"
-              cx={siteS.x1}
-              cy={siteS.y1}
-              r="2"
-              fill="red"
-            ></circle>
-            <circle
-              id="segment {idx + tilingSitePoints.length}"
-              cx={siteS.x2}
-              cy={siteS.y2}
-              r="2"
-              fill="red"
-            ></circle>
-          {/each}
-        {/if}
-        {#each voronoiEdges as e, idx}
-          {#if e.isValid && !e.isBetweenSameColorCells && showBorder}
-            <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
-            <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
-            {#if e.isCurved && e.controlPoints.length == 3}
-              <path
-                id={"edge_" + idx}
-                d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
-                  .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
-                  .x} {e.controlPoints[2].y}"
-                stroke="blue"
-                stroke-width="1"
-                fill="none"
-              ></path>
-            {:else if e.isPrimary}
-              <path
-                id={"edge_" + idx}
-                d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-                stroke="blue"
-                stroke-width="1"
-                fill="none"
-              ></path>
-            {:else if showSecondary}
-              <path
-                id={"edge_" + idx}
-                d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-                stroke="green"
-                stroke-width="1"
-                fill="none"
-              ></path>
             {/if}
-          {:else if !e.isValid}
-            <path
-            id={"edge_" + idx}
-            d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-            stroke="red"
-            stroke-width="1"
-            fill="none"
-          ></path>
-          {/if}
-        {/each}
-        {#each tiles as tile, idx}
-          {#if showOrigins}
-            <circle
-              id="origin {idx}"
-              cx={tile.origin.x}
-              cy={tile.origin.y}
-              r="5"
-              fill="pink"
-            ></circle>
-          {/if}
-        {/each}
-        {#if showDebugMorphLines}
-          {#each outlines as fl, idx}
-            <path
-              id={"outline_" + idx}
-              d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl
-                .endPoint.y}"
-              stroke="yellow"
-              stroke-width="1"
-              fill="none"
-            ></path>
           {/each}
-          {#each morphedSiteSegments as fl, idx}
-            <g transform={toSVG(getTransformation(mostCenterTile.M, mostCenterTile.origin))}>
+          {#each tiles as tile, idx}
+            {#if showOrigins}
+              <circle
+                id="origin {idx}"
+                cx={tile.origin.x}
+                cy={tile.origin.y}
+                r="5"
+                fill="pink"
+              ></circle>
+            {/if}
+          {/each}
+          {#if showDebugMorphLines}
+            {#each outlines as fl, idx}
               <path
-                id={"outlineMorphed_" + idx}
-                d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
-                stroke="red"
-                stroke-width="2"
+                id={"outline_" + idx}
+                d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl
+                  .endPoint.y}"
+                stroke="yellow"
+                stroke-width="1"
                 fill="none"
               ></path>
-            </g>
-          {/each}
-        {/if}
-        <!-- <g
-          transform={toSVG(
-            getTransformation(
-              [1, 0, 1.732050807563, 0, 1, 2],
-              { x: 173.2050807563, y: 200 },
-              true,
-            ),
-          )}
-        >
-          <rect
-            x="0"
-            y="0"
-            width={346}
-            height={360}
-            stroke="rgb(255 0 0)"
-            stroke-width="1"
-            fill="none"
-          />
-        </g> -->
-      
+            {/each}
+            {#each morphedSiteSegments as fl, idx}
+              <g transform={toSVG(getTransformation(mostCenterTile.M, mostCenterTile.origin))}>
+                <path
+                  id={"outlineMorphed_" + idx}
+                  d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}"
+                  stroke="red"
+                  stroke-width="2"
+                  fill="none"
+                ></path>
+              </g>
+            {/each}
+          {/if}   
+        {/if}     
       {:catch someError}
         <text x="250" y="250" text-anchor="middle" class="svgText">Error: {someError.message}.</text>
       {/await}
