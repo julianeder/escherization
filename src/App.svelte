@@ -2,7 +2,7 @@
   import UploadImage from "./lib/UploadImage.svelte";
   import Tiling from "./lib/Tiling.svelte";
 
-  let helpActive: boolean = true;
+  let helpActive: boolean = false;
 
   function showHelp() {
     helpActive = !helpActive;
@@ -31,7 +31,7 @@
   </header>
 
   {#if helpActive}
-    <div class="flex flex-col grow">
+    <div class="flex flex-col grow pb-10">
 
       <p class="text-2xl font-sans text-sky-400 p-4">
         Help
@@ -40,22 +40,25 @@
       <p class="text-xl font-sans text-sky-400 p-4">
         Step 1: Upload Image
       </p>
-      <ul class="list-disc list-inside pl-10">
+      <ul class="list-disc list-inside pl-10 pr-10">
         <li> Get an image to use for the tool in a common image format (png, jpg, ...). </li>
         <li> 
           To be able to generate a tiling the tool has to know what the content and what the backgound of the image is. 
-          It assumes that all black (#000000) pixel are background and everything else is the subject.
-          Use a tool like Photoshop, GIMP or MS Paint to fill the background with black pixell.          
+          It assumes that all black (#000000) pixels are the background and everything else is the subject.
+          Use a tool like Photoshop, GIMP or MS Paint to fill the background with black pixels.          
         </li>
         <li> 
           Now use the "Upload Image" button to upload the Image to the tool.
         </li>
         <li>
           The Tool will automaticaly calculate a "skelleton" of the image.
-          Use the "Deviation Tolerance" slider to adjust the skelleton so it closely assembles the subject but does not have to many red lines.
+          Use the "Deviation Tolerance" slider to adjust the skelleton, so it closely assembles the subject but does not have to many red lines.
         </li>
         <li>
           The tools next to the image can be used to manualy adjust the skelleton.
+        </li>        
+        <li>
+          The pink dot can be moved to adjust the center of the tiling. The skelloton will be drawn relative to this center in the next step.
         </li>
         <li>
           The steps above can be repeated anytime to readjust the skelleton. Changing the deviation tolerance will reset any manual changes.
@@ -73,6 +76,15 @@
         <li> Now the settings on the right can be chaged to modify the tiling.</li> 
         <li> The "Tile Size" changes the size of an individual tile</li>
         <li> The "Tiling Size" changes the scale of the whole tiling</li>
+        <li> The "Base Type" of the tiling can be changed using the "&lt;" and "&gt;" buttons</li>
+        <li> In the Morph Settings area image morphing (warping) can be disabled and the behaviour of the morph can be modified</li>
+        <li> t - amount of warping (none vs. full) </li>
+        <li> a - precision vs. smoothness of the warping </li>
+        <li> b - affection of all lines vs. closest line to a pixel </li>
+        <li> p - all lines influence the same vs. longer lines have greater influence </li>
+        <li> The Display Settings area can be used to customize which parts of the output are displayed and in which colors</li>
+        <li> Press the "Download SVG" button to save the generate tiling as an SVG file. SVGs can be displayed using most Web-Browsers and further Edited using Software like Incscape, Adobe Illustrator etc.</li>
+
       </ul>  
     </div>
   {/if}

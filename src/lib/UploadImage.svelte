@@ -659,7 +659,7 @@
             </div>
         </div>
         <div
-            class="resolution-slider min-w-72 font-sans text-center text-sky-400"
+            class="resolution-slider min-w-72 font-sans text-center text-black"
             class:purple-theme={false}
         >
             <label for="basic-range">Deviation Tolerance</label>

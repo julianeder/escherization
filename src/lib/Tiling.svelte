@@ -1063,9 +1063,9 @@
 
 </script>
 
-<div class="grid grid-cols-2">
+<div class="flex">
 
-  <div class="grid grid-cols-1 justify-items-center content-start gap-4">
+  <div class="grid grid-cols-1 justify-items-center content-start gap-4 pl-10">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <svg
@@ -1297,7 +1297,7 @@
       <div class="col-span-3 min-w-72">
         <Range
           min={50}
-          max={300}
+          max={250}
           stepSize={1}
           initialValue={tilingSize}
           decimalPlaces={0}
@@ -1306,7 +1306,7 @@
       </div>
     </div>
     <div class="tilingCtrl flex items-center gap-4">
-      <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded h-10 w-10"
+      <button class="bg-sky-300 hover:bg-sky-500 text-black font-bold rounded h-10 w-10"
         on:click={() => {
           onTilingMinus();
         }}
@@ -1320,7 +1320,7 @@
         </p>
       </div>
       <img class="max-w-20" src={symGroups[tilingIdx].image} alt="Preview...">
-      <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded w-10 h-10"
+      <button class="bg-sky-300 hover:bg-sky-500 text-black font-bold rounded w-10 h-10"
         on:click={() => {
           onTilingPlus();
         }}
@@ -1346,24 +1346,24 @@
         </div>
       {/each}
     </div> -->
-      <button
-        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-48"
+      <!-- <button
+        class="bg-sky-300 hover:bg-sky-500 text-black py-2 px-4 rounded min-w-48"
         on:click={() => {
           onResetParams();
         }}
       >
         Reset Params
-      </button>
+      </button> -->
     <p class="text-xl font-sans text-center text-sky-400 p-2">Morph Settings</p>
     <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
-      <label class="p-2">
+      <label class="p-4">
         <input type="checkbox" bind:checked={doMorph} />
         Morph
       </label>
     </div>
     {#if doMorph}
-    <div class="grid grid-cols-4">
-      <p class="">t</p>
+    <div class="flex">
+      <p class="pr-5">t</p>
       <div class="col-span-3 min-w-72">
         <Range
           min={0}
@@ -1375,8 +1375,8 @@
         />
       </div>
     </div>
-    <div class="grid grid-cols-4">
-      <p class="">p</p>
+    <div class="flex">
+      <p class="pr-5">p</p>
       <div class="col-span-3 min-w-72">
         <Range
           min={0}
@@ -1388,8 +1388,8 @@
         />
       </div>
     </div>
-    <div class="grid grid-cols-4">
-      <p class="">a</p>
+    <div class="flex">
+      <p class="pr-5">a</p>
       <div class="col-span-3 min-w-72">
         <Range
           min={1}
@@ -1401,8 +1401,8 @@
         />
       </div>
     </div>
-    <div class="grid grid-cols-4">
-      <p class="">b</p>
+    <div class="flex">
+      <p class="pr-5">b</p>
       <div class="col-span-3 min-w-72">
         <Range
           min={50}
@@ -1417,38 +1417,38 @@
     {/if}
     <p class="text-xl font-sans text-center text-sky-400 p-2">Display Settings</p>
     <div class="displaySettings grid grid-cols-3 gap-4 mr-4 ml-4">
-      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
-        <label class="p-2">
+      <div class="bg-slate-100 flex items-center justify-left h-10 rounded">
+        <label class="p-4">
           <input type="checkbox" bind:checked={showBorder} />
           Border
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
-        <label class="p-2">
+      <div class="bg-slate-100 flex items-center justify-left h-10 rounded">
+        <label class="p-4">
           <input type="checkbox" bind:checked={showSkeleton} />
           Skeleton
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
-        <label class="p-2">
+      <div class="bg-slate-100 flex items-center justify-left h-10 rounded">
+        <label class="p-4">
           <input type="checkbox" bind:checked={showOrigins} />
           Origins
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
-        <label class="p-2">
+      <div class="bg-slate-100 flex items-center justify-left h-10 rounded">
+        <label class="p-4">
           <input type="checkbox" bind:checked={showBackground} />
           Background
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
-        <label class="p-2">
+      <div class="bg-slate-100 flex items-center justify-left h-10 rounded">
+        <label class="p-4">
           <input type="checkbox" bind:checked={showBackgroundImage} />
           Background Image
         </label>
       </div>
-      <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
-        <label class="p-2">
+      <div class="bg-slate-100 flex items-center justify-left h-10 rounded">
+        <label class="p-4">
           <input type="checkbox" bind:checked={showDebugMorphLines} />
           Debug Morph Lines 
         </label>
