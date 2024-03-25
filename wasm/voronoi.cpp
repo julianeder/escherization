@@ -131,7 +131,7 @@ struct EdgeResult {
   bool isFinite;
   bool isCurved;
   bool isPrimary;
-  bool isBetweenSameColorCells;
+  bool isWithinCell;
   const voronoi_diagram<double>::edge_type* edge_ref; // not for javascript
   // std::vector<double> samples;
   std::vector<double> controll_points;
@@ -843,7 +843,8 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
     edgeResult.isFinite = edge->is_finite();
     edgeResult.isPrimary = edge->is_primary();
     edgeResult.isCurved = edge->is_curved();
-    edgeResult.isBetweenSameColorCells = edge->cell()->color() == edge->twin()->cell()->color();
+    // edgeResult.isWithinCell = edge->cell()->color() == edge->twin()->cell()->color();
+    edgeResult.isWithinCell = segmentTileIdxs[edge->cell()->source_index()] == segmentTileIdxs[edge->twin()->cell()->source_index()];
   
     bool added = false;
     
@@ -964,7 +965,7 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
     .field("isPrimary", &EdgeResult::isPrimary)
     // .field("samples", &EdgeResult::samples)
     .field("controll_points", &EdgeResult::controll_points)
-    .field("isBetweenSameColorCells", &EdgeResult::isBetweenSameColorCells)
+    .field("isWithinCell", &EdgeResult::isWithinCell)
     ;
 
   value_object<DiagrammResult>("DiagrammResult")

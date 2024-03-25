@@ -66,7 +66,7 @@ export type EdgeResult = {
   isCurved: boolean,
   isPrimary: boolean,
   controll_points: VectorDouble,
-  isBetweenSameColorCells: boolean
+  isWithinCell: boolean
 };
 
 interface EmbindModule {

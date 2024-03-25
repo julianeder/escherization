@@ -44,6 +44,15 @@
   } from "./state";
   import { checkIntersections } from "./collisionDetection";
 
+  import p4m from './images/p4m.png'
+  import p1 from './images/p1.png'
+  import pg from './images/pg.png'
+  import p3 from './images/p3.png'
+  import p6 from './images/p6.png'
+  import p6m from './images/p6m.png'
+  import p4g from './images/p4g.png'
+
+
   let wasmVoronoi: VoronoiWasmModule;
   let wasmMorph: MorphWasmModule;
   let bbox: BBox = new BBox(0, 500, 0, 500);
@@ -89,23 +98,23 @@
   let mostCenterTile: Tile;
   let morphedBBox: number[] = [-40, -17, 306, 343];
 
-  const symGroups: Record<string, any> = {
-    "1": "p1",
-    "2": "pg",
-    "4": "p2",
-    "5": "pgg",
-    "7": "p3",
-    "11": "p6",
-    "12": "cm",
-    "13": "pmg",
-    "16": "p31m",
-    "26": "cmm",
-    "28": "p4",
-    "37": "p6m",
-    "42": "pm",
-    "56": "p4g",
-    "72": "pmm",
-    "76": "p4m",
+  const symGroups: Record<string, any> = {        
+    "1": {symGroup: "p1",   origin: "center", name:"Grid Shifted", image: p1},
+    "2": {symGroup: "pg",   origin: "center", name:"Grid Mirrored", image: pg},
+    // "4": {symGroup: "p2",   origin: "center", name:"", image: null},
+    // "5": {symGroup: "pgg",  origin: "center", name:"", image: null},
+    "7": {symGroup: "p3",   origin: "center", name:"3 Rotations", image: p3},
+    "21":{symGroup: "p6",   origin: "center", name:"6 Rotations", image: p6},
+    // "12":{symGroup: "cm",   origin: "center", name:"", image: null},
+    // "13":{symGroup: "pmg",  origin: "center", name:"", image: null},
+    // "16":{symGroup: "p31m", origin: "center", name:"", image: null},
+    // "26":{symGroup: "cmm",  origin: "center", name:"", image: null},
+    // "28":{symGroup: "p4",   origin: "center", name:"", image: null},
+    "37":{symGroup: "p6m",  origin: "center", name:"6 Rotations Mirrored", image: p6m},
+    // "42":{symGroup: "pm",   origin: "center", name:"", image: null},
+    "71":{symGroup: "p4g",  origin: "center", name:"4 Rotations", image: p4g},
+    // "72":{symGroup: "pmm",  origin: "center", name:"", image: null},
+    "76":{symGroup: "p4m",  origin: "center", name:"Grid", image: p4m},
   };
 
   const availableTilings: string[] = Object.keys(symGroups);
@@ -184,7 +193,7 @@
             c.edgeIndices.forEach((idxE) => {
               if (
                 voronoiEdges[idxE].isPrimary &&
-                !voronoiEdges[idxE].isBetweenSameColorCells
+                !voronoiEdges[idxE].isWithinCell
               ) {
                 let featureLine: FeatureLine = {
                   startPoint: {
@@ -543,14 +552,14 @@
           controlPoints: controlPoints,
           isPrimary: e.isPrimary,
           isValid: valid,
-          isBetweenSameColorCells: e.isBetweenSameColorCells,
+          isWithinCell: e.isWithinCell,
         });
 
         // if (newVoronoiEdges.length == 98) {
         //   console.log(newVoronoiEdges[97]);
         // }
 
-        // console.log(e.isBetweenSameColorCells);
+        // console.log(e.isWithinCell);
       }
 
       let newVoronoiCells: Cell[] = [];
@@ -1039,20 +1048,21 @@
       id="voronoiSvg"
       width={bbox.xh}
       height={bbox.yh}
-      viewBox="{bbox.xl} {bbox.yl} {bbox.xh} {bbox.yh}"
+      viewBox="{bbox.xl + 100} {bbox.yl + 100} {bbox.xh - 200} {bbox.yh - 200}"
       xmlns="http://www.w3.org/2000/svg"
       on:click={addPoint}
       on:mousemove={handleMousemove}
     >
       <rect
-      x="0"
-      y="0"
-      width={bbox.xh}
-      height={bbox.yh}
+      x="{bbox.xl + 100}"
+      y="{bbox.yl + 100}"
+      width="{bbox.xh - 200}"
+      height="{bbox.yh - 200}"
       stroke="rgb(2 132 199)"
       stroke-width="1"
-      fill="rgb(248 250 252)"
+      fill="white"
       />
+      <!-- fill="rgb(248 250 252)" -->
       {#await updatePromise}
         <text x="250" y="220" text-anchor="middle" class="svgText">Loading...</text>		
       {:then}
@@ -1131,16 +1141,16 @@
             {/each}
           {/if}
           {#each voronoiEdges as e, idx}
-            {#if e.isValid && !e.isBetweenSameColorCells && showBorder}
-              <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
-              <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle>
+            {#if e.isValid && !e.isWithinCell && showBorder}
+              <!-- <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
+              <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle> -->
               {#if e.isCurved && e.controlPoints.length == 3}
                 <path
                   id={"edge_" + idx}
                   d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
                     .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
                     .x} {e.controlPoints[2].y}"
-                  stroke="blue"
+                  stroke="black"
                   stroke-width="1"
                   fill="none"
                 ></path>
@@ -1148,7 +1158,7 @@
                 <path
                   id={"edge_" + idx}
                   d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-                  stroke="blue"
+                  stroke="black"
                   stroke-width="1"
                   fill="none"
                 ></path>
@@ -1271,31 +1281,29 @@
         />
       </div>
     </div>
-    <div class="tilingCtrl grid grid-cols-4 gap-4 min-h-10">
+    <div class="tilingCtrl grid grid-cols-5 gap-4 min-h-10">
       <button
-        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded min-w-10"
+        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded h-10 w-10 justify-self-end place-self-center"
         on:click={() => {
           onTilingMinus();
         }}
       >
         &lt;</button
       >
-      <div class="bg-slate-100 flex items-center justify-center col-span-2">
+      <div class="bg-slate-100 flex items-center justify-center col-span-2 p-4 h-10 place-self-center">
         <p class="text-center">
-          IH {availableTilings[tilingIdx]} / {symGroups[
-            availableTilings[tilingIdx]
-          ]}
+          {symGroups[availableTilings[tilingIdx]].name} / {symGroups[availableTilings[tilingIdx]].symGroup}  / IH {availableTilings[tilingIdx]}
         </p>
       </div>
+      <img class="" src={symGroups[availableTilings[tilingIdx]].image} alt="Preview...">
       <button
-        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded min-w-10"
+        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded w-10 h-10 justify-self-start place-self-center"
         on:click={() => {
           onTilingPlus();
         }}
       >
-        &gt;</button
-      >
-      
+        &gt;
+      </button>
     </div>
     <div class="tilingParams">
       {#each tilingParams as p, idx}

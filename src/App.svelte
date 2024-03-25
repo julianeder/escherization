@@ -36,7 +36,7 @@
       <p class="text-2xl font-sans text-sky-400 p-4">
         Help
       </p>
-      <p>This tool is meant to generate escher like tilings from any Image. To generate a tiling follow the steps below: </p>      
+      <p class="pl-10">This tool is meant to generate escher like tilings from any Image. To generate a tiling follow the steps below: </p>      
       <p class="text-xl font-sans text-sky-400 p-4">
         Step 1: Upload Image
       </p>
