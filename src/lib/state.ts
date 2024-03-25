@@ -8,13 +8,31 @@ export let siteStore: Writable<Sites> = writable({
   siteSegments: [],
   tileWidth: canvasSize.x,
   tileHeight: canvasSize.y,
-  tileCenter: new Point(0,0),
-  imageOffset: new Point(0,0),
+  tileCenter: new Point(0, 0),
+  imageOffset: new Point(0, 0),
 });
 
-export class ImageStoreContent{
+export class ImageStoreContent {
   image: HTMLImageElement | null = null;
   imageData: ImageData | null = null;
 }
 
-export let imageStore: Writable<ImageStoreContent> = writable({image: null, imageData: null});
+export let imageStore: Writable<ImageStoreContent> = writable({ image: null, imageData: null });
+
+export class SymGroupParams {
+  symGroup: string = "";
+  IH: number = -1;
+  origin: string = "";
+  name: string = "";
+  image: string = "";
+  tilingScaleFactor: number = 1;
+}
+
+export let originStore: Writable<SymGroupParams> = writable({
+  symGroup: "",
+  IH: -1,
+  origin: "",
+  name: "",
+  image: "",
+  tilingScaleFactor: 1
+});

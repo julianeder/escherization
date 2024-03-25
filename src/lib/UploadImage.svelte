@@ -8,7 +8,7 @@
         SiteSegment,
     } from "./voronoiDataStructures";
     import { Vectorization } from "./vectorization";
-    import { canvasSize, imageStore, siteStore } from "./state";
+    import { canvasSize, imageStore, siteStore, originStore, SymGroupParams } from "./state";
     import { checkIntersections } from "./collisionDetection";
 
     let tracer: any;
@@ -59,6 +59,8 @@
 
     let lastError: any = "";
 
+    let myOrigin: string = "";
+
     function update() {
         //Trigger Reactive Update?
         siteSegments = Vectorization.updateSkelleton(
@@ -100,6 +102,15 @@
             });
         }
     }
+  
+    function updateOrigin() {
+        if(myOrigin == "center")
+            tileCenter = new Point((tileWidth / 2), (tileHeight / 2));
+        else if(myOrigin == "ul")
+            tileCenter = new Point(0, 0);
+
+        updateStore();
+    }
 
     function onFileSelected(e: any) {
         Promise.resolve().then(() => handleFileUpload(e)); // Run Async
@@ -124,6 +135,7 @@
                         let imageData:ImageData | null = drawImageScaled(image);
                         // ctx.fillStyle = ctx.createPattern(image, 'repeat');
                         // ctx.fillRect(0, 0, width, height);
+                        updateOrigin()
                         update();
                         // console.log("w h" + imageData?.width + " " + imageData?.height);
                         imageStore.set({image: image, imageData: imageData});
@@ -426,9 +438,16 @@
     }
 
     onMount(async () => {
+
+        originStore.subscribe((value: SymGroupParams) => {
+            myOrigin = value.origin;
+            updateOrigin();
+        });
+
         tracer = await TraceSkeleton2.load();
         updateStore();
     });
+
 </script>
 
 <div>

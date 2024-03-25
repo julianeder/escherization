@@ -41,6 +41,10 @@
     ImageStoreContent,
     imageStore,
     siteStore,
+    originStore,
+
+    SymGroupParams
+
   } from "./state";
   import { checkIntersections } from "./collisionDetection";
 
@@ -72,7 +76,9 @@
   let voronoiVertices: Vertex[] = [];
   let voronoiEdges: Edge[] = [];
   let voronoiCells: Cell[] = [];
+  let tilingScaleFactor: number = 1;
   let tilingSize: number = 100;
+
   let tileSize: number = 1;
   let tileCenter: Point = new Point(150, 150);
   let imageOffset: Point;
@@ -89,41 +95,44 @@
   let autoUpdate: boolean = false;
   let showBorder: boolean = true;
   let showSkeleton: boolean = true;
-  let showOrigins: boolean = true;
+  let showOrigins: boolean = false;
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
   let showDebugMorphLines: boolean = false;
 
   let morphedSiteSegments: SiteSegment[] = []; // Debug only
   let mostCenterTile: Tile;
-  let morphedBBox: number[] = [-40, -17, 306, 343];
+  let morphedBBox: number[] = [];
 
-  const symGroups: Record<string, any> = {        
-    "1": {symGroup: "p1",   origin: "center", name:"Grid Shifted", image: p1},
-    "2": {symGroup: "pg",   origin: "center", name:"Grid Mirrored", image: pg},
-    // "4": {symGroup: "p2",   origin: "center", name:"", image: null},
-    // "5": {symGroup: "pgg",  origin: "center", name:"", image: null},
-    "7": {symGroup: "p3",   origin: "center", name:"3 Rotations", image: p3},
-    "21":{symGroup: "p6",   origin: "center", name:"6 Rotations", image: p6},
-    // "12":{symGroup: "cm",   origin: "center", name:"", image: null},
-    // "13":{symGroup: "pmg",  origin: "center", name:"", image: null},
-    // "16":{symGroup: "p31m", origin: "center", name:"", image: null},
-    // "26":{symGroup: "cmm",  origin: "center", name:"", image: null},
-    // "28":{symGroup: "p4",   origin: "center", name:"", image: null},
-    "37":{symGroup: "p6m",  origin: "center", name:"6 Rotations Mirrored", image: p6m},
-    // "42":{symGroup: "pm",   origin: "center", name:"", image: null},
-    "71":{symGroup: "p4g",  origin: "center", name:"4 Rotations", image: p4g},
-    // "72":{symGroup: "pmm",  origin: "center", name:"", image: null},
-    "76":{symGroup: "p4m",  origin: "center", name:"Grid", image: p4m},
-  };
+  const symGroups: Array<SymGroupParams> = [        
+    {symGroup: "p4m", IH:76, origin: "ul", name:"Grid", image: p4m, tilingScaleFactor: 0.5},
+    {symGroup: "pg",  IH:2,  origin: "ul", name:"Grid Mirrored", image: pg, tilingScaleFactor: 0.66},
+    {symGroup: "p1",  IH:1,  origin: "center", name:"Grid Shifted", image: p1, tilingScaleFactor: 0.66},
+    {symGroup: "p3",  IH:7,  origin: "center", name:"3 Rotations", image: p3, tilingScaleFactor: 0.66},
+    {symGroup: "p4g", IH:71, origin: "ul", name:"4 Rotations", image: p4g, tilingScaleFactor: 0.5},
+    {symGroup: "p6",  IH:21, origin: "center", name:"6 Rotations", image: p6, tilingScaleFactor: 0.5},
+    {symGroup: "p6m", IH:37, origin: "center", name:"6 Rotations Mirrored", image: p6m, tilingScaleFactor: 0.5},
+    // "4": {symGroup: "p2",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
+    // "5": {symGroup: "pgg",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
+    // "12":{symGroup: "cm",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
+    // "13":{symGroup: "pmg",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
+    // "16":{symGroup: "p31m", origin: "center", name:"", image: null, tilingScaleFactor: 1},
+    // "26":{symGroup: "cmm",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
+    // "28":{symGroup: "p4",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
+    // "42":{symGroup: "pm",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
+    // "72":{symGroup: "pmm",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
+];
 
-  const availableTilings: string[] = Object.keys(symGroups);
   let tilingIdx = 0;
   let prevTilingIndex = -1;
+
+  let borderColor: string = "#0000ffff";
+  let skelletonColor: string = "#ff0000ff";
 
   let color1: string = "#e06d4380";
   let color2: string = "#59da5980";
   let color3: string = "#c3c63580";
+
 
   let doMorph: boolean = true;
   let p: number = 0;
@@ -302,7 +311,7 @@
         );
         for (let i = 0; i < result.size(); i++) {
           // let e: number = result.get(i);
-          morphedBackgroundImageData.data[i] = result.get(i);
+          morphedBackgroundImageData.data[i] = result.get(i)!;
         }
         // console.log(morphedBackgroundImageData.data);
 
@@ -342,7 +351,7 @@
     tilingSitePoints = [];
     tilingSiteSegments = [];
     let tiling: IsohedralTiling = new IsohedralTiling(
-      Number(availableTilings[tilingIdx]),
+      Number(symGroups[tilingIdx].IH),
     );
 
     if (prevTilingIndex == tilingIdx) {
@@ -359,10 +368,10 @@
     prevTilingIndex = tilingIdx;
 
     for (let i of tiling.fillRegionBounds(
-      bbox.xl / tilingSize,
-      bbox.yl / tilingSize,
-      bbox.xh / tilingSize,
-      bbox.yh / tilingSize,
+      (bbox.xl) / (tilingSize * tilingScaleFactor),
+      (bbox.yl) / (tilingSize * tilingScaleFactor),
+      (bbox.xh) / (tilingSize * tilingScaleFactor),
+      (bbox.yh) / (tilingSize * tilingScaleFactor),
     )) {
       // Use a simple colouring algorithm to pick a colour for this tile
       // so that adjacent tiles aren't the same colour.  The resulting
@@ -380,8 +389,8 @@
 
       let origin = scalePoint(
         SitePoint.mulPoint(M, new SitePoint(0, 0)),
-        tilingSize,
-        tilingSize,
+        tilingSize * tilingScaleFactor,
+        tilingSize * tilingScaleFactor,
       );
       let tile: Tile = { origin: origin, M: M, tileIdx: tiles.length - 1 }; //tileIndex counting up
       tiles.push(tile);
@@ -396,8 +405,8 @@
               tileSize / tileHeight,
             ),
           ),
-          tilingSize,
-          tilingSize,
+          tilingSize * tilingScaleFactor,
+          tilingSize * tilingScaleFactor,
         );
 
         newSitePoint.color = color;
@@ -422,8 +431,8 @@
               tileSize / canvasSize.y,
             ),
           ),
-          tilingSize,
-          tilingSize,
+          tilingSize * tilingScaleFactor,
+          tilingSize * tilingScaleFactor,
         );
         newSiteSegment.color = color;
         newSiteSegment.M = M;
@@ -822,7 +831,12 @@
   }
 
   function onTilingPlus() {
-    tilingIdx = (tilingIdx + 1) % availableTilings.length;
+    tilingIdx = (tilingIdx + 1) % symGroups.length;
+
+    tilingScaleFactor = symGroups[tilingIdx].tilingScaleFactor;
+
+    originStore.set(symGroups[tilingIdx]);
+
 
     if (autoUpdate) 
       updatePromise = update();
@@ -830,7 +844,11 @@
 
   function onTilingMinus() {
     tilingIdx = tilingIdx - 1;
-    if (tilingIdx < 0) tilingIdx = availableTilings.length - 1;
+    if (tilingIdx < 0) tilingIdx = symGroups.length - 1;
+
+    tilingScaleFactor = symGroups[tilingIdx].tilingScaleFactor;
+
+    originStore.set(symGroups[tilingIdx])
 
     if (autoUpdate) 
       updatePromise = update();
@@ -847,7 +865,7 @@
 
   function onResetParams() {
     let tiling: IsohedralTiling = new IsohedralTiling(
-      Number(availableTilings[tilingIdx]),
+      Number(symGroups[tilingIdx].IH),
     );
     if (tiling.numParameters() > 0) {
       tilingParams = tiling.getParameters();
@@ -916,12 +934,12 @@
       tx = tx + morphedBBox[0];
       ty = ty + morphedBBox[1];
 
-      sx = (sx * tilingSize * tileSize) / tileWidth;
-      sy = (sy * tilingSize * tileSize) / tileHeight;
+      sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
+      sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
 
     }else{
-      sx = (sx * tilingSize * tileSize) / canvasSize.x;
-      sy = (sy * tilingSize * tileSize) / canvasSize.y;
+      sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
+      sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
     }
     // console.log("tx: " + tx +" ty "+ ty +" sx:  " + sx +" sy "+ sy +  " angle " + angle)
 
@@ -961,8 +979,8 @@
     M.f = 0;
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
-    sx = tileWidth / (sx * tilingSize * tileSize); // canvasSize.x statt tileWidth ?
-    sy = tileHeight / (sy * tilingSize * tileSize); // canvasSize.y statt tileHeight ?
+    sx = tileWidth / (sx * tilingSize * tilingScaleFactor * tileSize); // canvasSize.x statt tileWidth ?
+    sy = tileHeight / (sy * tilingSize * tilingScaleFactor * tileSize); // canvasSize.y statt tileHeight ?
 
     let angle = Math.atan2(M.b, M.a);
     let Mtransform = compose(
@@ -1007,6 +1025,9 @@
       // if (autoUpdate)  updatePromise = update();
     });
 
+    originStore.set(symGroups[tilingIdx])
+
+
     tileSitePoints = [
       new SitePoint(100, 50),
       new SitePoint(300, 50),
@@ -1030,6 +1051,9 @@
       tileCenter: tileCenter,
       imageOffset: imageOffset,
     });
+
+    tilingScaleFactor = symGroups[tilingIdx].tilingScaleFactor;
+
   });
 
   function handleMousemove(event: any) {
@@ -1059,7 +1083,7 @@
       width="{bbox.xh - 200}"
       height="{bbox.yh - 200}"
       stroke="rgb(2 132 199)"
-      stroke-width="1"
+      stroke-width="0.66"
       fill="white"
       />
       <!-- fill="rgb(248 250 252)" -->
@@ -1113,15 +1137,15 @@
           {/each}
           {#if showSkeleton}
             {#each tilingSitePoints as siteP, idx}
-              <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill="red"
+              <circle id="point {idx}" cx={siteP.x} cy={siteP.y} r="2" fill={skelletonColor}
               ></circle>
             {/each}
             {#each tilingSiteSegments as siteS, idx}
               <path
                 id="segment {idx + tilingSitePoints.length}"
                 d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-                stroke="red"
-                stroke-width="1"
+                stroke={skelletonColor}
+                stroke-width="0.66"
                 fill="none"
               ></path>
               <circle
@@ -1129,14 +1153,14 @@
                 cx={siteS.x1}
                 cy={siteS.y1}
                 r="2"
-                fill="red"
+                fill={skelletonColor}
               ></circle>
               <circle
                 id="segment {idx + tilingSitePoints.length}"
                 cx={siteS.x2}
                 cy={siteS.y2}
                 r="2"
-                fill="red"
+                fill={skelletonColor}
               ></circle>
             {/each}
           {/if}
@@ -1150,16 +1174,16 @@
                   d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e
                     .controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2]
                     .x} {e.controlPoints[2].y}"
-                  stroke="black"
-                  stroke-width="1"
+                  stroke={borderColor}
+                  stroke-width="0.66"
                   fill="none"
                 ></path>
               {:else if e.isPrimary}
                 <path
                   id={"edge_" + idx}
                   d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
-                  stroke="black"
-                  stroke-width="1"
+                  stroke={borderColor}
+                  stroke-width="0.66"
                   fill="none"
                 ></path>
               {:else if showSecondary}
@@ -1167,7 +1191,7 @@
                   id={"edge_" + idx}
                   d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
                   stroke="green"
-                  stroke-width="1"
+                  stroke-width="0.66"
                   fill="none"
                 ></path>
               {/if}
@@ -1176,7 +1200,7 @@
               id={"edge_" + idx}
               d="M {e.va.x} {e.va.y} L {e.vb.x} {e.vb.y}"
               stroke="red"
-              stroke-width="1"
+              stroke-width="0.66"
               fill="none"
             ></path>
             {/if}
@@ -1187,7 +1211,7 @@
                 id="origin {idx}"
                 cx={tile.origin.x}
                 cy={tile.origin.y}
-                r="5"
+                r="2"
                 fill="pink"
               ></circle>
             {/if}
@@ -1199,7 +1223,7 @@
                 d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl
                   .endPoint.y}"
                 stroke="yellow"
-                stroke-width="1"
+                stroke-width="0.66"
                 fill="none"
               ></path>
             {/each}
@@ -1224,19 +1248,19 @@
 
     <p class="min-h-8"> {"Mouse: (" + mousePoint.x  + "," + mousePoint.y + ")"}</p>
 
-    <div class="grid grid-cols-2 gap-4">
-      <button
-      class="bg-blue-500 hover:bg-blue-700 text-white font-bold rounded max-h-12"
-      on:click={() => updatePromise = update()}
-      >Update</button
-      >
-      <div class="bg-slate-100 flex items-center justify-center max-h-12">
+    <button
+    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+    on:click={() => updatePromise = update()}
+    >Update</button
+    >
+    <!-- <div class="grid grid-cols-2 gap-4"> -->
+      <!-- <div class="bg-slate-100 flex items-center justify-center max-h-12">
         <label class="p-2">
           <input type="checkbox" bind:checked={autoUpdate} />
           Auto Update
         </label>
-      </div>
-    </div>
+      </div> -->
+    <!-- </div> -->
 
     <button
     class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
@@ -1281,23 +1305,22 @@
         />
       </div>
     </div>
-    <div class="tilingCtrl grid grid-cols-5 gap-4 min-h-10">
-      <button
-        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded h-10 w-10 justify-self-end place-self-center"
+    <div class="tilingCtrl flex items-center gap-4">
+      <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded h-10 w-10"
         on:click={() => {
           onTilingMinus();
         }}
       >
         &lt;</button
       >
-      <div class="bg-slate-100 flex items-center justify-center col-span-2 p-4 h-10 place-self-center">
+      <div class="bg-slate-100 flex items-center justify-center p-4 h-10 min-w-52">
         <p class="text-center">
-          {symGroups[availableTilings[tilingIdx]].name} / {symGroups[availableTilings[tilingIdx]].symGroup}  / IH {availableTilings[tilingIdx]}
+          {symGroups[tilingIdx].name} 
+          <!-- / {symGroups[tilingIdx].symGroup}  / IH {symGroups[tilingIdx].IH} -->
         </p>
       </div>
-      <img class="" src={symGroups[availableTilings[tilingIdx]].image} alt="Preview...">
-      <button
-        class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded w-10 h-10 justify-self-start place-self-center"
+      <img class="max-w-20" src={symGroups[tilingIdx].image} alt="Preview...">
+      <button class="bg-sky-300 hover:bg-sky-500 text-white font-bold rounded w-10 h-10"
         on:click={() => {
           onTilingPlus();
         }}
@@ -1305,7 +1328,7 @@
         &gt;
       </button>
     </div>
-    <div class="tilingParams">
+    <!-- <div class="tilingParams">
       {#each tilingParams as p, idx}
         <div class="tilingParam flex flex-row gap-4">
           <p class="basis-1/12">p {idx}</p>
@@ -1322,7 +1345,7 @@
           </div>
         </div>
       {/each}
-    </div>
+    </div> -->
       <button
         class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-48"
         on:click={() => {
@@ -1430,11 +1453,21 @@
           Debug Morph Lines 
         </label>
       </div>
-    </div>
-    <div class="colorSettings grid grid-cols-3 gap-4 min-h-12">
-      <ColorPicker bind:hex={color1} label="Color 1" />
-      <ColorPicker bind:hex={color2} label="Color 2" />
-      <ColorPicker bind:hex={color3} label="Color 3" />
+      <div>
+        <ColorPicker bind:hex={borderColor} label="Border" />
+      </div>
+      <div>
+        <ColorPicker bind:hex={skelletonColor} label="Skelleton" />
+      </div>
+      <div class="col-start-1">
+        <ColorPicker bind:hex={color1} label="Background 1" />
+      </div>
+      <div>
+        <ColorPicker bind:hex={color2} label="Background 2" />
+      </div>
+      <div>
+        <ColorPicker bind:hex={color3} label="Background 3" />
+      </div>
     </div>
   </div>
 </div>
