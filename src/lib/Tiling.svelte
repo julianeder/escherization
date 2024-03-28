@@ -144,6 +144,14 @@
 
   let mousePoint: Point = {x:-1, y:-1};
 
+  function clean() {
+    tiles = [];
+    voronoiCells = [];
+    voronoiEdges = [];
+    tilingSitePoints = [];
+    tilingSiteSegments = [];
+  }
+  
   async function update(): Promise<void> {
     isUptoDate = true;
     await new Promise<void>((resolve, reject) => {
@@ -277,10 +285,10 @@
           for (let i = 0; i < morphedOutline.size(); i++) {
             morphedSiteSegments.push(
               new SiteSegment(
-                morphedOutline.get(i).startPoint.x,
-                morphedOutline.get(i).startPoint.y,
-                morphedOutline.get(i).endPoint.x,
-                morphedOutline.get(i).endPoint.y,
+                morphedOutline.get(i)!.startPoint.x,
+                morphedOutline.get(i)!.startPoint.y,
+                morphedOutline.get(i)!.endPoint.x,
+                morphedOutline.get(i)!.endPoint.y,
                 0,
                 [],
                 14,
@@ -837,6 +845,7 @@
 
     originStore.set(symGroups[tilingIdx]);
 
+    clean();
 
     if (autoUpdate) 
       updatePromise = update();
@@ -849,6 +858,9 @@
     tilingScaleFactor = symGroups[tilingIdx].tilingScaleFactor;
 
     originStore.set(symGroups[tilingIdx])
+
+    clean();
+
 
     if (autoUpdate) 
       updatePromise = update();
