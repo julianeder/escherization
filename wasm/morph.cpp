@@ -1,4 +1,9 @@
-// Source: https://github.com/OneSlashNinja/FeatureBasedImageMorphing
+//  
+//    Source: https://github.com/OneSlashNinja/FeatureBasedImageMorphing
+//    Copyright (C) OneSlashNinja
+//    under: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
+//    modified by Julian Eder 
+//
 
 #include <emscripten/bind.h>
 using namespace emscripten;
