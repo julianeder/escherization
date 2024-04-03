@@ -247,7 +247,8 @@ pixel bilinear(pixel **&Im, float row, float col)
 
 bool approximatelyEqual(float a, float b, float epsilon)
 {
-  return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+  return fabs(a - b) <= epsilon;
+  // return fabs(a - b) <= ((fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 }
 
 vector<FeatureLine> sortOutlineLines(vector<FeatureLine> &outlineLines)
@@ -263,11 +264,12 @@ vector<FeatureLine> sortOutlineLines(vector<FeatureLine> &outlineLines)
     // printf("i e  %f %f \n", outlineLines[i].endPoint.x, outlineLines[i].endPoint.y);
     for (int j = 0; j < outlineLines.size(); j++)
     {
-      // printf("%f == %f && %f == %f \n", outlineLines[i].endPoint.x, outlineLines[j].startPoint.x,
-      // outlineLines[i].endPoint.y, outlineLines[j].startPoint.y);
       // printf("j e  %f %f \n", outlineLines[j].endPoint.x, outlineLines[j].endPoint.y);
-      if (approximatelyEqual(outlineLines[i].endPoint.x, outlineLines[j].startPoint.x, 1e-3f) && approximatelyEqual(outlineLines[i].endPoint.y, outlineLines[j].startPoint.y, 1e-3f))
+      if (approximatelyEqual(outlineLines[i].endPoint.x, outlineLines[j].startPoint.x, 1e-3f) 
+       && approximatelyEqual(outlineLines[i].endPoint.y, outlineLines[j].startPoint.y, 1e-3f))
       {
+        // printf("%f == %f && %f == %f \n", outlineLines[i].endPoint.x, outlineLines[j].startPoint.x,
+        // outlineLines[i].endPoint.y, outlineLines[j].startPoint.y);
         // printf("i %d j %d \n", i, j);
         found = true;
         sorted.push_back(outlineLines[i]);
@@ -345,7 +347,7 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
   vector<FeatureLine> result;
   for (int i = 0; i < outlineLines.size(); i++)
   {
-    // printf("outlineLines[%d].startPoint (%f %f)\n", i, outlineLines[i].startPoint.x,outlineLines[i].startPoint.y);
+    // printf("outlineLines[%d].startPoint (%f %f)\n", i, outlineLines[i].startPoint.x, outlineLines[i].startPoint.y);
     // find closest
     Vector2d d, s, e;
 
@@ -420,6 +422,10 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
       e.y = skelletonLines[idx_s_closest].startPoint.y;
       d.x = e.x - s.x;
       d.y = e.y - s.y;
+
+      // printf("s skelletonLines[%d].startPoint (%f %f)\n", idx_s_closest, skelletonLines[idx_s_closest].startPoint.x, skelletonLines[idx_s_closest].startPoint.y);
+      // printf("d (%f %f)\n", d.x, d.y);
+
     }
     else
     {
@@ -427,9 +433,13 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
       s.y = outlineLines[i].startPoint.y;
       // s = transformPoint(s, M);
       e.x = skelletonLines[idx_s_closest].endPoint.x;
-      e.y = skelletonLines[idx_s_closest].endPoint.y;
+      e.y = skelletonLines[idx_s_closest].endPoint.y;      
       d.x = e.x - s.x;
       d.y = e.y - s.y;
+
+      // printf("e skelletonLines[%d].endPoint (%f %f)\n", idx_s_closest, skelletonLines[idx_s_closest].endPoint.x, skelletonLines[idx_s_closest].endPoint.y);
+
+
     }
     // Binary Search Along Line
 
@@ -439,6 +449,7 @@ vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vecto
     // printf("dir (%f %f)\n", d.x, d.y);
 
     Vector2dInt shift_s = SearchAlongLineRec(s, d, s, srcImgMap, w, h, 0);
+      // printf("shift_s (%d %d)\n", shift_s.x, shift_s.y);
 
     // Move Direction (End Point)
     if (e_isStartClosest)
@@ -509,7 +520,6 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
   //   printf("%d %f %f %f %f\n", i, outlineLines[i].startPoint.x, outlineLines[i].startPoint.y, outlineLines[i].endPoint.x, outlineLines[i].endPoint.y);
   // }
 
-
   vector<FeatureLine> outlineLinesSorted = sortOutlineLines(outlineLines);
   
   // printf("sorted\n");
@@ -517,9 +527,14 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
   // {
   //   printf("%d %f %f %f %f\n", i, outlineLinesSorted[i].startPoint.x, outlineLinesSorted[i].startPoint.y, outlineLinesSorted[i].endPoint.x, outlineLinesSorted[i].endPoint.y);
   // }
-  
-  
   transformAll(outlineLinesSorted, matrixVector);
+  // printf("transformed\n");
+  // for (int i = 0; i < outlineLinesSorted.size(); i++)
+  // {
+  //   printf("%d %f %f %f %f\n", i, outlineLinesSorted[i].startPoint.x, outlineLinesSorted[i].startPoint.y, outlineLinesSorted[i].endPoint.x, outlineLinesSorted[i].endPoint.y);
+  // }
+  
+  
   vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
   
   vector<FeatureLine> srcLines;
