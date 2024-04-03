@@ -6,7 +6,7 @@
   import instantiate_wasmMorph, { type FeatureLine, type MorphWasmModule } from "../lib/wasm/wasmMorph";
   import { IsohedralTiling, mulSegment } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
-  import { type Matrix, compose, scale, toSVG, translate, rotate } from "transformation-matrix";
+  import { type Matrix, compose, scale, toSVG, translate, rotate, applyToPoint } from "transformation-matrix";
   import { canvasSize, ImageStoreContent, imageStore, siteStore, originStore, SymGroupParams } from "./state";
   import { checkIntersections } from "./collisionDetection";
 
@@ -58,11 +58,12 @@
   let showOrigins: boolean = false;
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
-  let showDebugMorphLines: boolean = false;
+  let showDebugMorphLines: boolean = true;
 
   let morphedSiteSegments: SiteSegment[] = []; // Debug only
   let mostCenterTile: Tile;
   let morphedBBox: number[] = [];
+  let morphedBBox_transf: BBox = new BBox(0,0,0,0);
 
   const p2ParameterNames = {
     0: {name: "Spacing Column 1-2",min: 0.01,max: 0.3,stepSize: 0.01,initialValue: 0.2,},
@@ -187,9 +188,12 @@
     // Get Outline
     outlines = [];
     let Minv: Matrix;
+    let M: Matrix; 
+
     for (let i = 0; i < tiles.length; i++) {
       if (tiles[i].tileIdx == mostCenterTile.tileIdx) {
         Minv = getInverseTransformation(tiles[i].M, tiles[i].origin);
+        M = getTransformation(tiles[i].M, tiles[i].origin);
         voronoiCells
           .filter((c) => c.tileIdx == tiles[i].tileIdx)
           .forEach((c) => {
@@ -251,6 +255,15 @@
           morphedBBox.push(bbox.get(i)!);
         }
         morphedBBox = morphedBBox;
+
+
+
+        let l = applyToPoint(M!, new Point(morphedBBox[0],morphedBBox[1]))
+        let h = applyToPoint(M!, new Point(morphedBBox[2],morphedBBox[3]))
+        morphedBBox_transf.xl = l.x;
+        morphedBBox_transf.yl = l.y;
+        morphedBBox_transf.xh = h.x;
+        morphedBBox_transf.yh = h.y;
 
         if (showDebugMorphLines) {
           let morphedOutline = wasmMorph.getMorphOutline(backgroundImageData.width, backgroundImageData.height, t, imageDataVector, skelletonLinesVector, outlineLinesVector, mInvVector);
@@ -327,7 +340,7 @@
     tilingSiteSegments = [];
     let tiling: IsohedralTiling = new IsohedralTiling(Number(symGroups[tilingIdx].IH));
     tiling.setParameters(tilingParams);
-    console.log(tilingParams);
+    // console.log(tilingParams);
 
     for (let i of tiling.fillRegionBounds(bbox.xl / (tilingSize * tilingScaleFactor), bbox.yl / (tilingSize * tilingScaleFactor), bbox.xh / (tilingSize * tilingScaleFactor), bbox.yh / (tilingSize * tilingScaleFactor))) {
       // Use a simple colouring algorithm to pick a colour for this tile
@@ -349,7 +362,15 @@
       tiles.push(tile);
 
       for (let j = 0; j < tileSitePoints.length; j++) {
-        let newSitePoint: SitePoint = scalePoint(SitePoint.mulPoint(M, scalePoint(tileSitePoints[j], tileSize / tileWidth, tileSize / tileHeight)), tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor);
+        let newSitePoint: SitePoint = 
+          scalePoint(
+            SitePoint.mulPoint(M, 
+              scalePoint(tileSitePoints[j], 
+                tileSize / tileWidth, tileSize / tileHeight
+              )
+            ), 
+            tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor
+          );
 
         newSitePoint.color = color;
         newSitePoint.tileIdx = tile.tileIdx;
@@ -363,7 +384,15 @@
       // + 0 + " " + 0 + " " + 0 + "\n"
       // );
       for (let j = 0; j < tileSiteSegments.length; j++) {
-        let newSiteSegment: SiteSegment = scaleSegment(mulSegment(M, scaleSegment(tileSiteSegments[j], tileSize / canvasSize.x, tileSize / canvasSize.y)), tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor);
+        let newSiteSegment: SiteSegment = 
+          scaleSegment(
+            mulSegment(M, 
+              scaleSegment(tileSiteSegments[j], 
+                tileSize / canvasSize.x, tileSize / canvasSize.y
+              )
+            ), 
+            tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor
+          );
         newSiteSegment.color = color;
         newSiteSegment.M = M;
         newSiteSegment.tileIdx = tile.tileIdx;
@@ -672,7 +701,7 @@
     if (autoUpdate) updatePromise = update();
   }
 
-  function getTransformation(mat: number[], origin: Point, includeMorphedBBox: boolean = false): Matrix {
+  function getTransformation(mat: number[], origin: Point, includeMorphedBBox: boolean = false, isPattern: boolean = false): Matrix {
     let M: Matrix = {
       a: mat[0],
       b: mat[3],
@@ -682,52 +711,46 @@
       f: mat[5],
     };
 
-    // console.log(
-    //     M.a + " " + M.c + " " + M.e + "\n"
-    //   + M.b + " " + M.d + " " + M.f + "\n"
-    //   + 0 + " " + 0 + " " + 0 + "\n"
-    //   );
-
     // Decompose M into Translation, Rotation, Scale Matrices
     M.e = 0; //MM.e*tilingSize;
     M.f = 0; //MM.f*tilingSize;
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
 
-    // console.log("tilingSize " + tilingSize + " tileHeight " + tileHeight + " tileWidth " + tileWidth);
-
     let angle = Math.atan2(M.b, M.a);
 
     let tx: number = -tileCenter.x + origin.x;
     let ty: number = -tileCenter.y + origin.y;
-    if (includeMorphedBBox) {
-      // console.log("tileCenter.y " + tileCenter.y + " origin.y " + origin.y)
-      // console.log("t " + tx + " " + ty)
-      // console.log("morph offset " + morphedBBox[0] + " " + morphedBBox[1])
-      tx = tx + morphedBBox[0];
-      ty = ty + morphedBBox[1];
+    
+    if(isPattern){
+      if (includeMorphedBBox) {
+        tx = tx + morphedBBox[0];
+        ty = ty + morphedBBox[1];
+        
+        sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
+        sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
+      } else {
+        sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
+        sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
+      }
 
-      sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
-      sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
-    } else {
-      sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
-      sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
+    }else{
+      if (includeMorphedBBox) {
+        tx = tx + morphedBBox[0];
+        ty = ty + morphedBBox[1];
+        
+        sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
+        sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
+      } else {
+        sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
+        sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
+      }
     }
-    // console.log("tx: " + tx +" ty "+ ty +" sx:  " + sx +" sy "+ sy +  " angle " + angle)
 
-    let Mtransform = compose(rotate(angle, origin.x, origin.y), scale(sx, sy, origin.x, origin.y), translate(tx, ty));
-    // console.log(M)
-    // console.log("tileCenter: " + tileCenter.x +" "+ tileCenter.y +" origin:  " + origin.x +" "+ origin.y +  " / " + toSVG(Mtransform))
-    // console.log("e: " + MM.e + " f "+ MM.f)
-
-    // if (includeMorphedBBox && tileIdx == 14)
-    //   console.log(Mtransform)
-
-    // console.log(
-    //   Mtransform.a + " " + Mtransform.c + " " + Mtransform.e + "\n"
-    //   + Mtransform.b + " " + Mtransform.d + " " + Mtransform.f + "\n"
-    //   + 0 + " " + 0 + " " + 0 + "\n"
-    //   );
+    let Mtransform = compose(
+      rotate(angle, origin.x, origin.y), 
+      scale(sx, sy, origin.x, origin.y), 
+      translate(tx, ty));
 
     return Mtransform;
   }
@@ -747,11 +770,19 @@
     M.f = 0;
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
+    
+    let angle = Math.atan2(M.b, M.a);
+    
+    let tx: number = -tileCenter.x + origin.x;
+    let ty: number = -tileCenter.y + origin.y;
+
     sx = tileWidth / (sx * tilingSize * tilingScaleFactor * tileSize); // canvasSize.x statt tileWidth ?
     sy = tileHeight / (sy * tilingSize * tilingScaleFactor * tileSize); // canvasSize.y statt tileHeight ?
 
-    let angle = Math.atan2(M.b, M.a);
-    let Mtransform = compose(translate(tileCenter.x - origin.x, tileCenter.y - origin.y), scale(sx, sy, origin.x, origin.y), rotate(-angle, origin.x, origin.y));
+    let Mtransform = compose(
+      translate(-tx, -ty), 
+      scale(sx, sy, origin.x, origin.y), 
+      rotate(-angle, origin.x, origin.y));
     return Mtransform;
   }
 
@@ -825,7 +856,7 @@
         {#if isUptoDate}
           <defs>
             {#each tiles as tile, idx}
-              <pattern id={"pattern_" + tile.tileIdx} patternContentUnits="userSpaceOnUse" patternUnits="userSpaceOnUse" patternTransform={toSVG(getTransformation(tile.M, tile.origin, doMorph))} width={morphedBBox[2] - morphedBBox[0]} height={morphedBBox[3] - morphedBBox[1]}>
+              <pattern id={"pattern_" + tile.tileIdx} patternContentUnits="userSpaceOnUse" patternUnits="userSpaceOnUse" patternTransform={toSVG(getTransformation(tile.M, tile.origin, doMorph, true))} width={morphedBBox[2] - morphedBBox[0]} height={morphedBBox[3] - morphedBBox[1]}>
                 <image href={backgroundImage?.src} x={0} y={0} width={morphedBBox[2] - morphedBBox[0]} height={morphedBBox[3] - morphedBBox[1]} />
               </pattern>
             {/each}
@@ -876,9 +907,15 @@
             {/each}
             {#each morphedSiteSegments as fl, idx}
               <g transform={toSVG(getTransformation(mostCenterTile.M, mostCenterTile.origin))}>
-                <path id={"outlineMorphed_" + idx} d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}" stroke="red" stroke-width="2" fill="none"></path>
+                <path id={"outlineMorphed_" + idx} d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}" stroke="#c300ff" stroke-width="2" fill="none"></path>
               </g>
             {/each}
+            <rect x={morphedBBox_transf.xl} y={morphedBBox_transf.yl} width={morphedBBox_transf.xh-morphedBBox_transf.xl} height={morphedBBox_transf.yh-morphedBBox_transf.yl}
+            fill="#00000000" stroke="green">
+
+            </rect>
+            
+
           {/if}
         {/if}
       {:catch someError}

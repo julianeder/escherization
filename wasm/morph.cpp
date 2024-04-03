@@ -342,7 +342,7 @@ Vector2d transformDirection(Vector2d v, vector<double> M)
   return r;
 }
 
-vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vector<FeatureLine> skelletonLines, pixel **srcImgMap, vector<double> M, int w, int h)
+vector<FeatureLine> projectOutlineLines(vector<FeatureLine> &outlineLines, vector<FeatureLine> skelletonLines, pixel **srcImgMap, int w, int h)
 {
   vector<FeatureLine> result;
   for (int i = 0; i < outlineLines.size(); i++)
@@ -510,7 +510,7 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
                                                          vector<unsigned char> imageData,
                                                          vector<FeatureLine> skelletonLines,
                                                          vector<FeatureLine> outlineLines,
-                                                         vector<double> matrixVector)
+                                                         vector<double> Minv)
 {
   pixel **srcImgMap = pixmapFromVector(w, h, imageData);
 
@@ -527,7 +527,7 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
   // {
   //   printf("%d %f %f %f %f\n", i, outlineLinesSorted[i].startPoint.x, outlineLinesSorted[i].startPoint.y, outlineLinesSorted[i].endPoint.x, outlineLinesSorted[i].endPoint.y);
   // }
-  transformAll(outlineLinesSorted, matrixVector);
+  transformAll(outlineLinesSorted, Minv);
   // printf("transformed\n");
   // for (int i = 0; i < outlineLinesSorted.size(); i++)
   // {
@@ -535,7 +535,7 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
   // }
   
   
-  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
+  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, w, h);
   
   vector<FeatureLine> srcLines;
 
@@ -610,7 +610,7 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
   // }
   
 
-  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, matrixVector, w, h);
+  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, w, h);
 
   // Remove lines of length zero in the result because they cause NaN problems later
   for (int i = outlineLinesMorphed.size()-1; i >= 0; i--)
