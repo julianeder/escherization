@@ -4,7 +4,10 @@
  *
  * Distributed under the terms of the 3-clause BSD license.  See the
  * file "LICENSE" for more information.
+ * 
+ * Source: https://github.com/isohedral/tactile-js
  */
+
 
 import { SiteSegment, Point } from "../voronoiDataStructures";
 
