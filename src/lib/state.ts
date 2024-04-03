@@ -26,6 +26,7 @@ export class SymGroupParams {
   name: string = "";
   image: string = "";
   tilingScaleFactor: number = 1;
+  parameterNames: any;
 }
 
 export let originStore: Writable<SymGroupParams> = writable({

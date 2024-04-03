@@ -11,6 +11,8 @@
     import { canvasSize, imageStore, siteStore, originStore, SymGroupParams } from "./state";
     import { checkIntersections } from "./collisionDetection";
 
+    import ExampleImage from './images/Tux.png';
+
     let tracer: any;
 
 
@@ -114,6 +116,26 @@
 
     function onFileSelected(e: any) {
         Promise.resolve().then(() => handleFileUpload(e)); // Run Async
+    }
+
+    function useExampleImage(){
+        let image: HTMLImageElement = new Image();
+        image.onload = () =>
+            Promise.resolve().then(() => {
+                ctx = canvas.getContext("2d", {
+                    willReadFrequently: true,
+                });
+                ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
+                let imageData:ImageData | null = drawImageScaled(image);
+                // ctx.fillStyle = ctx.createPattern(image, 'repeat');
+                // ctx.fillRect(0, 0, width, height);
+                updateOrigin()
+                update();
+                // console.log("w h" + imageData?.width + " " + imageData?.height);
+                imageStore.set({image: image, imageData: imageData});
+            });
+        image.src = ExampleImage;
+
     }
 
     function handleFileUpload(e: any) {
@@ -675,6 +697,12 @@
             on:click={() => {
                 fileinput.click();
             }}>Upload Image</button
+        >
+        <button
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+            on:click={() => {
+                useExampleImage();
+            }}>Use Example Image</button
         >
         <button
             class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
