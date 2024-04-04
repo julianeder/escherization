@@ -45,6 +45,7 @@ public:
 class Vector2dInt {
 public:
   int x, y;
+  Vector2dInt();
   Vector2dInt(const Vector2d &v);
   friend short operator==(const Vector2dInt& one, const Vector2dInt& two); // eq
 };

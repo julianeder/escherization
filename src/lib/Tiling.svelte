@@ -58,7 +58,7 @@
   let showOrigins: boolean = false;
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
-  let showDebugMorphLines: boolean = false;
+  let showDebugMorphLines: boolean = true;
 
   let morphedSiteSegments: SiteSegment[] = []; // Debug only
   let mostCenterTile: Tile;

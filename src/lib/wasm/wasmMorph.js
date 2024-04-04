@@ -3568,6 +3568,8 @@ var wasmImports = {
   /** @export */
   invoke_iiiii: invoke_iiiii,
   /** @export */
+  invoke_iiiiiii: invoke_iiiiiii,
+  /** @export */
   invoke_v: invoke_v,
   /** @export */
   invoke_vi: invoke_vi,
@@ -3588,7 +3590,7 @@ var wasmImports = {
   /** @export */
   invoke_viiiiii: invoke_viiiiii,
   /** @export */
-  invoke_viiiiiiii: invoke_viiiiiiii
+  invoke_viiiiiiiiii: invoke_viiiiiiiiii
 };
 var wasmExports = createWasm();
 var ___wasm_call_ctors = createExportWrapper('__wasm_call_ctors');
@@ -3672,10 +3674,10 @@ function invoke_iidd(index,a1,a2,a3) {
   }
 }
 
-function invoke_viiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8) {
+function invoke_viiiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10) {
   var sp = stackSave();
   try {
-    getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6,a7,a8);
+    getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10);
   } catch(e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;
@@ -3687,6 +3689,17 @@ function invoke_viiiiii(index,a1,a2,a3,a4,a5,a6) {
   var sp = stackSave();
   try {
     getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_iiiiiii(index,a1,a2,a3,a4,a5,a6) {
+  var sp = stackSave();
+  try {
+    return getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6);
   } catch(e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;
