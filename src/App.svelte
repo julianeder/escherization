@@ -18,7 +18,7 @@
     href="https://fonts.googleapis.com/icon?family=Material+Icons"
     rel="stylesheet"
   />
-  <header class="sticky z-50 bg-sky-300 top-0 p-4">
+  <header class="sticky z-50 bg-sky-500 top-0 p-4">
     <h1 class="text-4xl font-sans text-center text-white">Eschherization</h1>
     <button
       class="absolute right-3 top-3 min-h-12 min-w-12 bg-sky-500 rounded"
@@ -38,7 +38,7 @@
       </p>
       <p class="pl-10">This tool is meant to generate escher like tilings from any Image. To generate a tiling follow the steps below: </p>      
       <p class="text-xl font-sans text-sky-400 p-4">
-        Step 1: Upload Image
+        Step 1: Skeleton
       </p>
       <ul class="list-disc list-inside pl-10 pr-10">
         <li> Get an image to use for the tool in a common image format (png, jpg, ...). </li>
@@ -93,7 +93,7 @@
     <div class="flex flex-row flex-wrap flex-grow">
       <div class="flex-grow flex-1" style="min-width: 500px">
         <p class="text-2xl font-sans text-center text-sky-400 p-4">
-          Upload Image
+          Skeleton
         </p>
         <UploadImage></UploadImage>
       </div>
@@ -103,7 +103,9 @@
       ></div>
   
       <div class="flex-grow flex-1" style="min-width: 1200px">
-        <p class="text-2xl font-sans text-center text-sky-400 p-4">Tiling</p>
+        <p class="text-2xl font-sans text-center text-sky-400 p-4">
+          Tiling
+        </p>
         <Tiling></Tiling>
       </div>
     </div>

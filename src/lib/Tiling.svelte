@@ -6,7 +6,7 @@
   import instantiate_wasmMorph, { type FeatureLine, type MorphWasmModule } from "../lib/wasm/wasmMorph";
   import { IsohedralTiling, mulSegment } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
-  import { type Matrix, compose, scale, toSVG, translate, rotate, applyToPoint } from "transformation-matrix";
+  import { type Matrix, compose, scale, toSVG, translate, rotate, applyToPoint, flipX, flipY } from "transformation-matrix";
   import { canvasSize, ImageStoreContent, imageStore, siteStore, originStore, SymGroupParams } from "./state";
   import { checkIntersections } from "./collisionDetection";
 
@@ -37,7 +37,7 @@
   let voronoiEdges: Edge[] = [];
   let voronoiCells: Cell[] = [];
   let tilingScaleFactor: number = 1;
-  let tilingSize: number = 100;
+  let tilingSize: number = 150;
 
   let tileSize: number = 1;
   let tileCenter: Point = new Point(150, 150);
@@ -58,7 +58,7 @@
   let showOrigins: boolean = false;
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
-  let showDebugMorphLines: boolean = true;
+  let showDebugMorphLines: boolean = false;
 
   let morphedSiteSegments: SiteSegment[] = []; // Debug only
   let mostCenterTile: Tile;
@@ -193,7 +193,7 @@
     for (let i = 0; i < tiles.length; i++) {
       if (tiles[i].tileIdx == mostCenterTile.tileIdx) {
         Minv = getInverseTransformation(tiles[i].M, tiles[i].origin);
-        M = getTransformation(tiles[i].M, tiles[i].origin);
+        M = getTransformation(tiles[i].M, tiles[i].origin, false, false);
         voronoiCells
           .filter((c) => c.tileIdx == tiles[i].tileIdx)
           .forEach((c) => {
@@ -260,17 +260,33 @@
 
         let l = applyToPoint(M!, new Point(morphedBBox[0],morphedBBox[1]))
         let h = applyToPoint(M!, new Point(morphedBBox[2],morphedBBox[3]))
-        morphedBBox_transf.xl = l.x;
         morphedBBox_transf.yl = l.y;
-        morphedBBox_transf.xh = h.x;
         morphedBBox_transf.yh = h.y;
+        
+        // In case of fliping
+        if(l.x < h.x){
+          morphedBBox_transf.xl = l.x;
+          morphedBBox_transf.xh = h.x;
+        }else{
+          morphedBBox_transf.xl = h.x;
+          morphedBBox_transf.xh = l.x;
+        }
+        if(l.y < h.y){
+          morphedBBox_transf.yl = l.y;
+          morphedBBox_transf.yh = h.y;
+        }else{
+          morphedBBox_transf.yl = h.y;
+          morphedBBox_transf.yh = l.y;
+        }
+
+
 
         if (showDebugMorphLines) {
           let morphedOutline = wasmMorph.getMorphOutline(backgroundImageData.width, backgroundImageData.height, t, imageDataVector, skelletonLinesVector, outlineLinesVector, mInvVector);
 
           morphedSiteSegments = [];
           for (let i = 0; i < morphedOutline.size(); i++) {
-            morphedSiteSegments.push(new SiteSegment(morphedOutline.get(i)!.startPoint.x, morphedOutline.get(i)!.startPoint.y, morphedOutline.get(i)!.endPoint.x, morphedOutline.get(i)!.endPoint.y, 0, [], 14));
+            morphedSiteSegments.push(new SiteSegment(morphedOutline.get(i)!.startPoint.x, morphedOutline.get(i)!.startPoint.y, morphedOutline.get(i)!.endPoint.x, morphedOutline.get(i)!.endPoint.y, 0, [], -1));
           }
           morphedSiteSegments = morphedSiteSegments;
           // console.log(morphedSiteSegments);
@@ -359,6 +375,8 @@
 
       let origin = scalePoint(SitePoint.mulPoint(M, new SitePoint(0, 0)), tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor);
       let tile: Tile = { origin: origin, M: M, tileIdx: tiles.length - 1 }; //tileIndex counting up
+
+
       tiles.push(tile);
 
       for (let j = 0; j < tileSitePoints.length; j++) {
@@ -504,6 +522,12 @@
           color: c.color,
           tileIdx: c.tileIdx,
         };
+
+        // if(c.sourceIndex = 332){
+        //   console.log(c.tileIdx);
+        //   console.log(c.tileIdx);
+        // }
+
         newVoronoiCells.push(newCell);
         for (let j = 0; j < c.edgeIndices.size(); j++) {
           let newIndex: number = c.edgeIndices.get(j)!;
@@ -701,7 +725,7 @@
     if (autoUpdate) updatePromise = update();
   }
 
-  function getTransformation(mat: number[], origin: Point, includeMorphedBBox: boolean = false, isPattern: boolean = false): Matrix {
+  function getTransformation(mat: number[], origin: Point, includeMorphedBBox: boolean, scaleCanvasSize: boolean): Matrix {
     let M: Matrix = {
       a: mat[0],
       b: mat[3],
@@ -710,6 +734,8 @@
       e: mat[2],
       f: mat[5],
     };
+
+    
 
     // Decompose M into Translation, Rotation, Scale Matrices
     M.e = 0; //MM.e*tilingSize;
@@ -721,36 +747,57 @@
 
     let tx: number = -tileCenter.x + origin.x;
     let ty: number = -tileCenter.y + origin.y;
-    
-    if(isPattern){
-      if (includeMorphedBBox) {
-        tx = tx + morphedBBox[0];
-        ty = ty + morphedBBox[1];
-        
-        sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
-        sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
-      } else {
-        sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
-        sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
-      }
 
-    }else{
-      if (includeMorphedBBox) {
+    
+    if (includeMorphedBBox) {
         tx = tx + morphedBBox[0];
         ty = ty + morphedBBox[1];
-        
-        sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
-        sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
-      } else {
-        sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
-        sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
-      }
+    }
+    if(scaleCanvasSize){
+      sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
+      sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
+    }else{
+      sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
+      sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
     }
 
+    // if(isPattern){
+    //   if (includeMorphedBBox) {
+    //     tx = tx + morphedBBox[0];
+    //     ty = ty + morphedBBox[1];
+        
+    //     sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
+    //     sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
+    //   } else {
+    //     sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
+    //     sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
+    //   }
+
+    // }else{
+    //   if (includeMorphedBBox) {
+    //     // tx = tx + morphedBBox[0];
+    //     // ty = ty + morphedBBox[1];
+        
+    //     sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
+    //     sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
+    //   } else {
+    //     sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
+    //     sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
+    //   }
+    // }
+
     let Mtransform = compose(
+      // translate(tx_image, ty_image),
       rotate(angle, origin.x, origin.y), 
       scale(sx, sy, origin.x, origin.y), 
-      translate(tx, ty));
+      translate(tx, ty),
+    );
+
+    if(Math.sign(M.a) != Math.sign(M.d))
+      Mtransform = compose(Mtransform, flipX());
+
+    if(Math.sign(M.c) != Math.sign(M.b))
+      Mtransform = compose(Mtransform, flipY());
 
     return Mtransform;
   }
@@ -779,10 +826,21 @@
     sx = tileWidth / (sx * tilingSize * tilingScaleFactor * tileSize); // canvasSize.x statt tileWidth ?
     sy = tileHeight / (sy * tilingSize * tilingScaleFactor * tileSize); // canvasSize.y statt tileHeight ?
 
+    // sx = canvasSize.x / (sx * tilingSize * tilingScaleFactor * tileSize); // canvasSize.x statt tileWidth ?
+    // sy = canvasSize.y / (sy * tilingSize * tilingScaleFactor * tileSize); // canvasSize.y statt tileHeight ?
+
     let Mtransform = compose(
       translate(-tx, -ty), 
       scale(sx, sy, origin.x, origin.y), 
-      rotate(-angle, origin.x, origin.y));
+      rotate(-angle, origin.x, origin.y)
+    );
+
+    if(Math.sign(M.a) != Math.sign(M.d))
+      Mtransform = compose(Mtransform, flipX());
+
+    if(Math.sign(M.c) != Math.sign(M.b))
+      Mtransform = compose(Mtransform, flipY());
+
     return Mtransform;
   }
 
@@ -856,7 +914,7 @@
         {#if isUptoDate}
           <defs>
             {#each tiles as tile, idx}
-              <pattern id={"pattern_" + tile.tileIdx} patternContentUnits="userSpaceOnUse" patternUnits="userSpaceOnUse" patternTransform={toSVG(getTransformation(tile.M, tile.origin, doMorph, true))} width={morphedBBox[2] - morphedBBox[0]} height={morphedBBox[3] - morphedBBox[1]}>
+              <pattern id={"pattern_" + tile.tileIdx} patternContentUnits="userSpaceOnUse" patternUnits="userSpaceOnUse" patternTransform={toSVG(getTransformation(tile.M, tile.origin, doMorph, true, true))} width={morphedBBox[2] - morphedBBox[0]} height={morphedBBox[3] - morphedBBox[1]}>
                 <image href={backgroundImage?.src} x={0} y={0} width={morphedBBox[2] - morphedBBox[0]} height={morphedBBox[3] - morphedBBox[1]} />
               </pattern>
             {/each}
@@ -906,7 +964,7 @@
               <path id={"outline_" + idx} d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl.endPoint.y}" stroke="yellow" stroke-width="0.66" fill="none"></path>
             {/each}
             {#each morphedSiteSegments as fl, idx}
-              <g transform={toSVG(getTransformation(mostCenterTile.M, mostCenterTile.origin))}>
+              <g transform={toSVG(getTransformation(mostCenterTile.M, mostCenterTile.origin, false,  true))}>
                 <path id={"outlineMorphed_" + idx} d="M {fl.x1} {fl.y1} L {fl.x2} {fl.y2}" stroke="#c300ff" stroke-width="2" fill="none"></path>
               </g>
             {/each}
@@ -923,11 +981,15 @@
       {/await}
     </svg>
 
-    <p class="min-h-8">
+    <!-- <p class="min-h-8">
       {"Mouse: (" + mousePoint.x + "," + mousePoint.y + ")"}
-    </p>
+    </p> -->
 
-    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40" on:click={() => (updatePromise = update())}>Update</button>
+    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center min-w-52" 
+      on:click={() => (updatePromise = update())}>
+      <span class="material-symbols-outlined me-2"> refresh </span>
+      Update
+    </button>
     <!-- <div class="grid grid-cols-2 gap-4"> -->
     <!-- <div class="bg-slate-100 flex items-center justify-center max-h-12">
         <label class="p-2">
@@ -938,11 +1000,13 @@
     <!-- </div> -->
 
     <button
-      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+      class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center min-w-52"
       on:click={() => {
         downloadSVG();
-      }}>Download SVG</button
-    >
+      }}>
+      <span class="material-symbols-outlined me-2"> download </span>
+      Download SVG
+    </button>
 
     <div class="lastErrorContainer max-w-96 max-h-24">
       <p class="text-red-700 text-sm break-words">{lastError}</p>

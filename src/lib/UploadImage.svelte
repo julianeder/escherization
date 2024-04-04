@@ -12,6 +12,8 @@
     import { checkIntersections } from "./collisionDetection";
 
     import ExampleImage from './images/Tux.png';
+    import { toSVG, type Matrix, compose, scale, translate } from "transformation-matrix";
+    // import DropFile from '@svelte-parts/drop-file'
 
     let tracer: any;
 
@@ -21,6 +23,8 @@
     let canvas: HTMLCanvasElement;
     let ctx: CanvasRenderingContext2D | null = null;
     let svgContainer: any;
+
+    let imageElement: HTMLImageElement;
 
     let tileWidth: number = 300;
     let tileHeight: number = 300;
@@ -119,24 +123,56 @@
     }
 
     function useExampleImage(){
-        let image: HTMLImageElement = new Image();
-        image.onload = () =>
+        imageElement = new Image();
+        imageElement.onload = () =>
             Promise.resolve().then(() => {
                 ctx = canvas.getContext("2d", {
                     willReadFrequently: true,
                 });
                 ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
-                let imageData:ImageData | null = drawImageScaled(image);
+                let imageData:ImageData | null = drawImageScaled(imageElement);
                 // ctx.fillStyle = ctx.createPattern(image, 'repeat');
                 // ctx.fillRect(0, 0, width, height);
                 updateOrigin()
                 update();
                 // console.log("w h" + imageData?.width + " " + imageData?.height);
-                imageStore.set({image: image, imageData: imageData});
+                imageStore.set({image: imageElement, imageData: imageData});
             });
-        image.src = ExampleImage;
+            imageElement.src = ExampleImage;
 
     }
+
+    // function onDrop(files){
+    //     // alert(`Files: ${files.map(d => d.name).join(', ')}`)
+
+    //     sitePoints = [];
+    //     let imageFile = files[0];
+    //     if(imageFile){
+    //         let reader = new FileReader();
+    //         reader.readAsDataURL(imageFile);
+    //         reader.onload = (e) => {
+    //             inputImage = e.target?.result;
+
+    //             let image: HTMLImageElement = new Image();
+    //             image.onload = () =>
+    //                 Promise.resolve().then(() => {
+    //                     ctx = canvas.getContext("2d", {
+    //                         willReadFrequently: true,
+    //                     });
+    //                     ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
+    //                     let imageData:ImageData | null = drawImageScaled(image);
+    //                     // ctx.fillStyle = ctx.createPattern(image, 'repeat');
+    //                     // ctx.fillRect(0, 0, width, height);
+    //                     updateOrigin()
+    //                     update();
+    //                     // console.log("w h" + imageData?.width + " " + imageData?.height);
+    //                     imageStore.set({image: image, imageData: imageData});
+    //                 });
+    //             image.src = inputImage;
+    //             // let img = inputImage;
+    //         };
+    //     }
+    // }
 
     function handleFileUpload(e: any) {
         sitePoints = [];
@@ -147,22 +183,22 @@
             reader.onload = (e) => {
                 inputImage = e.target?.result;
 
-                let image: HTMLImageElement = new Image();
-                image.onload = () =>
+                imageElement = new Image();
+                imageElement.onload = () =>
                     Promise.resolve().then(() => {
                         ctx = canvas.getContext("2d", {
                             willReadFrequently: true,
                         });
                         ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
-                        let imageData:ImageData | null = drawImageScaled(image);
+                        let imageData:ImageData | null = drawImageScaled(imageElement);
                         // ctx.fillStyle = ctx.createPattern(image, 'repeat');
                         // ctx.fillRect(0, 0, width, height);
                         updateOrigin()
                         update();
                         // console.log("w h" + imageData?.width + " " + imageData?.height);
-                        imageStore.set({image: image, imageData: imageData});
+                        imageStore.set({image: imageElement, imageData: imageData});
                     });
-                image.src = inputImage;
+                    imageElement.src = inputImage;
                 // let img = inputImage;
             };
         }
@@ -249,9 +285,46 @@
         link.click();
     };
 
+
+    function getTransformation(imageElement: HTMLImageElement): Matrix {
+
+        let Mtransform = compose(
+            scale(canvasSize.x / imageElement.width, canvasSize.y / imageElement.height, 0, 0), 
+            // translate(imgX, imgY)
+        );
+
+        return Mtransform;
+    }
+    
     function downloadSVG() {
-        const svg = document.getElementById("previewSvg");
+        const svg: HTMLElement | null = document.getElementById("previewSvg");
         if (svg != null) {
+            
+            // Manualy add the image as background
+            let defs = svg.appendChild(document.createElement("defs"));
+            let pattern = defs.appendChild(document.createElement("pattern"));
+            pattern.setAttribute("id", "patternBackground");
+            pattern.setAttribute("patternContentUnits","userSpaceOnUse");
+            pattern.setAttribute("patternUnits", "userSpaceOnUse"); 
+            pattern.setAttribute("patternTransform", toSVG(getTransformation(imageElement)) );
+            pattern.setAttribute("width", "1");
+            pattern.setAttribute("height", "1" );
+
+
+            let image = pattern.appendChild(document.createElement("image"));
+            image.setAttribute("href", imageElement.src );
+            image.setAttribute("x",     String(0) );
+            image.setAttribute("y",     String(0) );
+            image.setAttribute("width", String(tileWidth) );
+            image.setAttribute("height",String(tileHeight) );
+
+            let rect = svg.insertBefore(document.createElement("rect"), svg.firstChild);
+            rect.setAttribute("x",     String(imgX) );
+            rect.setAttribute("y",     String(imgY) );
+            rect.setAttribute("width", String(tileWidth) );
+            rect.setAttribute("height",String(tileHeight) );
+            rect.setAttribute("fill", "url(#patternBackground)" );
+
             const blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
@@ -565,116 +638,127 @@
                     height={canvasSize.y}
                     style="width: {canvasSize.x}px; height: {canvasSize.y}px"
                 ></canvas>
-                <div
-                    class="overdrawSvg col-start-1 row-start-1"
-                    bind:this={svgContainer}
-                >
-                    <svg
-                        id="previewSvg"
-                        on:load={makeDraggable}
-                        width={canvasSize.x}
-                        height={canvasSize.y}
-                        viewBox="0 0 {canvasSize.x} {canvasSize.y}"
-                        xmlns="http://www.w3.org/2000/svg"
+
+                <!-- {#if inputImage == null}
+                    <div
+                        class="col-start-1 row-start-1 m-10"
                     >
-                        <g transform="translate({imgX} {imgY})">
-                            <!-- svelte-ignore a11y-click-events-have-key-events -->
-                            <!-- svelte-ignore a11y-no-static-element-interactions -->
-                            <rect
-                                width={tileWidth}
-                                height={tileHeight}
-                                class="svgBackground"
-                                style={cssVarStyles}
-                                fill="transparent"
-                                on:click={(evt) => backgroundClick(evt)}
-                            >
-                            </rect>
-                            <circle
-                                class="tileCenter draggable"
-                                style={cssVarStyles}
-                                id="origin"
-                                cx={tileCenter.x}
-                                cy={tileCenter.y}
-                                r="5"
-                                fill="pink"
-                            ></circle>
-                            <!-- svelte-ignore a11y-click-events-have-key-events -->
-                            {#each sitePoints as siteP, idx}
+                        <DropFile onDrop={onDrop} />
+                    </div>
+
+                {:else} -->
+                    <div
+                        class="overdrawSvg col-start-1 row-start-1"
+                        bind:this={svgContainer}
+                    >
+                        <svg
+                            id="previewSvg"
+                            on:load={makeDraggable}
+                            width={canvasSize.x}
+                            height={canvasSize.y}
+                            viewBox="0 0 {canvasSize.x} {canvasSize.y}"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <g transform="translate({imgX} {imgY})">
+                                <!-- svelte-ignore a11y-click-events-have-key-events -->
                                 <!-- svelte-ignore a11y-no-static-element-interactions -->
-                                <circle
-                                    id={"sitePoint_" + idx}
-                                    class="sitePoint draggable"
+                                <rect
+                                    width={tileWidth}
+                                    height={tileHeight}
+                                    class="svgBackground"
                                     style={cssVarStyles}
-                                    cx={siteP.x}
-                                    cy={siteP.y}
-                                    r="2"
-                                    fill="black"
-                                    on:click={(evt) => sitePointClick(evt)}
-                                ></circle>
-                            {/each}
-                            {#each siteSegments as siteS, idx}
-                                <path
-                                    id={"siteSegment_" + idx}
-                                    d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
-                                    stroke="red"
-                                    stroke-width="1"
-                                    fill="none"
-                                ></path>
-                                <!-- svelte-ignore a11y-click-events-have-key-events -->
-                                <!-- svelte-ignore a11y-no-static-element-interactions -->
-                                <circle
-                                    id={"siteSegmentPoint_" + idx * 2}
-                                    class="siteSegmentPoint draggable"
-                                    style={cssVarStyles}
-                                    cx={siteS.x1}
-                                    cy={siteS.y1}
-                                    r="2"
-                                    fill="red"
-                                    on:click={(evt) => siteSegmentClick(evt)}
-                                ></circle>
-                                <!-- svelte-ignore a11y-click-events-have-key-events -->
-                                <!-- svelte-ignore a11y-no-static-element-interactions -->
-                                <circle
-                                    id={"siteSegmentPoint_" + (idx * 2 + 1)}
-                                    class="siteSegmentPoint draggable"
-                                    style={cssVarStyles}
-                                    cx={siteS.x2}
-                                    cy={siteS.y2}
-                                    r="2"
-                                    fill="red"
-                                    on:click={(evt) => siteSegmentClick(evt)}
-                                ></circle>
-                            {/each}
-                            {#if creatingSegmet != null}
-                                <path
-                                    d="M {creatingSegmet.x1} {creatingSegmet.y1} L {creatingSegmet.x2} {creatingSegmet.y2}"
-                                    stroke="red"
-                                    stroke-width="1"
-                                    fill="none"
-                                ></path>
-                                <!-- svelte-ignore a11y-click-events-have-key-events -->
-                                <!-- svelte-ignore a11y-no-static-element-interactions -->
-                                <circle
-                                    class="siteSegmentPoint draggable"
-                                    cx={creatingSegmet.x1}
-                                    cy={creatingSegmet.y1}
-                                    r="2"
-                                    fill="red"
-                                ></circle>
-                                <!-- svelte-ignore a11y-click-events-have-key-events -->
-                                <!-- svelte-ignore a11y-no-static-element-interactions -->
-                                <circle
-                                    class="siteSegmentPoint draggable"
-                                    cx={creatingSegmet.x2}
-                                    cy={creatingSegmet.y2}
-                                    r="2"
-                                    fill="red"
+                                    fill="transparent"
                                     on:click={(evt) => backgroundClick(evt)}
+                                >
+                                </rect>
+                                <circle
+                                    class="tileCenter draggable"
+                                    style={cssVarStyles}
+                                    id="origin"
+                                    cx={tileCenter.x}
+                                    cy={tileCenter.y}
+                                    r="5"
+                                    fill="pink"
                                 ></circle>
-                            {/if}
-                        </g>
-                    </svg>
-                </div>
+                                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                {#each sitePoints as siteP, idx}
+                                    <!-- svelte-ignore a11y-no-static-element-interactions -->
+                                    <circle
+                                        id={"sitePoint_" + idx}
+                                        class="sitePoint draggable"
+                                        style={cssVarStyles}
+                                        cx={siteP.x}
+                                        cy={siteP.y}
+                                        r="2"
+                                        fill="black"
+                                        on:click={(evt) => sitePointClick(evt)}
+                                    ></circle>
+                                {/each}
+                                {#each siteSegments as siteS, idx}
+                                    <path
+                                        id={"siteSegment_" + idx}
+                                        d="M {siteS.x1} {siteS.y1} L {siteS.x2} {siteS.y2}"
+                                        stroke="red"
+                                        stroke-width="1"
+                                        fill="none"
+                                    ></path>
+                                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                    <!-- svelte-ignore a11y-no-static-element-interactions -->
+                                    <circle
+                                        id={"siteSegmentPoint_" + idx * 2}
+                                        class="siteSegmentPoint draggable"
+                                        style={cssVarStyles}
+                                        cx={siteS.x1}
+                                        cy={siteS.y1}
+                                        r="2"
+                                        fill="red"
+                                        on:click={(evt) => siteSegmentClick(evt)}
+                                    ></circle>
+                                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                    <!-- svelte-ignore a11y-no-static-element-interactions -->
+                                    <circle
+                                        id={"siteSegmentPoint_" + (idx * 2 + 1)}
+                                        class="siteSegmentPoint draggable"
+                                        style={cssVarStyles}
+                                        cx={siteS.x2}
+                                        cy={siteS.y2}
+                                        r="2"
+                                        fill="red"
+                                        on:click={(evt) => siteSegmentClick(evt)}
+                                    ></circle>
+                                {/each}
+                                {#if creatingSegmet != null}
+                                    <path
+                                        d="M {creatingSegmet.x1} {creatingSegmet.y1} L {creatingSegmet.x2} {creatingSegmet.y2}"
+                                        stroke="red"
+                                        stroke-width="1"
+                                        fill="none"
+                                    ></path>
+                                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                    <!-- svelte-ignore a11y-no-static-element-interactions -->
+                                    <circle
+                                        class="siteSegmentPoint draggable"
+                                        cx={creatingSegmet.x1}
+                                        cy={creatingSegmet.y1}
+                                        r="2"
+                                        fill="red"
+                                    ></circle>
+                                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                    <!-- svelte-ignore a11y-no-static-element-interactions -->
+                                    <circle
+                                        class="siteSegmentPoint draggable"
+                                        cx={creatingSegmet.x2}
+                                        cy={creatingSegmet.y2}
+                                        r="2"
+                                        fill="red"
+                                        on:click={(evt) => backgroundClick(evt)}
+                                    ></circle>
+                                {/if}
+                            </g>
+                        </svg>
+                    </div>
+                <!-- {/if} -->
+
                 <div class="lastErrorContainer max-w-72">
                     <p class="text-red-700 text-sm break-words">{lastError}</p>
                 </div>
@@ -693,29 +777,39 @@
             />
         </div>
         <button
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center min-w-52"
             on:click={() => {
                 fileinput.click();
-            }}>Upload Image</button
-        >
+            }}>
+            <span class="material-symbols-outlined me-2"> upload </span>
+            Upload Image
+        </button>
+        
         <button
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-center inline-flex items-center min-w-52"
             on:click={() => {
                 useExampleImage();
-            }}>Use Example Image</button
-        >
-        <button
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+            }}>
+            <span class="material-symbols-outlined me-2"> image </span>
+            Use Example Image
+
+        </button>
+        <!-- <button
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center min-w-52"
             on:click={() => {
                 downloadCanvasImage();
-            }}>Download Image</button
-        >
+            }}>
+            <span class="material-symbols-outlined me-2"> download </span>
+            Download Image
+        </button> -->
         <button
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded min-w-40"
+            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center min-w-52"
             on:click={() => {
                 downloadSVG();
-            }}>Download SVG</button
-        >
+            }}>
+            <span class="material-symbols-outlined me-2"> download </span>
+            Download SVG            
+        </button>
         <input
             type="file"
             style="display:none"
