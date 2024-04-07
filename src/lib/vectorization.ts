@@ -41,10 +41,14 @@ export class Vectorization {
             tileWidth,
             tileHeight,
         );
+
+        Vectorization.fixSmallPassages(imageData);
+
         // console.log('w ' + width + ' h ' +  height + ' imgX ' + imgX + ' imgY ' + imgY);
         // console.log(imageData);
         // let { polylines, rects, thinImag } = TraceSkeleton.fromImageData(imageData, resolution);
         let binaryImg: number[] = TraceSkeleton.imageDataToBinary(imageData);
+
 
         // let borderImg: number[] = Vectorization.getBorderImg(binaryImg);
 
@@ -259,6 +263,73 @@ export class Vectorization {
             }
             i++;
         });
+    }
+
+    static isBlack(idx: number, binaryImg: ImageData): boolean{
+        return binaryImg.data[idx] == 0 
+        && binaryImg.data[idx + 1] == 0 
+        && binaryImg.data[idx + 2] == 0;
+    }
+
+    static fixSmallPassages(img: ImageData){
+        for (let x = 0; x < img.width; x++) {
+            for (let y = 0; y < img.height; y++) {
+                if (!Vectorization.isBlack(this.fromXY(x, y) * 4, img)){
+                    if(Vectorization.isBlack(this.fromXY(x - 1, y) * 4, img)
+                    && Vectorization.isBlack(this.fromXY(x + 1, y) * 4, img)
+                    && Vectorization.isBlack(this.fromXY(x, y - 1) * 4, img)
+                    && Vectorization.isBlack(this.fromXY(x, y + 1) * 4, img)
+                    )
+                    {
+                        img.data[this.fromXY(x, y) * 4] = 0;
+                        img.data[this.fromXY(x, y) * 4 + 1] = 0;
+                        img.data[this.fromXY(x, y) * 4 + 2] = 0;
+                        img.data[this.fromXY(x, y) * 4 + 3] = 0;
+                        // console.log("cleared: " + x + " " + y);
+                    }
+
+                    let n: Array<Point> =  []; 
+                    n.push(new Point(x - 1, y - 1));
+                    n.push(new Point(x - 1, y));
+                    n.push(new Point(x - 1, y + 1));
+                    n.push(new Point(x,     y + 1));
+                    n.push(new Point(x + 1, y + 1));
+                    n.push(new Point(x + 1, y));
+                    n.push(new Point(x + 1, y - 1));
+                    n.push(new Point(x,     y - 1));
+
+                    let active = Vectorization.isBlack(this.fromXY(n[0].x, n[0].y) * 4, img);
+                    let switches = 0;
+                    let lastCol = [0,0,0,0];
+                    for(let i: number = 1; i < 8; i++){
+                        let isBl = Vectorization.isBlack(this.fromXY(n[i].x, n[i].y) * 4, img)
+                        if(active != isBl){
+                            switches += 1;
+                            active = isBl;
+                        }
+                        if(!isBl){
+                            lastCol = [
+                                img.data[this.fromXY(x, y) * 4], 
+                                img.data[this.fromXY(x, y) * 4 + 1], 
+                                img.data[this.fromXY(x, y) * 4 + 2], 
+                                img.data[this.fromXY(x, y) * 4 + 3], 
+                            ];
+                        }
+                    }
+                    if(switches > 3){
+                        for(let i: number = 0; i < 8; i++){
+                            img.data[this.fromXY(n[i].x, n[i].y) * 4] = lastCol[0];
+                            img.data[this.fromXY(n[i].x, n[i].y) * 4 + 1] = lastCol[1];
+                            img.data[this.fromXY(n[i].x, n[i].y) * 4 + 2] = lastCol[2];
+                            img.data[this.fromXY(n[i].x, n[i].y) * 4 + 3] = lastCol[3];
+
+                        }
+                        // console.log("filled: " + x + " " + y);
+
+                    }
+                }
+            }
+        }
     }
 
     static getBorderImg(binaryImg: number[]): number[] {

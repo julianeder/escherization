@@ -195,6 +195,15 @@
                         // ctx.fillRect(0, 0, width, height);
                         updateOrigin()
                         update();
+
+                        // Get Image Data back for the later stages
+                        imageData = ctx!.getImageData(
+                            imgX,
+                            imgY,
+                            tileWidth,
+                            tileHeight,
+                        );
+
                         // console.log("w h" + imageData?.width + " " + imageData?.height);
                         imageStore.set({image: imageElement, imageData: imageData});
                     });
@@ -794,14 +803,14 @@
             Use Example Image
 
         </button>
-        <!-- <button
+        <button
             class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center min-w-52"
             on:click={() => {
                 downloadCanvasImage();
             }}>
             <span class="material-symbols-outlined me-2"> download </span>
             Download Image
-        </button> -->
+        </button>
         <button
             class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center min-w-52"
             on:click={() => {

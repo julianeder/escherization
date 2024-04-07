@@ -302,8 +302,13 @@ Vector2dInt SearchAlongLineRec(Vector2d s, Vector2d d, Vector2dInt prev_c, pixel
 {
   Vector2d center = s + (d / 2.0);
   Vector2dInt c(center);
-  if (c == prev_c)
-    return prev_c;
+  if (c == prev_c){
+    while (isBlack(c, srcImgMap, w, h)){ // step into the direction a little bit more to garante we are inside the border
+      center = center + (d / 2.0);
+      c = center;
+    }
+    return c;
+  }
 
   if(verbose) printf("depth %d\n", depth);
   if(verbose) printf("s (%f %f)\n", s.x, s.y);
@@ -575,88 +580,216 @@ void removeZeroLengthLines(vector<FeatureLine> &outlineLinesSorted, vector<Featu
   }
 }
 
-// bool fitToImageBetter(vector<FeatureLine> &outlineLinesSorted, vector<FeatureLine> &outlineLinesMorphed, vector<FeatureLine> skelletonLines, pixel **srcImgMap, int w, int h)
-// {
-//       // printf("\n\nsize %ld\n", outlineLinesMorphed.size());
+bool isBoundaryPoint(Vector2dInt c, pixel **srcImgMap, int w, int h)
+{
+  if(isBlack(c, srcImgMap, w, h)){
+    return false;
+  }else{
+    Vector2dInt N(c.x, c.y-1);
+    Vector2dInt S(c.x, c.y+1);
+    Vector2dInt E(c.x+1, c.y);
+    Vector2dInt W(c.x-1, c.y);
+    return !isBlack(N, srcImgMap, w, h)
+        || !isBlack(S, srcImgMap, w, h)
+        || !isBlack(E, srcImgMap, w, h)
+        || !isBlack(W, srcImgMap, w, h);
+  }
+  if (c.x < 0 || c.x >= w)
+    return false;
+  if (c.y < 0 || c.y >= h)
+    return false;
+  // printf("c %d %d\n",c.x, c.y);
+  pixel pix = srcImgMap[c.y][c.x];
 
 
+  return pix.r == 0 && pix.g == 0 && pix.b == 0 && pix.a == 255;
+}
 
-//   bool subdividesAnythng = false;
-//   auto it_o = outlineLinesSorted.begin();
-//   auto it_end = outlineLinesMorphed.end();
-//   for (auto it = outlineLinesMorphed.begin(); it != it_end; ++it, ++it_o)
-//   {
-//     double lx = it->startPoint.x - it->endPoint.x;
-//     double ly = it->startPoint.y - it->endPoint.y;
-//     double l = lx * lx + ly * ly; // sqrt omited
-//     // printf("l %f\n", l);
 
-//     if(l > 5 * 5) //sqr
-//     {
-//       subdividesAnythng = true; 
+Vector2dInt* neigh(Vector2dInt p){
+      static Vector2dInt n[8];
+      n[0].x = p.x-1;
+      n[0].y = p.y-1;
 
-//       Vector2d c_outer(
-//         (it_o->startPoint.x + it_o->endPoint.x) / 2.0,
-//         (it_o->startPoint.y + it_o->endPoint.y) / 2.0
-//       );
+      n[1].x = p.x;
+      n[1].y = p.y-1;
       
-//       FeatureLine ins_outer;
-//       ins_outer.startPoint.x = c_outer.x;
-//       ins_outer.startPoint.y = c_outer.y;
-//       ins_outer.endPoint.x = it_o->endPoint.x;
-//       ins_outer.endPoint.y = it_o->endPoint.y;
-//       it_o = outlineLinesSorted.insert(it_o+1, ins_outer);
-//       it_o--;
-//       it_o->endPoint.x = c_outer.x;
-//       it_o->endPoint.y = c_outer.y;   
+      n[2].x = p.x+1;
+      n[2].y = p.y-1;
+      
+      n[3].x = p.x+1;
+      n[3].y = p.y;
 
-//       Vector2d c_inner(
-//         (it->startPoint.x + it->endPoint.x) / 2.0,
-//         (it->startPoint.y + it->endPoint.y) / 2.0
-//       );
+      n[4].x = p.x+1;
+      n[4].y = p.y+1;
 
-//       FeatureLine ins_inner;
-//       ins_inner.startPoint.x = c_inner.x;
-//       ins_inner.startPoint.y = c_inner.y;
-//       ins_inner.endPoint.x = it->endPoint.x;
-//       ins_inner.endPoint.y = it->endPoint.y;
-//       it = outlineLinesMorphed.insert(it+1, ins_inner);
-//       it--;
-//       it->endPoint.x = c_inner.x;
-//       it->endPoint.y = c_inner.y;   
+      n[5].x = p.x;
+      n[5].y = p.y+1;
 
+      n[6].x = p.x-1;
+      n[6].y = p.y+1;
 
+      n[7].x = p.x-1;
+      n[7].y = p.y;
+      return n;
+}
 
-
-//       Vector2d d, s, e; 
-//       s = c_inner;
-//       bool black = isBlack(c_inner, srcImgMap, w, h);
-//       if(black){ // Search toward center
-//         e = closetsPointOnSkelleton(c_inner, skelletonLines);
-//       }else{ // Search toward outside
-//         e = c_outer;
-//       }
-//       d.x = e.x - s.x;
-//       d.y = e.y - s.y;
-
-//       Vector2dInt shift = SearchAlongLineRec(s, d, s, srcImgMap, w, h, 0, !black, false);
-
-//       // printf("%ld %d s(%f %f) e(%f %f) d(%f %f) \n", it - outlineLinesMorphed.begin(), black, s.x, s.y, e.x, e.y, d.x, d.y);
-
-//       // printf("(%f %f) -> (%d %d) \n", it->endPoint.x, it->endPoint.y, shift.x, shift.y);
-
-//       it->endPoint = shift;
-//       (it+1)->startPoint = shift;  
+bool neighContain(Vector2dInt p, Vector2dInt g){
+  if(p == g) return true;
+  if(p.x + 1 == g.x && p.y == g.y) return true;
+  if(p.x - 1 == g.x && p.y == g.y) return true;
+  if(p.x == g.x && p.y + 1 == g.y) return true;
+  if(p.x == g.x && p.y - 1 == g.y) return true;
+  return false;
 
 
-//       it++; // decrease if something was inserted, this processes the shortened again, therefore simulating recursive calling
-//       it_o++;
-//     }
-//     it_end = outlineLinesMorphed.end();
+}
 
-//   }
-//   return subdividesAnythng;
-// }
+void traceBoundary(vector<FeatureLine> &outlineLinesSorted, vector<FeatureLine> &outlineLinesMorphed, vector<FeatureLine> skelletonLines, pixel **srcImgMap, int w, int h){
+
+  auto it_o = outlineLinesSorted.begin();
+  auto it_end = outlineLinesMorphed.end();
+  printf("size %ld \n", outlineLinesMorphed.size());
+
+  int idx_seg = 0;
+  for (auto it = outlineLinesMorphed.begin(); it < it_end; ++it, ++it_o, ++idx_seg){
+    
+    FeatureLine prev_line;
+    if(it == outlineLinesMorphed.begin()) 
+      prev_line = outlineLinesMorphed[outlineLinesMorphed.size()-1];
+    else
+      prev_line = *(it-1);
+
+
+    vector<Vector2dInt> boundaryPoints;
+    Vector2dInt p = it->startPoint;
+    Vector2dInt b;
+    int idx_b = -1;
+    
+    Vector2dInt *n = neigh(p);
+    // printf("p1 (%d %d) \n", p.x, p.y);
+
+    int nNEIGH = 8;
+    for(int i = 0; i < nNEIGH; i++){
+      if(isBlack(n[i], srcImgMap, w, h)){
+        b = n[i];
+        idx_b = i;
+        // printf("b1 (%d %d) \n", b.x, b.y);
+        break;
+      }
+    }
+
+    int cnt = 0;
+    while(cnt++ < w*h){
+
+
+      for(int i = 0; i < nNEIGH; i++){
+        if(isBlack(n[i], srcImgMap, w, h)){
+          idx_b = i;
+          break;
+        }
+      }
+      for(int i = 0; i < nNEIGH; i++){
+        if(!isBlack(n[(idx_b + i) % nNEIGH], srcImgMap, w, h)){
+          p = n[(idx_b + i) % nNEIGH];
+          b = n[(idx_b + i - 1) % nNEIGH];
+          idx_b = (idx_b + i - 1) % nNEIGH;
+          boundaryPoints.push_back(p);
+          n = neigh(p);
+
+          // printf("p (%d %d) b (%d %d)\n", p.x, p.y, b.x, b.y);
+          break;
+        }
+      }
+
+      // if(idx_seg == 14)
+      //   printf("p (%d %d) b (%d %d)\n", p.x, p.y, b.x, b.y);
+
+      if(neighContain(p, it->endPoint))
+      {
+        if(!(p == it->endPoint))
+          boundaryPoints.push_back(p);
+
+        int l = boundaryPoints.size();
+        int steps = (l / 20) + 1;
+        printf("found forward: %d %d\n", l, steps);
+
+        if(steps > 1){
+          vector<FeatureLine> subdiv_outer;
+          vector<FeatureLine> subdiv_inner;
+          Vector2d c_inner(
+            (it->endPoint.x - it->startPoint.x) / ((double)steps),
+            (it->endPoint.y - it->startPoint.y) / ((double)steps)
+          );
+          Vector2d c_outer(
+            (it_o->endPoint.x - it_o->startPoint.x) / ((double)steps),
+            (it_o->endPoint.y - it_o->startPoint.y) / ((double)steps)
+          );
+
+          // printf(" -- (%f %f) (%f %f) -- \n", it->startPoint.x, it->startPoint.y, it->endPoint.x, it->endPoint.y);
+          // printf(" -- (%f %f) -- \n", c_inner.x, c_inner.y);
+
+
+          for(int j = 0; j<steps; j++){
+
+            
+            FeatureLine ins_outer;
+            ins_outer.startPoint.x = it_o->startPoint.x + c_outer.x * j;
+            ins_outer.startPoint.y = it_o->startPoint.y + c_outer.y * j;
+            ins_outer.endPoint.x = it_o->startPoint.x + c_outer.x * (j+1);
+            ins_outer.endPoint.y = it_o->startPoint.y + c_outer.y * (j+1);
+            subdiv_outer.push_back(ins_outer);
+
+            FeatureLine ins_inner;
+            int idx_start = (l / steps) * j;
+            int idx_end = (j == steps-1) ? (l-1) : ((l / steps) * (j+1));
+            ins_inner.startPoint = boundaryPoints[idx_start];
+            ins_inner.endPoint   = boundaryPoints[idx_end];
+            subdiv_inner.push_back(ins_inner);
+
+            // printf("(%f %f) (%f %f) \n", ins_inner.startPoint.x, ins_inner.startPoint.y, ins_inner.endPoint.x, ins_inner.endPoint.y);
+          }
+
+          it_o = outlineLinesSorted.erase(it_o);
+          it_o = outlineLinesSorted.insert(it_o, subdiv_outer.begin(), subdiv_outer.end());
+          it_o += steps;
+          
+          
+          it = outlineLinesMorphed.erase(it);
+          it = outlineLinesMorphed.insert(it, subdiv_inner.begin(), subdiv_inner.end());
+          it += steps;
+
+          // printf("it %ld sz %ld \n", it - outlineLinesMorphed.begin(),  outlineLinesMorphed.size());
+
+        }
+
+        boundaryPoints.clear();
+        break;
+      }
+      else if(p == prev_line.startPoint){
+        int l = boundaryPoints.size();
+
+        printf("found backward: %d \n", l);
+        printf("(%f %f) (%f %f) \n", it->startPoint.x, it->startPoint.y, it->endPoint.x, it->endPoint.y);
+        printf("p (%f %f) (%f %f) \n", prev_line.startPoint.x, prev_line.startPoint.y, prev_line.endPoint.x, prev_line.endPoint.y);
+        for(int k = 0; k < boundaryPoints.size(); k++)
+          printf("b(%d %d) \n", boundaryPoints[k].x, boundaryPoints[k].y);
+
+        break;
+
+      }
+      else if(p == it->startPoint)
+      {
+        printf("found loop \n");
+        break;
+      }
+    }
+
+    it_end = outlineLinesMorphed.end();
+
+  }
+  printf("done \n");
+}
 
 void transformAll(vector<FeatureLine> &outlineLines, vector<double> M)
 {
@@ -680,6 +813,9 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
 {
   pixel **srcImgMap = pixmapFromVector(w, h, imageData);
 
+
+  printf("w h %d %d\n",w,h);
+
   // printf("outlineLines\n");
   // for (int i = 0; i < outlineLines.size(); i++)
   // {
@@ -702,9 +838,8 @@ EMSCRIPTEN_KEEPALIVE vector<FeatureLine> getMorphOutline(int w, int h, float t,
 
   vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, w, h);
 
-  // fitToImageBetter(outlineLinesSorted, outlineLinesMorphed, skelletonLines, srcImgMap, w, h);
-  // fitToImageBetter(outlineLinesSorted, outlineLinesMorphed, skelletonLines, srcImgMap, w, h);
-  // fitToImageBetter(outlineLinesSorted, outlineLinesMorphed, skelletonLines, srcImgMap, w, h);
+  removeZeroLengthLines(outlineLinesSorted, outlineLinesMorphed);
+  traceBoundary(outlineLinesSorted, outlineLinesMorphed, skelletonLines, srcImgMap, w, h);
   removeZeroLengthLines(outlineLinesSorted, outlineLinesMorphed);
 
       vector<FeatureLine>
@@ -789,12 +924,11 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
 
   vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, w, h);
 
-  // TODO: Instead of this: follow the border and subdivide at the center pixel along the border
-  // fitToImageBetter(outlineLinesSorted, outlineLinesMorphed, skelletonLines, srcImgMap, w, h);
-  // fitToImageBetter(outlineLinesSorted, outlineLinesMorphed, skelletonLines, srcImgMap, w, h);
-  // fitToImageBetter(outlineLinesSorted, outlineLinesMorphed, skelletonLines, srcImgMap, w, h); 
   removeZeroLengthLines(outlineLinesSorted, outlineLinesMorphed);
-  printf("\n\nsize %ld\n", outlineLinesMorphed.size());
+  traceBoundary(outlineLinesSorted, outlineLinesMorphed, skelletonLines, srcImgMap, w, h);
+  removeZeroLengthLines(outlineLinesSorted, outlineLinesMorphed);
+
+  // printf("\n\nsize %ld\n", outlineLinesMorphed.size());
 
   // the featureline of sourceImage, destImage and the morphImage
   vector<FeatureLine> srcLines;

@@ -17,6 +17,11 @@ Vector2d::Vector2d(const Vector2d &v){
 Vector2dInt::Vector2dInt(){
 }
 
+Vector2dInt::Vector2dInt(int x, int y){
+  this->x = x;
+  this->y = y;
+}
+
 Vector2dInt::Vector2dInt(const Vector2d &v){
   x = (int)round(v.x);
   y = (int)round(v.y);
