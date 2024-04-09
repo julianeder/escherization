@@ -1,3 +1,5 @@
+import { identity, type Matrix } from "transformation-matrix";
+
 export class BBox {
     contains(x: number, y: number): any {
         return (this.xl < x && x < this.xh) && (this.yl < y && y < this.yh);
@@ -43,11 +45,11 @@ export class SitePoint extends Point {
         return new SitePoint(this.x - rhs.x, this.y - rhs.y, this.color, this.M, this.tileIdx);
     }
 
-    static mulPoint(A: number[], B: SitePoint): SitePoint {
+    static mulPoint(A: Matrix, B: SitePoint): SitePoint {
         // Matrix * Point
         return new SitePoint(
-            A[0] * B.x + A[1] * B.y + A[2],
-            A[3] * B.x + A[4] * B.y + A[5],
+            A.a * B.x + A.c * B.y + A.e,
+            A.b * B.x + A.d * B.y + A.f,
             B.color,
             B.M,
             B.tileIdx
@@ -56,10 +58,10 @@ export class SitePoint extends Point {
     };
 
     color: number = 0;
-    M: number[] = [];
+    M: Matrix;
     tileIdx: number;
 
-    constructor(x: number, y: number, color: number = 0, M:number[] = [], tileIdx: number = -1) {
+    constructor(x: number, y: number, color: number = 0, M:Matrix = identity(), tileIdx: number = -1) {
         super(x, y);
         this.color = color;
 		this.M = M;
@@ -84,10 +86,10 @@ export class SiteSegment {
     connected_22: Array<SiteSegment>;
 
     color: number = 0;
-    M: number[] = [];
+    M: Matrix;
     tileIdx: number;
     
-    constructor(x1: number, y1: number, x2: number, y2: number, color: number = 0, M: number[] = [], tileIdx: number = -1) {
+    constructor(x1: number, y1: number, x2: number, y2: number, color: number = 0, M: Matrix, tileIdx: number = -1) {
         this.x1 = x1;
         this.y1 = y1;
         this.x2 = x2;
@@ -138,6 +140,6 @@ export interface Cell {
 export interface Tile {
     tileIdx: number;
     origin: Point;
-    M: number[];
+    M: Matrix;
 }
 

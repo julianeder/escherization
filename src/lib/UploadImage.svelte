@@ -12,7 +12,7 @@
     import { checkIntersections } from "./collisionDetection";
 
     import ExampleImage from './images/Tux.png';
-    import { toSVG, type Matrix, compose, scale, translate } from "transformation-matrix";
+    import { toSVG, type Matrix, compose, scale, translate, identity } from "transformation-matrix";
     import type { FeatureLine } from "./wasm/wasmMorph";
     // import DropFile from '@svelte-parts/drop-file'
 
@@ -508,7 +508,7 @@
                     evt.offsetX - imgX,
                     evt.offsetY - imgY,
                     undefined,
-                    [],
+                    identity(),
                     -1,
                 );
             } else {

@@ -40,6 +40,7 @@
   let tilingSize: number = 150;
 
   let tileSize: number = 1.5;
+  let tileRotation: number = 0;
   let tileCenter: Point = new Point(150, 150);
   let imageOffset: Point;
 
@@ -334,7 +335,7 @@
 
           morphedSiteSegments = [];
           for (let i = 0; i < morphedOutline.size(); i++) {
-            morphedSiteSegments.push(new SiteSegment(morphedOutline.get(i)!.startPoint.x, morphedOutline.get(i)!.startPoint.y, morphedOutline.get(i)!.endPoint.x, morphedOutline.get(i)!.endPoint.y, 0, [], -1));
+            morphedSiteSegments.push(new SiteSegment(morphedOutline.get(i)!.startPoint.x, morphedOutline.get(i)!.startPoint.y, morphedOutline.get(i)!.endPoint.x, morphedOutline.get(i)!.endPoint.y, 0, identity(), -1));
           }
           morphedSiteSegments = morphedSiteSegments;
           // console.log("lengths: " + outlines.length + " " + morphedSiteSegments.length);
@@ -414,7 +415,15 @@
       const color = tiling.getColour(i.t1, i.t2, i.aspect);
       // Get the 3x3 matrix corresponding to one of the transformed
       // tiles in the filled region.
-      const M = i.T;
+      const mat = i.T;
+      let M: Matrix = {
+        a: mat[0],
+        b: mat[3],
+        c: mat[1],
+        d: mat[4],
+        e: mat[2],
+        f: mat[5],
+      };
       // console.log(
       //   M[0] + " " + M[1] + " " + M[2] + "\n"
       // + M[3] + " " + M[4] + " " + M[5] + "\n"
@@ -424,19 +433,31 @@
       let origin = scalePoint(SitePoint.mulPoint(M, new SitePoint(0, 0)), tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor);
       let tile: Tile = { origin: origin, M: M, tileIdx: tiles.length - 1 }; //tileIndex counting up
 
+      let I2T2C = getTransformation(M, origin, false, true);
+      
+      I2T2C = compose(
+        scale(tileSize / tileWidth, tileSize / tileHeight), 
+        M,
+        scale(tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor), 
+      );
 
       tiles.push(tile);
 
       for (let j = 0; j < tileSitePoints.length; j++) {
+        let t = applyToPoint(I2T2C, tileSitePoints[j]);
+
         let newSitePoint: SitePoint = 
-          scalePoint(
-            SitePoint.mulPoint(M, 
-              scalePoint(tileSitePoints[j], 
-                tileSize / tileWidth, tileSize / tileHeight
+        scalePoint(
+          SitePoint.mulPoint(M, 
+            scalePoint(tileSitePoints[j], 
+              tileSize / tileWidth, tileSize / tileHeight
               )
-            ), 
-            tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor
-          );
+          ), 
+          tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor
+        );
+        
+        // newSitePoint.x = t.x;
+        // newSitePoint.y = t.y;
 
         newSitePoint.color = color;
         newSitePoint.tileIdx = tile.tileIdx;
@@ -450,6 +471,9 @@
       // + 0 + " " + 0 + " " + 0 + "\n"
       // );
       for (let j = 0; j < tileSiteSegments.length; j++) {
+        let s = applyToPoint(I2T2C, {x: tileSiteSegments[j].x1, y: tileSiteSegments[j].y1});
+        let e = applyToPoint(I2T2C, {x: tileSiteSegments[j].x2, y: tileSiteSegments[j].y2});
+
         let newSiteSegment: SiteSegment = 
           scaleSegment(
             mulSegment(M, 
@@ -459,6 +483,13 @@
             ), 
             tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor
           );
+
+        console.log(tileSiteSegments[j].x1 + " " + tileSiteSegments[j].y1 + " -> " + s.x + " " + s.y);
+        // tileSiteSegments[j].x1 = s.x;
+        // tileSiteSegments[j].y1 = s.y;
+        // tileSiteSegments[j].x2 = e.x;
+        // tileSiteSegments[j].y2 = e.y;
+
         newSiteSegment.color = color;
         newSiteSegment.M = M;
         newSiteSegment.tileIdx = tile.tileIdx;
@@ -613,7 +644,7 @@
   }
 
   function addPoint(event: MouseEvent) {
-    tilingSitePoints = [...tilingSitePoints, new SitePoint(event.offsetX, event.offsetY, undefined, [], -1)]; // This syntax triggeres Sveltes reactive reload
+    tilingSitePoints = [...tilingSitePoints, new SitePoint(event.offsetX, event.offsetY, undefined, identity(), -1)]; // This syntax triggeres Sveltes reactive reload
     siteStore.set({
       sitePoints: tilingSitePoints,
       siteSegments: tilingSiteSegments,
@@ -768,22 +799,19 @@
     tilingSize = newValue;
     if (autoUpdate) updatePromise = update();
   }
+
   function onTileSizeChanged(newValue: number) {
     tileSize = newValue / 100;
     if (autoUpdate) updatePromise = update();
   }
 
-  function getTransformation(mat: number[], origin: Point, includeMorphedBBox: boolean, scaleCanvasSize: boolean): Matrix {
-    let M: Matrix = {
-      a: mat[0],
-      b: mat[3],
-      c: mat[1],
-      d: mat[4],
-      e: mat[2],
-      f: mat[5],
-    };
+  function onTileRotationChanged(newValue: number) {
+    tileRotation = newValue;
+    if (autoUpdate) updatePromise = update();
+  }
 
-    
+  function getTransformation(M: Matrix, origin: Point, includeMorphedBBox: boolean, scaleCanvasSize: boolean): Matrix {
+   
 
     // Decompose M into Translation, Rotation, Scale Matrices
     M.e = 0; //MM.e*tilingSize;
@@ -791,7 +819,7 @@
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
 
-    let angle = Math.atan2(M.b, M.a);
+    let angle = Math.atan2(M.b, M.a) + tileRotation * (Math.PI/180);
 
     let tx: number = -tileCenter.x + origin.x;
     let ty: number = -tileCenter.y + origin.y;
@@ -852,23 +880,14 @@
     return Mtransform;
   }
 
-  function getInverseTransformation(mat: number[], origin: Point, scaleCanvasSize: boolean): Matrix {
-    let M: Matrix = {
-      a: mat[0],
-      b: mat[3],
-      c: mat[1],
-      d: mat[4],
-      e: mat[2],
-      f: mat[5],
-    };
-
+  function getInverseTransformation(M: Matrix, origin: Point, scaleCanvasSize: boolean): Matrix {
     // Decompose M into Translation, Rotation, Scale Matrices
     M.e = 0;
     M.f = 0;
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
     
-    let angle = Math.atan2(M.b, M.a);
+    let angle = Math.atan2(M.b, M.a) + tileRotation * (Math.PI/180);
     
     let tx: number = tileCenter.x - origin.x;
     let ty: number = tileCenter.y - origin.y;
@@ -1078,6 +1097,12 @@
       <p class="">Tile Size [%]</p>
       <div class="col-span-3 min-w-72">
         <Range min={50} max={300} stepSize={1} initialValue={tileSize * 100} decimalPlaces={0} on:change={(e) => onTileSizeChanged(e.detail.value)} />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">Tile Rotation [°]</p>
+      <div class="col-span-3 min-w-72">
+        <Range min={0} max={360} stepSize={1} initialValue={tileRotation} decimalPlaces={0} on:change={(e) => onTileRotationChanged(e.detail.value)} />
       </div>
     </div>
     <div class="grid grid-cols-4">

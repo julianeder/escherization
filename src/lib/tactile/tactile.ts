@@ -9,6 +9,7 @@
  */
 
 
+import type { Matrix } from "transformation-matrix";
 import { SiteSegment, Point } from "../voronoiDataStructures";
 
 
@@ -35,13 +36,13 @@ export function mul(A: number[], B: number[]): number[] {
 
 };
 
-export function mulSegment(A: number[], B: SiteSegment): SiteSegment {
+export function mulSegment(A: Matrix, B: SiteSegment): SiteSegment {
 	// Matrix * Point
 	return new SiteSegment(
-		A[0] * B.x1 + A[1] * B.y1 + A[2],
-		A[3] * B.x1 + A[4] * B.y1 + A[5],
-		A[0] * B.x2 + A[1] * B.y2 + A[2],
-		A[3] * B.x2 + A[4] * B.y2 + A[5],
+		A.a * B.x1 + A.c * B.y1 + A.e,
+		A.b * B.x1 + A.d * B.y1 + A.f,
+		A.a * B.x2 + A.c * B.y2 + A.e,
+		A.b * B.x2 + A.d * B.y2 + A.f,
 		B.color,
 		B.M,
 		B.tileIdx
