@@ -779,7 +779,7 @@
                                 {/if}
 
                                 {#each outlines_Img as fl, idx}
-                                    <path id={"outlineMorphed_" + idx} d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl.endPoint.y}" stroke="#c300ff" stroke-width="2" fill="none"></path>                                                                   
+                                    <path id={"outline_" + idx} d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl.endPoint.y}" stroke="yellow" stroke-width="2" fill="none"></path>                                                                   
                                 {/each}
                                 
                             </g>

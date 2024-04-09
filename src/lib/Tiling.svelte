@@ -6,7 +6,7 @@
   import instantiate_wasmMorph, { type FeatureLine, type MorphWasmModule } from "../lib/wasm/wasmMorph";
   import { IsohedralTiling, makeMatrix, mulSegment } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
-  import { type Matrix, compose, scale, toSVG, translate, rotate, applyToPoint, flipX, flipY } from "transformation-matrix";
+  import { type Matrix, compose, scale, toSVG, translate, rotate, applyToPoint, flipX, flipY, identity } from "transformation-matrix";
   import { canvasSize, ImageStoreContent, imageStore, siteStore, originStore, SymGroupParams, dataBackStore } from "./state";
   import { checkIntersections } from "./collisionDetection";
 
@@ -39,7 +39,7 @@
   let tilingScaleFactor: number = 1;
   let tilingSize: number = 150;
 
-  let tileSize: number = 1;
+  let tileSize: number = 1.5;
   let tileCenter: Point = new Point(150, 150);
   let imageOffset: Point;
 
@@ -95,9 +95,9 @@
 
 
   const symGroups: Array<SymGroupParams> = [
+    { symGroup: "p1", IH: 1, origin: "center", name: "Grid Shifted", image: p1, tilingScaleFactor: 0.66, parameterNames: p1ParameterNames,},
     { symGroup: "p4m",IH: 76,origin: "ul",name: "Grid",image: p4m,tilingScaleFactor: 0.5,parameterNames: {},},
     { symGroup: "p2",IH: 4,origin: "ul",name: "2 Rotations",image: p2,tilingScaleFactor: 0.66,parameterNames: p2ParameterNames,},
-    { symGroup: "p1", IH: 1, origin: "center", name: "Grid Shifted", image: p1, tilingScaleFactor: 0.66, parameterNames: p1ParameterNames,},
     { symGroup: "p3", IH: 7, origin: "center", name: "3 Rotations", image: p3, tilingScaleFactor: 0.66, parameterNames: p3ParameterNames,},
     { symGroup: "p4g", IH: 71, origin: "ul", name: "4 Rotations", image: p4g, tilingScaleFactor: 0.5, parameterNames: {},},
     { symGroup: "p6", IH: 21, origin: "center", name: "6 Rotations", image: p6, tilingScaleFactor: 0.5, parameterNames: p6ParameterNames,},
@@ -194,6 +194,8 @@
       if (tiles[i].tileIdx == mostCenterTile.tileIdx) {
         T2I = getInverseTransformation(tiles[i].M, tiles[i].origin, true);
         I2T = getTransformation(tiles[i].M, tiles[i].origin, false, true);
+        // console.log("origin " + tiles[i].origin.x + " " + tiles[i].origin.y)
+
         voronoiCells
           .filter((c) => c.tileIdx == tiles[i].tileIdx)
           .forEach((c) => {
@@ -240,6 +242,15 @@
         );
         // console.log(outlines);
 
+      
+        // console.log("For 0 0")
+        // let s1 = applyToPoint(T2I!, new Point(0,0))
+        // let s2 = applyToPoint(I2T!, s1)
+        // console.log("T2I " + 0 + " " + 0 + " -> " + s1.x + " " + s1.y)
+        // console.log("I2T " + " -> " + s2.x + " " + s2.y)
+
+          
+
         let outlines_Img: FeatureLine[] = [];
         for (let i = 0; i < outlines.length; i++) {
           let s1 = applyToPoint(T2I!, new Point(outlines[i].startPoint.x,outlines[i].startPoint.y))
@@ -248,12 +259,12 @@
           let s2 = applyToPoint(I2T!, s1)
           let e2 = applyToPoint(I2T!, e1)
 
-          if(i==18){
-            console.log("NUMBER 18 ")
-            console.log(outlines[i])
-            console.log(s1)
-            console.log(e1)
-          }
+          // if(i==0){
+          //   console.log("NUMBER 0 ")
+          //   console.log("T2I " + outlines[i].startPoint.x + " " + outlines[i].startPoint.y + " -> " + s1.x + " " + s1.y)
+          //   console.log("I2T " + " -> " + s2.x + " " + s2.y)
+
+          // }
 
           outlines_Img.push({startPoint: s1, endPoint: e1});
 
@@ -266,13 +277,13 @@
 
           // }
 
-          outlines[i].startPoint.x = s2.x;
-          outlines[i].startPoint.y = s2.y;
-          outlines[i].endPoint.x = e2.x;
-          outlines[i].endPoint.y = e2.y;
+          // outlines[i].startPoint.x = s2.x;
+          // outlines[i].startPoint.y = s2.y;
+          // outlines[i].endPoint.x = e2.x;
+          // outlines[i].endPoint.y = e2.y;
 
         }
-        outlines = outlines;
+        // outlines = outlines;
 
         dataBackStore.set(outlines_Img);
 
@@ -326,7 +337,7 @@
             morphedSiteSegments.push(new SiteSegment(morphedOutline.get(i)!.startPoint.x, morphedOutline.get(i)!.startPoint.y, morphedOutline.get(i)!.endPoint.x, morphedOutline.get(i)!.endPoint.y, 0, [], -1));
           }
           morphedSiteSegments = morphedSiteSegments;
-          // console.log(morphedSiteSegments);
+          // console.log("lengths: " + outlines.length + " " + morphedSiteSegments.length);
         }
 
         let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height, p, a, b, t, imageDataVector, skelletonLinesVector, outlineLinesVector, mInvVector);
@@ -822,19 +833,21 @@
     //     sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
     //   }
     // }
-
-    let Mtransform = compose(
-      // translate(tx_image, ty_image),
-      rotate(angle, origin.x, origin.y), 
-      scale(sx, sy, origin.x, origin.y), 
-      translate(tx, ty),
-    );
+    let Mtransform = identity();
 
     if(Math.sign(M.a) != Math.sign(M.d))
       Mtransform = compose(Mtransform, flipX());
 
     if(Math.sign(M.c) != Math.sign(M.b))
       Mtransform = compose(Mtransform, flipY());
+    
+    Mtransform = compose(
+      // translate(tx_image, ty_image),
+      rotate(angle, origin.x, origin.y), 
+      scale(sx, sy, origin.x, origin.y), 
+      translate(tx, ty),
+    );
+
 
     return Mtransform;
   }
@@ -857,8 +870,8 @@
     
     let angle = Math.atan2(M.b, M.a);
     
-    let tx: number = -tileCenter.x + origin.x;
-    let ty: number = -tileCenter.y + origin.y;
+    let tx: number = tileCenter.x - origin.x;
+    let ty: number = tileCenter.y - origin.y;
 
     if(scaleCanvasSize){
       sx = canvasSize.x / (sx * tilingSize * tilingScaleFactor * tileSize); 
@@ -871,17 +884,20 @@
     // sx = canvasSize.x / (sx * tilingSize * tilingScaleFactor * tileSize); // canvasSize.x statt tileWidth ?
     // sy = canvasSize.y / (sy * tilingSize * tilingScaleFactor * tileSize); // canvasSize.y statt tileHeight ?
 
-    let Mtransform = compose(
-      translate(-tx, -ty), 
-      scale(sx, sy, origin.x, origin.y), 
-      rotate(-angle, origin.x, origin.y)
-    );
+    let Mtransform = identity();
 
     if(Math.sign(M.a) != Math.sign(M.d))
       Mtransform = compose(Mtransform, flipX());
 
     if(Math.sign(M.c) != Math.sign(M.b))
       Mtransform = compose(Mtransform, flipY());
+    
+    Mtransform = compose(
+      translate(tx, ty),
+      scale(sx, sy, origin.x, origin.y), 
+      rotate(-angle, origin.x, origin.y)
+    );
+    
 
     return Mtransform;
   }
