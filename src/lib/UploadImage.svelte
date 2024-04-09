@@ -8,11 +8,12 @@
         SiteSegment,
     } from "./voronoiDataStructures";
     import { Vectorization } from "./vectorization";
-    import { canvasSize, imageStore, siteStore, originStore, SymGroupParams } from "./state";
+    import { canvasSize, imageStore, siteStore, originStore, SymGroupParams, dataBackStore } from "./state";
     import { checkIntersections } from "./collisionDetection";
 
     import ExampleImage from './images/Tux.png';
     import { toSVG, type Matrix, compose, scale, translate } from "transformation-matrix";
+    import type { FeatureLine } from "./wasm/wasmMorph";
     // import DropFile from '@svelte-parts/drop-file'
 
     let tracer: any;
@@ -66,6 +67,8 @@
     let lastError: any = "";
 
     let myOrigin: string = "";
+
+    let outlines_Img: FeatureLine[] = [];
 
     function update() {
         //Trigger Reactive Update?
@@ -135,6 +138,14 @@
                 // ctx.fillRect(0, 0, width, height);
                 updateOrigin()
                 update();
+
+                imageData = ctx!.getImageData(
+                            imgX,
+                            imgY,
+                            tileWidth,
+                            tileHeight,
+                        );
+
                 // console.log("w h" + imageData?.width + " " + imageData?.height);
                 imageStore.set({image: imageElement, imageData: imageData});
             });
@@ -292,8 +303,7 @@
         link.download = "canvas.png";
         link.href = canvas.toDataURL();
         link.click();
-    };
-
+    }
 
     function getTransformation(imageElement: HTMLImageElement): Matrix {
 
@@ -548,6 +558,10 @@
             updateOrigin();
         });
 
+        dataBackStore.subscribe((value: FeatureLine[]) => {
+            outlines_Img = value;
+        });
+
         tracer = await TraceSkeleton2.load();
         updateStore();
     });
@@ -763,6 +777,11 @@
                                         on:click={(evt) => backgroundClick(evt)}
                                     ></circle>
                                 {/if}
+
+                                {#each outlines_Img as fl, idx}
+                                    <path id={"outlineMorphed_" + idx} d="M {fl.startPoint.x} {fl.startPoint.y} L {fl.endPoint.x} {fl.endPoint.y}" stroke="#c300ff" stroke-width="2" fill="none"></path>                                                                   
+                                {/each}
+                                
                             </g>
                         </svg>
                     </div>

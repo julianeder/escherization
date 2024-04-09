@@ -1,5 +1,6 @@
 import { writable, type Writable } from "svelte/store";
 import { Sites, Point } from "./voronoiDataStructures";
+import type { FeatureLine } from "./wasm/wasmMorph";
 
 export const canvasSize: Point = new Point(300, 300);
 
@@ -35,5 +36,9 @@ export let originStore: Writable<SymGroupParams> = writable({
   origin: "",
   name: "",
   image: "",
-  tilingScaleFactor: 1
+  tilingScaleFactor: 1,
+  parameterNames: null
 });
+
+
+export let dataBackStore: Writable<FeatureLine[]> = writable([]);

@@ -4,10 +4,10 @@
   import { BBox, type Edge, SitePoint, SiteSegment, type Vertex, Sites, type Cell, type Tile, Point } from "./voronoiDataStructures";
   import instantiate_wasmVoronoi, { type VoronoiWasmModule, type EdgeResult, type DiagrammResult, type CellResult } from "../lib/wasm/wasmVoronoi";
   import instantiate_wasmMorph, { type FeatureLine, type MorphWasmModule } from "../lib/wasm/wasmMorph";
-  import { IsohedralTiling, mulSegment } from "./tactile/tactile";
+  import { IsohedralTiling, makeMatrix, mulSegment } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
   import { type Matrix, compose, scale, toSVG, translate, rotate, applyToPoint, flipX, flipY } from "transformation-matrix";
-  import { canvasSize, ImageStoreContent, imageStore, siteStore, originStore, SymGroupParams } from "./state";
+  import { canvasSize, ImageStoreContent, imageStore, siteStore, originStore, SymGroupParams, dataBackStore } from "./state";
   import { checkIntersections } from "./collisionDetection";
 
   import p4m from "./images/p4m.png";
@@ -187,13 +187,13 @@
 
     // Get Outline
     outlines = [];
-    let Minv: Matrix;
-    let M: Matrix; 
+    let T2I: Matrix;
+    let I2T: Matrix; 
 
     for (let i = 0; i < tiles.length; i++) {
       if (tiles[i].tileIdx == mostCenterTile.tileIdx) {
-        Minv = getInverseTransformation(tiles[i].M, tiles[i].origin);
-        M = getTransformation(tiles[i].M, tiles[i].origin, false, false);
+        T2I = getInverseTransformation(tiles[i].M, tiles[i].origin, true);
+        I2T = getTransformation(tiles[i].M, tiles[i].origin, false, true);
         voronoiCells
           .filter((c) => c.tileIdx == tiles[i].tileIdx)
           .forEach((c) => {
@@ -240,13 +240,50 @@
         );
         // console.log(outlines);
 
+        let outlines_Img: FeatureLine[] = [];
+        for (let i = 0; i < outlines.length; i++) {
+          let s1 = applyToPoint(T2I!, new Point(outlines[i].startPoint.x,outlines[i].startPoint.y))
+          let e1 = applyToPoint(T2I!, new Point(outlines[i].endPoint.x,outlines[i].endPoint.y))
+
+          let s2 = applyToPoint(I2T!, s1)
+          let e2 = applyToPoint(I2T!, e1)
+
+          if(i==18){
+            console.log("NUMBER 18 ")
+            console.log(outlines[i])
+            console.log(s1)
+            console.log(e1)
+          }
+
+          outlines_Img.push({startPoint: s1, endPoint: e1});
+
+          // if(outlines[i].startPoint.x != s2.x || outlines[i].startPoint.y != s2.y 
+          // || outlines[i].endPoint.x != e2.x || outlines[i].endPoint.y != e2.y ){
+          //   console.log("UNQUAL ")
+          //   console.log(outlines[i])
+          //   console.log(s2)
+          //   console.log(e2)
+
+          // }
+
+          outlines[i].startPoint.x = s2.x;
+          outlines[i].startPoint.y = s2.y;
+          outlines[i].endPoint.x = e2.x;
+          outlines[i].endPoint.y = e2.y;
+
+        }
+        outlines = outlines;
+
+        dataBackStore.set(outlines_Img);
+
+
         const mInvVector = new wasmMorph.VectorDouble();
-        mInvVector.push_back(Minv!.a);
-        mInvVector.push_back(Minv!.b);
-        mInvVector.push_back(Minv!.c);
-        mInvVector.push_back(Minv!.d);
-        mInvVector.push_back(Minv!.e);
-        mInvVector.push_back(Minv!.f);
+        mInvVector.push_back(T2I!.a);
+        mInvVector.push_back(T2I!.b);
+        mInvVector.push_back(T2I!.c);
+        mInvVector.push_back(T2I!.d);
+        mInvVector.push_back(T2I!.e);
+        mInvVector.push_back(T2I!.f);
 
         let bbox = wasmMorph.getBBox(outlineLinesVector, mInvVector);
 
@@ -258,8 +295,8 @@
 
 
 
-        let l = applyToPoint(M!, new Point(morphedBBox[0],morphedBBox[1]))
-        let h = applyToPoint(M!, new Point(morphedBBox[2],morphedBBox[3]))
+        let l = applyToPoint(I2T!, new Point(morphedBBox[0],morphedBBox[1]))
+        let h = applyToPoint(I2T!, new Point(morphedBBox[2],morphedBBox[3]))
         morphedBBox_transf.yl = l.y;
         morphedBBox_transf.yh = h.y;
         
@@ -758,7 +795,7 @@
       sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
     }else{
       sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
-      sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
+      sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight; 
     }
 
     // if(isPattern){
@@ -802,7 +839,7 @@
     return Mtransform;
   }
 
-  function getInverseTransformation(mat: number[], origin: Point): Matrix {
+  function getInverseTransformation(mat: number[], origin: Point, scaleCanvasSize: boolean): Matrix {
     let M: Matrix = {
       a: mat[0],
       b: mat[3],
@@ -823,8 +860,13 @@
     let tx: number = -tileCenter.x + origin.x;
     let ty: number = -tileCenter.y + origin.y;
 
-    sx = tileWidth / (sx * tilingSize * tilingScaleFactor * tileSize); // canvasSize.x statt tileWidth ?
-    sy = tileHeight / (sy * tilingSize * tilingScaleFactor * tileSize); // canvasSize.y statt tileHeight ?
+    if(scaleCanvasSize){
+      sx = canvasSize.x / (sx * tilingSize * tilingScaleFactor * tileSize); 
+      sy = canvasSize.y / (sy * tilingSize * tilingScaleFactor * tileSize); 
+    }else{
+      sx = tileWidth / (sx * tilingSize * tilingScaleFactor * tileSize);
+      sy = tileHeight / (sy * tilingSize * tilingScaleFactor * tileSize);
+    }
 
     // sx = canvasSize.x / (sx * tilingSize * tilingScaleFactor * tileSize); // canvasSize.x statt tileWidth ?
     // sy = canvasSize.y / (sy * tilingSize * tilingScaleFactor * tileSize); // canvasSize.y statt tileHeight ?
@@ -914,7 +956,7 @@
         {#if isUptoDate}
           <defs>
             {#each tiles as tile, idx}
-              <pattern id={"pattern_" + tile.tileIdx} patternContentUnits="userSpaceOnUse" patternUnits="userSpaceOnUse" patternTransform={toSVG(getTransformation(tile.M, tile.origin, doMorph, true, true))} width={morphedBBox[2] - morphedBBox[0]} height={morphedBBox[3] - morphedBBox[1]}>
+              <pattern id={"pattern_" + tile.tileIdx} patternContentUnits="userSpaceOnUse" patternUnits="userSpaceOnUse" patternTransform={toSVG(getTransformation(tile.M, tile.origin, doMorph, true))} width={morphedBBox[2] - morphedBBox[0]} height={morphedBBox[3] - morphedBBox[1]}>
                 <image href={backgroundImage?.src} x={0} y={0} width={morphedBBox[2] - morphedBBox[0]} height={morphedBBox[3] - morphedBBox[1]} />
               </pattern>
             {/each}
