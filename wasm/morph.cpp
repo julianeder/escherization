@@ -1002,6 +1002,7 @@ EMSCRIPTEN_KEEPALIVE vector<int> getBBox(vector<FeatureLine> outlineLines, vecto
 
 EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float a, float b, float t,
                                                    vector<unsigned char> imageData,
+                                                   vector<unsigned char> imageDataProcessed,
                                                    vector<FeatureLine> skelletonLines,
                                                    vector<FeatureLine> outlineLines,
                                                    vector<double> matrixVector)
@@ -1009,6 +1010,7 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
 
   // // pixel ** dstImgMap;
   pixel **srcImgMap = pixmapFromVector(w, h, imageData);
+  pixel **srcImgMapProcessed = pixmapFromVector(w, h, imageDataProcessed);
 
   // printf("skelletonLines size  %zu \n", skelletonLines.size());
 
@@ -1033,13 +1035,13 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
   //   printf("sort %i %f %f %f %f\n", i, outlineLines[i].startPoint.x, outlineLines[i].endPoint.x, outlineLinesSorted[i].startPoint.x, outlineLinesSorted[i].endPoint.x);
   // }
 
-  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMap, w, h);
+  vector<FeatureLine> outlineLinesMorphed = projectOutlineLines(outlineLinesSorted, skelletonLines, srcImgMapProcessed, w, h);
 
   removeZeroLengthLines(outlineLinesSorted, outlineLinesMorphed);
   
   vector<FeatureLine> outlineLinestraced_inner;
   vector<FeatureLine> outlineLinestraced_outer;
-  traceBoundary(outlineLinesSorted, outlineLinesMorphed, skelletonLines, outlineLinestraced_inner, outlineLinestraced_outer, srcImgMap, w, h);
+  traceBoundary(outlineLinesSorted, outlineLinesMorphed, skelletonLines, outlineLinestraced_inner, outlineLinestraced_outer, srcImgMapProcessed, w, h);
   // removeZeroLengthLines(outlineLinesSorted, outlineLinesMorphed);
 
   // printf("\n\nsize %ld\n", outlineLinesMorphed.size());
@@ -1132,6 +1134,7 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
 
   // clear the previous pixmap
   delete[] srcImgMap;
+  delete[] srcImgMapProcessed;
   delete[] morphMap;
 
   return result;

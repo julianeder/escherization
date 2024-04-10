@@ -139,7 +139,7 @@
                 updateOrigin()
                 update();
 
-                imageData = ctx!.getImageData(
+                let imageDataProcessed:ImageData | null = ctx!.getImageData(
                             imgX,
                             imgY,
                             tileWidth,
@@ -147,7 +147,7 @@
                         );
 
                 // console.log("w h" + imageData?.width + " " + imageData?.height);
-                imageStore.set({image: imageElement, imageData: imageData});
+                imageStore.set({image: imageElement, imageData: imageData, imageDataProcessed: imageDataProcessed});
             });
             imageElement.src = ExampleImage;
 
@@ -208,7 +208,7 @@
                         update();
 
                         // Get Image Data back for the later stages
-                        imageData = ctx!.getImageData(
+                        let imageDataProcessed:ImageData | null = ctx!.getImageData(
                             imgX,
                             imgY,
                             tileWidth,
@@ -216,7 +216,7 @@
                         );
 
                         // console.log("w h" + imageData?.width + " " + imageData?.height);
-                        imageStore.set({image: imageElement, imageData: imageData});
+                        imageStore.set({image: imageElement, imageData: imageData, imageDataProcessed: imageDataProcessed});
                     });
                     imageElement.src = inputImage;
                 // let img = inputImage;

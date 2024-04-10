@@ -16,9 +16,10 @@ export let siteStore: Writable<Sites> = writable({
 export class ImageStoreContent {
   image: HTMLImageElement | null = null;
   imageData: ImageData | null = null;
+  imageDataProcessed: ImageData | null = null;
 }
 
-export let imageStore: Writable<ImageStoreContent> = writable({ image: null, imageData: null });
+export let imageStore: Writable<ImageStoreContent> = writable({ image: null, imageData: null, imageDataProcessed: null });
 
 export class SymGroupParams {
   symGroup: string = "";

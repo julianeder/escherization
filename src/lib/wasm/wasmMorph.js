@@ -27,7 +27,7 @@ Module['ready'] = new Promise((resolve, reject) => {
   readyPromiseResolve = resolve;
   readyPromiseReject = reject;
 });
-["getExceptionMessage","$incrementExceptionRefcount","$decrementExceptionRefcount","_memory","__Z15getMorphOutlineiifNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","__Z7getBBoxNSt3__26vectorI11FeatureLineNS_9allocatorIS1_EEEENS0_IdNS2_IdEEEE","__Z7doMorphiiffffNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","___indirect_function_table","onRuntimeInitialized"].forEach((prop) => {
+["getExceptionMessage","$incrementExceptionRefcount","$decrementExceptionRefcount","_memory","__Z15getMorphOutlineiifNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","__Z7getBBoxNSt3__26vectorI11FeatureLineNS_9allocatorIS1_EEEENS0_IdNS2_IdEEEE","__Z7doMorphiiffffNSt3__26vectorIhNS_9allocatorIhEEEES3_NS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE","___indirect_function_table","onRuntimeInitialized"].forEach((prop) => {
   if (!Object.getOwnPropertyDescriptor(Module['ready'], prop)) {
     Object.defineProperty(Module['ready'], prop, {
       get: () => abort('You are getting ' + prop + ' on the Promise object, instead of the instance. Use .then() to get called back with the instance, see the MODULARIZE docs in src/settings.js'),
@@ -3578,7 +3578,7 @@ var wasmImports = {
   /** @export */
   invoke_viiif: invoke_viiif,
   /** @export */
-  invoke_viiiffffiiii: invoke_viiiffffiiii,
+  invoke_viiiffffiiiii: invoke_viiiffffiiiii,
   /** @export */
   invoke_viiifffi: invoke_viiifffi,
   /** @export */
@@ -3597,7 +3597,7 @@ var ___wasm_call_ctors = createExportWrapper('__wasm_call_ctors');
 var ___cxa_free_exception = createExportWrapper('__cxa_free_exception');
 var __Z15getMorphOutlineiifNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE = Module['__Z15getMorphOutlineiifNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE'] = createExportWrapper('_Z15getMorphOutlineiifNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE');
 var __Z7getBBoxNSt3__26vectorI11FeatureLineNS_9allocatorIS1_EEEENS0_IdNS2_IdEEEE = Module['__Z7getBBoxNSt3__26vectorI11FeatureLineNS_9allocatorIS1_EEEENS0_IdNS2_IdEEEE'] = createExportWrapper('_Z7getBBoxNSt3__26vectorI11FeatureLineNS_9allocatorIS1_EEEENS0_IdNS2_IdEEEE');
-var __Z7doMorphiiffffNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE = Module['__Z7doMorphiiffffNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE'] = createExportWrapper('_Z7doMorphiiffffNSt3__26vectorIhNS_9allocatorIhEEEENS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE');
+var __Z7doMorphiiffffNSt3__26vectorIhNS_9allocatorIhEEEES3_NS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE = Module['__Z7doMorphiiffffNSt3__26vectorIhNS_9allocatorIhEEEES3_NS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE'] = createExportWrapper('_Z7doMorphiiffffNSt3__26vectorIhNS_9allocatorIhEEEES3_NS0_I11FeatureLineNS1_IS4_EEEES6_NS0_IdNS1_IdEEEE');
 var ___getTypeName = createExportWrapper('__getTypeName');
 var _fflush = createExportWrapper('fflush');
 var _malloc = createExportWrapper('malloc');
@@ -3784,10 +3784,10 @@ function invoke_vi(index,a1) {
   }
 }
 
-function invoke_viiiffffiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11) {
+function invoke_viiiffffiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12) {
   var sp = stackSave();
   try {
-    getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11);
+    getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12);
   } catch(e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;

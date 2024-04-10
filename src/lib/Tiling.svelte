@@ -44,7 +44,8 @@
   let imageOffset: Point;
 
   let backgroundImage: HTMLImageElement | null;
-  let backgroundImageData: ImageData | null;
+  let imageData: ImageData | null;
+  let imageDataProcessed: ImageData | null;
 
   let showSecondary: boolean = false;
 
@@ -90,9 +91,6 @@
     0: {name: "Vertical Spacing", min: 0.0,max: 0.5,stepSize: 0.01,initialValue: 0.104512294489,},
     1: {name: "Horizontal Spacing", min: 0.0,max: 1.3,stepSize: 0.01,initialValue: 0.65,},
   };
-
-
-
 
   const symGroups: Array<SymGroupParams> = [
     { symGroup: "p1", IH: 1, origin: "center", name: "Grid Shifted", image: p1, tilingScaleFactor: 0.66, parameterNames: p1ParameterNames,},
@@ -220,10 +218,12 @@
     outlines = outlines; // Reactive Update
 
     // Morphing
-    if (backgroundImageData != null) {
+    if (imageDataProcessed != null && imageData != null) {
       if (doMorph) {
         const imageDataVector = new wasmMorph.VectorByte();
-        backgroundImageData.data.forEach((b) => imageDataVector.push_back(b));
+        imageData.data.forEach((b) => imageDataVector.push_back(b));
+        const imageDataProcessedVector = new wasmMorph.VectorByte();
+        imageDataProcessed.data.forEach((b) => imageDataProcessedVector.push_back(b));
 
         const skelletonLinesVector = new wasmMorph.VectorFeatureLine();
         tileSiteSegments.forEach((ss) =>
@@ -285,8 +285,11 @@
         }
         // outlines = outlines;
 
-        dataBackStore.set(outlines_Img);
-
+        if(showDebugMorphLines){
+          dataBackStore.set(outlines_Img);
+        }else{
+          dataBackStore.set([]);
+        }
 
         const mInvVector = new wasmMorph.VectorDouble();
         mInvVector.push_back(T2I!.a);
@@ -330,7 +333,7 @@
 
 
         if (showDebugMorphLines) {
-          let morphedOutline = wasmMorph.getMorphOutline(backgroundImageData.width, backgroundImageData.height, t, imageDataVector, skelletonLinesVector, outlineLinesVector, mInvVector);
+          let morphedOutline = wasmMorph.getMorphOutline(imageData.width, imageData.height, t, imageDataProcessedVector,skelletonLinesVector, outlineLinesVector, mInvVector);
 
           morphedSiteSegments = [];
           for (let i = 0; i < morphedOutline.size(); i++) {
@@ -340,19 +343,19 @@
           // console.log("lengths: " + outlines.length + " " + morphedSiteSegments.length);
         }
 
-        let result = wasmMorph.doMorph(backgroundImageData.width, backgroundImageData.height, p, a, b, t, imageDataVector, skelletonLinesVector, outlineLinesVector, mInvVector);
+        let result = wasmMorph.doMorph(imageDataProcessed.width, imageDataProcessed.height, p, a, b, t, imageDataVector, imageDataProcessedVector, skelletonLinesVector, outlineLinesVector, mInvVector);
 
         // console.log("result.size " + result.size());
-        let morphedBackgroundImageData: ImageData = new ImageData(morphedBBox[2] - morphedBBox[0], morphedBBox[3] - morphedBBox[1]);
+        let morphedImageData: ImageData = new ImageData(morphedBBox[2] - morphedBBox[0], morphedBBox[3] - morphedBBox[1]);
         for (let i = 0; i < result.size(); i++) {
           // let e: number = result.get(i);
-          morphedBackgroundImageData.data[i] = result.get(i)!;
+          morphedImageData.data[i] = result.get(i)!;
         }
         // console.log(morphedBackgroundImageData.data);
 
-        backgroundImage = imagedataToImage(morphedBackgroundImageData);
+        backgroundImage = imagedataToImage(morphedImageData);
       } else {
-        backgroundImage = imagedataToImage(backgroundImageData);
+        backgroundImage = imagedataToImage(imageDataProcessed);
         morphedBBox = [0, 0, tileWidth, tileHeight];
       }
     }
@@ -783,8 +786,6 @@
       f: mat[5],
     };
 
-    
-
     // Decompose M into Translation, Rotation, Scale Matrices
     M.e = 0; //MM.e*tilingSize;
     M.f = 0; //MM.f*tilingSize;
@@ -809,30 +810,6 @@
       sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight; 
     }
 
-    // if(isPattern){
-    //   if (includeMorphedBBox) {
-    //     tx = tx + morphedBBox[0];
-    //     ty = ty + morphedBBox[1];
-        
-    //     sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
-    //     sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
-    //   } else {
-    //     sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
-    //     sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
-    //   }
-
-    // }else{
-    //   if (includeMorphedBBox) {
-    //     // tx = tx + morphedBBox[0];
-    //     // ty = ty + morphedBBox[1];
-        
-    //     sx = (sx * tilingSize * tilingScaleFactor * tileSize) / canvasSize.x;
-    //     sy = (sy * tilingSize * tilingScaleFactor * tileSize) / canvasSize.y;
-    //   } else {
-    //     sx = (sx * tilingSize * tilingScaleFactor * tileSize) / tileWidth;
-    //     sy = (sy * tilingSize * tilingScaleFactor * tileSize) / tileHeight;
-    //   }
-    // }
     let Mtransform = identity();
 
     if(Math.sign(M.a) != Math.sign(M.d))
@@ -924,7 +901,8 @@
 
     imageStore.subscribe((value: ImageStoreContent) => {
       backgroundImage = value.image;
-      backgroundImageData = value.imageData;
+      imageData = value.imageData;
+      imageDataProcessed = value.imageDataProcessed;
       isUptoDate = false;
       // console.log(backgroundImage);
       // if (autoUpdate)  updatePromise = update();
