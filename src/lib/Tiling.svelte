@@ -17,6 +17,7 @@
   import p6 from "./images/p6.png";
   import p6m from "./images/p6m.png";
   import p4g from "./images/p4g.png";
+  import p4 from "./images/p4.png";
 
   let wasmVoronoi: VoronoiWasmModule;
   let wasmMorph: MorphWasmModule;
@@ -37,9 +38,9 @@
   let voronoiEdges: Edge[] = [];
   let voronoiCells: Cell[] = [];
   let tilingScaleFactor: number = 1;
-  let tilingSize: number = 150;
+  let tilingSize: number = 100;
 
-  let tileSize: number = 1.5;
+  let tileSize: number = 1;
   let tileCenter: Point = new Point(150, 150);
   let imageOffset: Point;
 
@@ -67,7 +68,7 @@
   let morphedBBox_transf: BBox = new BBox(0,0,0,0);
 
   const p2ParameterNames = {
-    0: {name: "Spacing Column 1-2",min: 0.01,max: 0.3,stepSize: 0.01,initialValue: 0.2,},
+    0: {name: "Spacing Column 1-2",min: 0.01,max: 0.6,stepSize: 0.01,initialValue: 0.2,},
     1: {name: "Height Offset",min: 0.12,max: 0.25,stepSize: 0.01,initialValue: 0,},
     // 2: {name:"2", min: 0.01, max: 2, stepSize: 0.01, initialValue: 0.2},
     // 3: {name:"3", min: 0.01, max: 2, stepSize: 0.01, initialValue: 0.2},
@@ -92,12 +93,18 @@
     1: {name: "Horizontal Spacing", min: 0.0,max: 1.3,stepSize: 0.01,initialValue: 0.65,},
   };
 
+  const p4ParameterNames = {
+    0: {name: "Horizontal Spacing", min: 0.0,max: 2.0,stepSize: 0.01,initialValue: 0.230769230769},
+    1: {name: "Vertical Spacing", min: 0.0,max: 2.0,stepSize: 0.01,initialValue: 0.230769230769},
+  };
+
   const symGroups: Array<SymGroupParams> = [
     { symGroup: "p1", IH: 1, origin: "center", name: "Grid Shifted", image: p1, tilingScaleFactor: 0.66, parameterNames: p1ParameterNames,},
     { symGroup: "p4m",IH: 76,origin: "ul",name: "Grid",image: p4m,tilingScaleFactor: 0.5,parameterNames: {},},
     { symGroup: "p2",IH: 4,origin: "ul",name: "2 Rotations",image: p2,tilingScaleFactor: 0.66,parameterNames: p2ParameterNames,},
     { symGroup: "p3", IH: 7, origin: "center", name: "3 Rotations", image: p3, tilingScaleFactor: 0.66, parameterNames: p3ParameterNames,},
-    { symGroup: "p4g", IH: 71, origin: "ul", name: "4 Rotations", image: p4g, tilingScaleFactor: 0.5, parameterNames: {},},
+    { symGroup: "p4", IH: 28, origin: "center", name:"p4", image: p4, tilingScaleFactor: 0.5, parameterNames: p4ParameterNames},
+    // { symGroup: "p4g", IH: 71, origin: "ul", name: "4 Rotations", image: p4g, tilingScaleFactor: 0.5, parameterNames: {},},
     { symGroup: "p6", IH: 21, origin: "center", name: "6 Rotations", image: p6, tilingScaleFactor: 0.5, parameterNames: p6ParameterNames,},
     { symGroup: "p6m", IH: 37, origin: "center", name: "6 Rotations Mirrored", image: p6m, tilingScaleFactor: 0.5, parameterNames: {},},
     // "4": {symGroup: "p2",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
@@ -106,7 +113,6 @@
     // "13":{symGroup: "pmg",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
     // "16":{symGroup: "p31m", origin: "center", name:"", image: null, tilingScaleFactor: 1},
     // "26":{symGroup: "cmm",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
-    // "28":{symGroup: "p4",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
     // "42":{symGroup: "pm",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
     // "72":{symGroup: "pmm",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
   ];
@@ -122,7 +128,7 @@
   let color3: string = "#c3c63580";
 
   let doMorph: boolean = true;
-  let p: number = 0;
+  let p: number = 0.6;
   let a: number = 1;
   let b: number = 2;
   let t: number = 1;
@@ -144,15 +150,35 @@
     await new Promise<void>((resolve, reject) => {
       setTimeout(() => {
         try {
+
+          let startTime = new Date().getTime();
+
           updateTilingParameters();
           updateTiling();
+
+          // const tilingTime = new Date().getTime();
+          // const durationTiling = tilingTime - startTime;
 
           if (checkIntersections(tilingSiteSegments)) {
             lastError = "Collision between tiles detected, please change the paremeters (e.g. decrease Tile Size)";
           } else {
             lastError = "";
+            // startTime = new Date().getTime();
+
             updateVoronoi();
+
+            // const voronoiTime = new Date().getTime();
+            // const durationVoronoi = voronoiTime - startTime;
+
+            // startTime = new Date().getTime();
+
             updateMorph();
+
+            // const morphTime = new Date().getTime();
+            // const durationMorph = morphTime - startTime;
+
+            // console.log(`${durationTiling} ${durationVoronoi} ${durationMorph}`);
+
           }
         } catch (e) {
           lastError = e;
@@ -355,7 +381,7 @@
 
         backgroundImage = imagedataToImage(morphedImageData);
       } else {
-        backgroundImage = imagedataToImage(imageDataProcessed);
+        backgroundImage = imagedataToImage(imageData);
         morphedBBox = [0, 0, tileWidth, tileHeight];
       }
     }

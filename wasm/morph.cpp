@@ -21,21 +21,6 @@ typedef struct pix
   unsigned char r, g, b, a;
 } pixel;
 
-// the GUI variables
-int currentButton;
-int currentPhase = 0;
-Point *hitpoint;
-Point *startPoint;
-
-// The name of input and output files
-string inputFileOrig;
-string inputFileDest;
-string outputFile;
-// the parameter of the weight
-string pStr, aStr, bStr, tStr;
-// float p = 0;
-// float a = 1;
-// float b = 2;
 
 //--------------------------------------------------------------------------
 //------------------------allocPixmap---------------------------------------
@@ -1050,8 +1035,8 @@ EMSCRIPTEN_KEEPALIVE vector<unsigned char> doMorph(int w, int h, float p, float 
   vector<FeatureLine> srcLines;
   vector<FeatureLine> dstLines;
 
-  srcLines.insert(srcLines.end(), skelletonLines.begin(), skelletonLines.end());
-  dstLines.insert(dstLines.end(), skelletonLines.begin(), skelletonLines.end());
+  // srcLines.insert(srcLines.end(), skelletonLines.begin(), skelletonLines.end());
+  // dstLines.insert(dstLines.end(), skelletonLines.begin(), skelletonLines.end());
 
   dstLines.insert(dstLines.end(), outlineLinestraced_outer.begin(), outlineLinestraced_outer.end());
   lineInterpolate(outlineLinestraced_outer, outlineLinestraced_inner, srcLines, t);

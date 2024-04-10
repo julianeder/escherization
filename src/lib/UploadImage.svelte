@@ -71,6 +71,8 @@
     let outlines_Img: FeatureLine[] = [];
 
     function update() {
+        // const startTimeInMs = new Date().getTime();
+
         //Trigger Reactive Update?
         siteSegments = Vectorization.updateSkelleton(
             ctx!,
@@ -81,6 +83,11 @@
             deviation,
         );
         updateStore();
+
+        // const endTimeInMs = new Date().getTime();
+        // const durationInMs = endTimeInMs - startTimeInMs;
+        // console.log(`skelletonization: ${durationInMs} ms`);
+
     }
 
     function updateStore() {
