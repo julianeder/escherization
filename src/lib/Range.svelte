@@ -202,6 +202,9 @@
         on:mousedown={onDragStart}
         on:mouseover={() => (thumbHover = true)}
         on:mouseout={() => (thumbHover = false)}
+        on:focus={() => {}}
+        on:blur={() => {}}
+        role="none"
       >
         {#if holding || thumbHover}
           <div

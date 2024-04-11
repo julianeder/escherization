@@ -22,7 +22,6 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
-    "@svelte-parts/drop-file": "^0.0.23",
     "skeleton-tracing-js": "^1.0.4",
     "skeleton-tracing-wasm": "^1.0.3",
     "svelte-awesome-color-picker": "^3.0.4",
