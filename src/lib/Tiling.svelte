@@ -60,7 +60,7 @@
   let showOrigins: boolean = false;
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
-  let showDebugMorphLines: boolean = true;
+  let showDebugMorphLines: boolean = false;
 
   let morphedSiteSegments: SiteSegment[] = []; // Debug only
   let mostCenterTile: Tile;
@@ -103,7 +103,7 @@
     { symGroup: "p4m",IH: 76,origin: "ul",name: "Grid",image: p4m,tilingScaleFactor: 0.5,parameterNames: {},},
     { symGroup: "p2",IH: 4,origin: "ul",name: "2 Rotations",image: p2,tilingScaleFactor: 0.66,parameterNames: p2ParameterNames,},
     { symGroup: "p3", IH: 7, origin: "center", name: "3 Rotations", image: p3, tilingScaleFactor: 0.66, parameterNames: p3ParameterNames,},
-    { symGroup: "p4", IH: 28, origin: "center", name:"p4", image: p4, tilingScaleFactor: 0.5, parameterNames: p4ParameterNames},
+    { symGroup: "p4", IH: 28, origin: "center", name:"4 Rotations", image: p4, tilingScaleFactor: 0.5, parameterNames: p4ParameterNames},
     // { symGroup: "p4g", IH: 71, origin: "ul", name: "4 Rotations", image: p4g, tilingScaleFactor: 0.5, parameterNames: {},},
     { symGroup: "p6", IH: 21, origin: "center", name: "6 Rotations", image: p6, tilingScaleFactor: 0.5, parameterNames: p6ParameterNames,},
     { symGroup: "p6m", IH: 37, origin: "center", name: "6 Rotations Mirrored", image: p6m, tilingScaleFactor: 0.5, parameterNames: {},},
@@ -1031,7 +1031,7 @@
               </g>
             {/each}
             <rect x={morphedBBox_transf.xl} y={morphedBBox_transf.yl} width={morphedBBox_transf.xh-morphedBBox_transf.xl} height={morphedBBox_transf.yh-morphedBBox_transf.yl}
-            fill="#00000000" stroke="green">
+            stroke="green" style="fill:none">
 
             </rect>
             

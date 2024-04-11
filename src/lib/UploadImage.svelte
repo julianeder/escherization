@@ -696,8 +696,7 @@
                                     width={tileWidth}
                                     height={tileHeight}
                                     class="svgBackground"
-                                    style={cssVarStyles}
-                                    fill="transparent"
+                                    style={cssVarStyles + ";fill:none"}
                                     on:click={(evt) => backgroundClick(evt)}
                                 >
                                 </rect>
