@@ -363,7 +363,7 @@
 
           morphedSiteSegments = [];
           for (let i = 0; i < morphedOutline.size(); i++) {
-            morphedSiteSegments.push(new SiteSegment(morphedOutline.get(i)!.startPoint.x, morphedOutline.get(i)!.startPoint.y, morphedOutline.get(i)!.endPoint.x, morphedOutline.get(i)!.endPoint.y, 0, [], -1));
+            morphedSiteSegments.push(new SiteSegment(morphedOutline.get(i)!.startPoint.x, morphedOutline.get(i)!.startPoint.y, morphedOutline.get(i)!.endPoint.x, morphedOutline.get(i)!.endPoint.y));
           }
           morphedSiteSegments = morphedSiteSegments;
           // console.log("lengths: " + outlines.length + " " + morphedSiteSegments.length);
@@ -443,54 +443,56 @@
       const color = tiling.getColour(i.t1, i.t2, i.aspect);
       // Get the 3x3 matrix corresponding to one of the transformed
       // tiles in the filled region.
-      const M = i.T;
-      // console.log(
-      //   M[0] + " " + M[1] + " " + M[2] + "\n"
-      // + M[3] + " " + M[4] + " " + M[5] + "\n"
-      // + 0 + " " + 0 + " " + 0 + "\n"
-      // );
+      const mat = i.T;
+      let M: Matrix = {
+        a: mat[0],
+        b: mat[3],
+        c: mat[1],
+        d: mat[4],
+        e: mat[2],
+        f: mat[5],
+      };
 
-      let origin = scalePoint(SitePoint.mulPoint(M, new SitePoint(0, 0)), tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor);
+      let I2T = compose(
+        scale(tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor), 
+        M,
+      );
+
+      let o = applyToPoint(I2T, {x: 0, y: 0});
+
+      let origin = new SitePoint(o.x, o.y);
+        // scalePoint(
+        //   SitePoint.mulPoint(M, 
+        //     new SitePoint(0, 0)), 
+        //   tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor
+        // );
       let tile: Tile = { origin: origin, M: M, tileIdx: tiles.length - 1 }; //tileIndex counting up
 
 
       tiles.push(tile);
 
-      for (let j = 0; j < tileSitePoints.length; j++) {
-        let newSitePoint: SitePoint = 
-          scalePoint(
-            SitePoint.mulPoint(M, 
-              scalePoint(tileSitePoints[j], 
-                tileSize / tileWidth, tileSize / tileHeight
-              )
-            ), 
-            tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor
-          );
+      let I2T2C = compose(
+        I2T,
+        scale(tileSize / canvasSize.x, tileSize / canvasSize.y), 
+      );
 
-        newSitePoint.color = color;
-        newSitePoint.tileIdx = tile.tileIdx;
-        newSitePoint.M = M;
+
+      for (let j = 0; j < tileSitePoints.length; j++) {
+        let p = applyToPoint(I2T2C, {x: tileSitePoints[j].x, y: tileSitePoints[j].y});
+        
+        let newSitePoint: SitePoint = new SitePoint(p.x, p.y, color, tile.tileIdx);
+        
         if (bbox.contains(newSitePoint.x, newSitePoint.y)) tilingSitePoints.push(newSitePoint);
       }
 
-      // console.log(
-      //   M[0] + " " + M[1] + " " + M[2] + "\n"
-      // + M[3] + " " + M[4] + " " + M[5] + "\n"
-      // + 0 + " " + 0 + " " + 0 + "\n"
-      // );
+
+
       for (let j = 0; j < tileSiteSegments.length; j++) {
-        let newSiteSegment: SiteSegment = 
-          scaleSegment(
-            mulSegment(M, 
-              scaleSegment(tileSiteSegments[j], 
-                tileSize / canvasSize.x, tileSize / canvasSize.y
-              )
-            ), 
-            tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor
-          );
-        newSiteSegment.color = color;
-        newSiteSegment.M = M;
-        newSiteSegment.tileIdx = tile.tileIdx;
+
+        let s = applyToPoint(I2T2C, {x: tileSiteSegments[j].x1, y: tileSiteSegments[j].y1});
+        let e = applyToPoint(I2T2C, {x: tileSiteSegments[j].x2, y: tileSiteSegments[j].y2});
+
+        let newSiteSegment: SiteSegment = new SiteSegment(s.x, s.y, e.x, e.y, color, tile.tileIdx);
 
         if (bbox.contains(newSiteSegment.x1, newSiteSegment.y1) || bbox.contains(newSiteSegment.x2, newSiteSegment.y2)) tilingSiteSegments.push(newSiteSegment);
       }
@@ -626,23 +628,23 @@
   }
 
   function scalePoint(p: SitePoint, sX: number, sY: number): SitePoint {
-    return new SitePoint(p.x * sX, p.y * sY, p.color, p.M, p.tileIdx);
+    return new SitePoint(p.x * sX, p.y * sY, p.color, p.tileIdx);
   }
 
   function scaleSegment(s: SiteSegment, sX: number, sY: number) {
-    return new SiteSegment(s.x1 * sX, s.y1 * sY, s.x2 * sX, s.y2 * sY, s.color, s.M, s.tileIdx);
+    return new SiteSegment(s.x1 * sX, s.y1 * sY, s.x2 * sX, s.y2 * sY, s.color, s.tileIdx);
   }
 
   function translateSegment(s: SiteSegment, offset: Point): SiteSegment {
-    return new SiteSegment(s.x1 + offset.x, s.y1 + offset.y, s.x2 + offset.x, s.y2 + offset.y, s.color, s.M, s.tileIdx);
+    return new SiteSegment(s.x1 + offset.x, s.y1 + offset.y, s.x2 + offset.x, s.y2 + offset.y, s.color, s.tileIdx);
   }
 
   function translatePoint(p: SitePoint, offset: Point): SitePoint {
-    return new SitePoint(p.x + offset.x, p.y + offset.y, p.color, p.M, p.tileIdx);
+    return new SitePoint(p.x + offset.x, p.y + offset.y, p.color, p.tileIdx);
   }
 
   function addPoint(event: MouseEvent) {
-    tilingSitePoints = [...tilingSitePoints, new SitePoint(event.offsetX, event.offsetY, undefined, [], -1)]; // This syntax triggeres Sveltes reactive reload
+    tilingSitePoints = [...tilingSitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
     siteStore.set({
       sitePoints: tilingSitePoints,
       siteSegments: tilingSiteSegments,
@@ -802,15 +804,7 @@
     if (autoUpdate) updatePromise = update();
   }
 
-  function getTransformation(mat: number[], origin: Point, includeMorphedBBox: boolean, scaleCanvasSize: boolean): Matrix {
-    let M: Matrix = {
-      a: mat[0],
-      b: mat[3],
-      c: mat[1],
-      d: mat[4],
-      e: mat[2],
-      f: mat[5],
-    };
+  function getTransformation(M: Matrix, origin: Point, includeMorphedBBox: boolean, scaleCanvasSize: boolean): Matrix {
 
     // Decompose M into Translation, Rotation, Scale Matrices
     M.e = 0; //MM.e*tilingSize;
@@ -855,15 +849,7 @@
     return Mtransform;
   }
 
-  function getInverseTransformation(mat: number[], origin: Point, scaleCanvasSize: boolean): Matrix {
-    let M: Matrix = {
-      a: mat[0],
-      b: mat[3],
-      c: mat[1],
-      d: mat[4],
-      e: mat[2],
-      f: mat[5],
-    };
+  function getInverseTransformation(M: Matrix, origin: Point, scaleCanvasSize: boolean): Matrix {
 
     // Decompose M into Translation, Rotation, Scale Matrices
     M.e = 0;
