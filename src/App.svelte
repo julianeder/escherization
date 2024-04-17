@@ -91,7 +91,7 @@
 
 
     <div class="flex flex-row flex-wrap flex-grow">
-      <div class="flex-grow flex-1" style="min-width: 500px">
+      <div class="flex-grow flex-1 min-w-fit">
         <p class="text-2xl font-sans text-center text-sky-400 p-4">
           Skeleton
         </p>
@@ -102,7 +102,7 @@
         class="col-start-2 min-h-[1em] w-px self-stretch bg-gradient-to-tr from-transparent via-neutral-500 to-transparent opacity-20 dark:opacity-100"
       ></div>
   
-      <div class="flex-grow flex-1" style="min-width: 1200px">
+      <div class="flex-grow flex-1 min-w-fit">
         <p class="text-2xl font-sans text-center text-sky-400 p-4">
           Tiling
         </p>

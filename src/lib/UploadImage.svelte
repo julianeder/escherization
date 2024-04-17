@@ -367,7 +367,14 @@
         svg!.addEventListener("mousemove", drag);
         svg!.addEventListener("mouseup", endDrag);
         svg!.addEventListener("mouseleave", endDrag);
+
+        svg!.addEventListener("touchstart", startDrag);
+        svg!.addEventListener("touchmove", drag);
+        svg!.addEventListener("touchend", endDrag);
+        svg!.addEventListener("touchcancel", endDrag);
+
         function startDrag(evt: any) {
+            console.log("start")
             if (activeTool == "move") {
                 if (evt.target.classList.contains("draggable")) {
                     selectedElement = evt.target;
@@ -384,6 +391,8 @@
             }
         }
         function drag(evt: any) {
+            console.log("move")
+
             if (selectedElement != null) {
                 evt.preventDefault();
                 var coord = getMousePosition(evt);
@@ -470,6 +479,8 @@
             }
         }
         function endDrag(evt: any) {
+            console.log("end")
+
             if (activeTool == "move" && selectedElement != null) {
                 selectedElement = null;
                 updateStore();
@@ -477,9 +488,23 @@
         }
         function getMousePosition(evt: any) {
             var CTM = svg.getScreenCTM();
+
+            let clientX = 0;
+            let clientY = 0; 
+            if(evt.touches && evt.touches[0] && !Number.isNaN(evt.touches[0].clientX) && evt.touches[0].clientY){
+                clientX = evt.touches[0].clientX;
+                clientY = evt.touches[0].clientY;
+
+            }else if(!Number.isNaN(evt.clientX) && !Number.isNaN(evt.clientX)){
+                clientX = evt.clientX;
+                clientY = evt.clientY;
+            }else{
+                console.log(evt)
+            }
+
             return {
-                x: (evt.clientX - CTM.e) / CTM.a,
-                y: (evt.clientY - CTM.f) / CTM.d,
+                x: (clientX - CTM.e) / CTM.a,
+                y: (clientY - CTM.f) / CTM.d,
             };
         }
     }
@@ -576,8 +601,8 @@
 </script>
 
 <div>
-    <div class="grid grid-cols-1 justify-items-center gap-4">
-        <div class="flex flex-cols">
+    <div class="flex flex-col items-center gap-4 place-content-start">
+        <div class="flex flex-row items-center">
             <div class="tools flex flex-col">
                 {#if activeTool == "move"}
                     <button
@@ -739,7 +764,7 @@
                                         style={cssVarStyles}
                                         cx={siteS.x1}
                                         cy={siteS.y1}
-                                        r="2"
+                                        r="4"
                                         fill="red"
                                         on:click={(evt) => siteSegmentClick(evt)}
                                     ></circle>
@@ -751,7 +776,7 @@
                                         style={cssVarStyles}
                                         cx={siteS.x2}
                                         cy={siteS.y2}
-                                        r="2"
+                                        r="4"
                                         fill="red"
                                         on:click={(evt) => siteSegmentClick(evt)}
                                     ></circle>
