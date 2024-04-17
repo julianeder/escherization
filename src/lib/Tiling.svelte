@@ -41,6 +41,7 @@
   let tilingSize: number = 100;
 
   let tileSize: number = 1;
+  let tileRotation: number = 0;
   let tileCenter: Point = new Point(150, 150);
   let imageOffset: Point;
 
@@ -453,13 +454,15 @@
         f: mat[5],
       };
 
+      let angle: number =  tileRotation * (Math.PI/180);
+
       let I2T = compose(
         scale(tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor), 
         M,
+        rotate(angle), 
       );
 
       let o = applyToPoint(I2T, {x: 0, y: 0});
-
       let origin = new SitePoint(o.x, o.y);
         // scalePoint(
         //   SitePoint.mulPoint(M, 
@@ -470,6 +473,7 @@
 
 
       tiles.push(tile);
+
 
       let I2T2C = compose(
         I2T,
@@ -799,8 +803,14 @@
     tilingSize = newValue;
     if (autoUpdate) updatePromise = update();
   }
+
   function onTileSizeChanged(newValue: number) {
     tileSize = newValue / 100;
+    if (autoUpdate) updatePromise = update();
+  }
+
+  function onTileRotationChanged(newValue: number) {
+    tileRotation = newValue;
     if (autoUpdate) updatePromise = update();
   }
 
@@ -812,7 +822,7 @@
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
 
-    let angle = Math.atan2(M.b, M.a);
+    let angle = Math.atan2(M.b, M.a) + tileRotation * (Math.PI/180);
 
     let tx: number = -tileCenter.x + origin.x;
     let ty: number = -tileCenter.y + origin.y;
@@ -857,7 +867,7 @@
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
     
-    let angle = Math.atan2(M.b, M.a);
+    let angle = Math.atan2(M.b, M.a) + tileRotation * (Math.PI/180);;
     
     let tx: number = tileCenter.x - origin.x;
     let ty: number = tileCenter.y - origin.y;
@@ -1068,6 +1078,12 @@
       <p class="">Tile Size [%]</p>
       <div class="col-span-3 min-w-72">
         <Range min={50} max={300} stepSize={1} initialValue={tileSize * 100} decimalPlaces={0} on:change={(e) => onTileSizeChanged(e.detail.value)} />
+      </div>
+    </div>
+    <div class="grid grid-cols-4">
+      <p class="">Tile Rotation [°]</p>
+      <div class="col-span-3 min-w-72">
+        <Range min={0} max={360} stepSize={1} initialValue={tileRotation} decimalPlaces={0} on:change={(e) => onTileRotationChanged(e.detail.value)} />
       </div>
     </div>
     <div class="grid grid-cols-4">
