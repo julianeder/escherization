@@ -19,7 +19,7 @@
     rel="stylesheet"
   />
   <header class="sticky z-50 bg-sky-500 top-0 p-4">
-    <h1 class="text-4xl font-sans text-center text-white">Eschherization</h1>
+    <h1 class="text-4xl font-sans text-center text-white">Escherization</h1>
     <button
       class="absolute right-3 top-3 min-h-12 min-w-12 bg-sky-500 rounded"
       on:click={() => {
