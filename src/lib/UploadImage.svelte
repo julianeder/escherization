@@ -374,7 +374,7 @@
         svg!.addEventListener("touchcancel", endDrag);
 
         function startDrag(evt: any) {
-            console.log("start")
+            // console.log("startDrag")
             if (activeTool == "move") {
                 if (evt.target.classList.contains("draggable")) {
                     selectedElement = evt.target;
@@ -389,10 +389,30 @@
                     );
                 }
             }
+            else if (activeTool == "add") {
+                sitePoints = [
+                    ...sitePoints,
+                    new SitePoint(evt.offsetX - imgX, evt.offsetY - imgY),
+                ];
+                updateStore();
+            } else if (activeTool == "addSegment") {
+                if (creatingSegmet == null) {
+                    creatingSegmet = new SiteSegment(
+                        evt.offsetX - imgX,
+                        evt.offsetY - imgY,
+                        evt.offsetX - imgX,
+                        evt.offsetY - imgY
+                    );
+                } else {
+                    creatingSegmet.x2 = evt.offsetX - imgX;
+                    creatingSegmet.y2 = evt.offsetY - imgY;
+                    siteSegments = [...siteSegments, creatingSegmet];
+                    creatingSegmet = null;
+                    updateStore();
+                }
+            }
         }
         function drag(evt: any) {
-            console.log("move")
-
             if (selectedElement != null) {
                 evt.preventDefault();
                 var coord = getMousePosition(evt);
@@ -479,8 +499,6 @@
             }
         }
         function endDrag(evt: any) {
-            console.log("end")
-
             if (activeTool == "move" && selectedElement != null) {
                 selectedElement = null;
                 updateStore();
@@ -511,6 +529,8 @@
 
     function setActiveTool(newTool: string) {
         activeTool = newTool;
+        // console.log("activeTool " + activeTool)
+
         if (activeTool == "move") {
             styles.cursorDraggable = "move";
             styles.cursorBackground = "default";
@@ -525,33 +545,6 @@
         if (activeTool != "addSegment") creatingSegmet = null;
     }
 
-    function backgroundClick(evt: any) {
-        if (activeTool == "add") {
-            sitePoints = [
-                ...sitePoints,
-                new SitePoint(evt.offsetX - imgX, evt.offsetY - imgY),
-            ];
-            updateStore();
-        } else if (activeTool == "addSegment") {
-            if (creatingSegmet == null) {
-                creatingSegmet = new SiteSegment(
-                    evt.offsetX - imgX,
-                    evt.offsetY - imgY,
-                    evt.offsetX - imgX,
-                    evt.offsetY - imgY,
-                    undefined,
-                    [],
-                    -1,
-                );
-            } else {
-                creatingSegmet.x2 = evt.offsetX - imgX;
-                creatingSegmet.y2 = evt.offsetY - imgY;
-                siteSegments = [...siteSegments, creatingSegmet];
-                creatingSegmet = null;
-                updateStore();
-            }
-        }
-    }
 
     function siteSegmentClick(evt: any) {
         if (activeTool == "delete") {
@@ -570,6 +563,7 @@
     }
 
     function sitePointClick(evt: any) {
+        console.log("sitePointClick")
         if (activeTool == "delete") {
             if (evt.target.classList.contains("sitePoint")) {
                 let idx: number = Number(
@@ -715,14 +709,12 @@
                             xmlns="http://www.w3.org/2000/svg"
                         >
                             <g transform="translate({imgX} {imgY})">
-                                <!-- svelte-ignore a11y-click-events-have-key-events -->
-                                <!-- svelte-ignore a11y-no-static-element-interactions -->
                                 <rect
                                     width={tileWidth}
                                     height={tileHeight}
                                     class="svgBackground"
                                     style={cssVarStyles + ";fill:none"}
-                                    on:click={(evt) => backgroundClick(evt)}
+                                    role="none"
                                 >
                                 </rect>
                                 <circle
@@ -805,7 +797,6 @@
                                         cy={creatingSegmet.y2}
                                         r="2"
                                         fill="red"
-                                        on:click={(evt) => backgroundClick(evt)}
                                     ></circle>
                                 {/if}
 
