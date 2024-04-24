@@ -16,7 +16,6 @@ morph.cpp geometricTool.cpp ^
 -s ASSERTIONS ^
 -sINITIAL_MEMORY=65536000 ^
 -s EXPORTED_RUNTIME_METHODS=['cwrap','ccall']
-@REM -s USE_BOOST_HEADERS=1 ^
 
 echo export default function instantiate_wasmMorph(mod^?: any): Promise^<MorphWasmModule^>^; >> ../src/lib/wasm/wasmMorph.d.ts
 

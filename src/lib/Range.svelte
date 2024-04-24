@@ -48,7 +48,7 @@
   }
 
   // Allows both bind:value and on:change for parent value retrieval
-  function setValue(val) {
+  function setValue(val: any) {
     value = val;
     let result: number = (value * stepSize).toFixed(decimalPlaces);
     dispatch("change", { value: result });

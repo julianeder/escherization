@@ -2,11 +2,12 @@
 
 //          Copyright Andrii Sydorchuk 2010-2012.
 // Distributed under the Boost Software License, Version 1.0.
-//    (See accompanying file LICENSE_1_0.txt or copy at
+//    (See accompanying file LICENSE_boost.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
 // See http://www.boost.org for updates, documentation, and revision history.
-// #include <emscripten/emscripten.h>
+// Modified by Julian Eder
+
 #include <emscripten/bind.h>
 using namespace emscripten;
 
@@ -18,8 +19,6 @@ using namespace emscripten;
 
 #include <boost/polygon/voronoi.hpp>
 #include <boost/polygon/polygon.hpp>
-
-#include "voronoi_visual_utils.hpp"
 
 using boost::polygon::voronoi_builder;
 using boost::polygon::voronoi_diagram;
@@ -47,15 +46,11 @@ typedef VD::const_vertex_iterator const_vertex_iterator;
 typedef VD::const_edge_iterator const_edge_iterator;
 
 
-// // #include "voronoi_visual_utils.hpp"
-
 struct Point {
   int a;
   int b;
   Point(int x, int y) : a(x), b(y) {}
-  // int x(){ return a; }  
   const int x(){ return a; }
-  // int y(){ return b; }
   const int y(){ return b; }
 
   inline bool operator==(point_type& rhs) {
@@ -105,13 +100,6 @@ namespace boost {
   }  // polygon
 }  // boost
   
-// #ifdef __cplusplus
-// #define EXTERN extern "C"
-// #else
-// #define EXTERN
-// #endif
-
-
 struct CellResult {
   size_t source_index;
   int source_category;
@@ -133,7 +121,6 @@ struct EdgeResult {
   bool isPrimary;
   bool isWithinCell;
   const voronoi_diagram<double>::edge_type* edge_ref; // not for javascript
-  // std::vector<double> samples;
   std::vector<double> controll_points;
 };
 
@@ -175,10 +162,6 @@ double get_point_projection(
     double point_vec_x = x(point) - x(low(segment));
     double point_vec_y = y(point) - y(low(segment));
 
-    // if(verbose) printf("segment_vec_x %f segment_vec_y %f \n", segment_vec_x, segment_vec_y);
-    // if(verbose) printf("point_vec_x %f point_vec_y %f \n", point_vec_x, point_vec_y);
-
-
     double sqr_segment_length =
         segment_vec_x * segment_vec_x + segment_vec_y * segment_vec_y;
     double vec_dot = segment_vec_x * point_vec_x + segment_vec_y * point_vec_y;
@@ -190,7 +173,7 @@ static double parabola_y(double x, double a, double b) {
   return ((x - a) * (x - a) + b * b) / (b + b);
 }
 
-  // Compute dy(x)/dx = ((x - a)² + b²) / (2b)' = (x-a) / b
+// Compute dy(x)/dx = ((x - a)² + b²) / (2b)' = (x-a) / b
 static double parabola_deriv_y(double x, double a, double b) {
   return (x - a) / b;
 }
@@ -198,8 +181,7 @@ static double parabola_deriv_y(double x, double a, double b) {
 void calc_control_points(
   Point& point,
   Segment& segment,
-  std::vector<point_type>* control_points,
-  bool verbose)
+  std::vector<point_type>* control_points)
 {
     // Save the first and last point.
     point_type c0 = (*control_points)[0];
@@ -211,51 +193,33 @@ void calc_control_points(
     // Apply the linear transformation to move start point of the segment to
     // the point with coordinates (0, 0) and the direction of the segment to
     // coincide the positive direction of the x-axis.
-    // v
     double segm_vec_x = high(segment).x() - low(segment).x();
     double segm_vec_y = high(segment).y() - low(segment).y();
     double sqr_segment_length = segm_vec_x * segm_vec_x + segm_vec_y * segm_vec_y;
 
     // Compute x-coordinates of the endpoints of the edge
     // in the transformed space.
-    double c0_x_proj = sqr_segment_length * // c_{0x}'
+    double c0_x_proj = sqr_segment_length * 
         get_point_projection(c0, segment);
-    double c2_x_proj = sqr_segment_length * // c_{2x}'
+    double c2_x_proj = sqr_segment_length * 
         get_point_projection(c2, segment);
-
-    // if(verbose) printf("sqr_segment_length %f get_point_projection(c0, segment) %f \n", sqr_segment_length, get_point_projection(c0, segment, verbose));
 
 
     // Compute parabola parameters in the transformed space.
     // Parabola has next representation:
     // f(x) = ((x-rot_x)^2 + rot_y^2) / (2.0*rot_y).
-    //f
     double point_vec_x = point.x() - low(segment).x();
     double point_vec_y = point.y() - low(segment).y();
 
-    // f_x' = (v dot f)
     double rot_x = segm_vec_x * point_vec_x + segm_vec_y * point_vec_y;
-    // f_y' = f - (v dot f)
     double rot_y = segm_vec_x * point_vec_y - segm_vec_y * point_vec_x;
 
-    // c_{0y}'
     double y_0_proj = parabola_y(c0_x_proj, rot_x, rot_y); 
-    // c_{2y}'
     double y_2_proj = parabola_y(c2_x_proj, rot_x, rot_y); 
     
-    // if(verbose) printf("y_0_proj %f y_2_proj %f\n", y_0_proj, y_2_proj);
-
-
-    // if(verbose) printf("c0_x_proj %f c2_x_proj %f \n", c0_x_proj, c2_x_proj);
-    // if(verbose) printf("rot_x %f rot_y %f\n", rot_x, rot_y);
-
     // special case where the line is vertical and therefore the derivative is infinity
     // in this case the parabolar degenerates to a line and we can set the middle controllpoint (c1) to the midpoint of c0 and c2
     if(c0_x_proj == rot_x){ 
-      // double dy_0_proj = 0;
-      // double dy_2_proj = inf;
-      // if(verbose) printf("special case \n");
-
       double u1 = (x(c0) + x(c2)) / 2.0;
       double v1 = (y(c0) + y(c2)) / 2.0;
 
@@ -268,49 +232,18 @@ void calc_control_points(
       return;
     }
     
-    //\dot{y}(c_{0x}')
     double dy_0_proj = parabola_deriv_y(c0_x_proj, rot_x, rot_y);
-    //\dot{y}(c_{2x}')
     double dy_2_proj = parabola_deriv_y(c2_x_proj, rot_x, rot_y);
     
-    // Equations
-    // (v1-v0) / (u1-u0) = dy_0
-    // (v2-v1) / (u2-u1) = dy_2
-
-    // Solve for u1
-    // dy_0 * (u1-u0) = (v1-v0) 
-    // u1 = (((v1-v0) + dy_0*u0) / dy_0)
-    
-    // Solve for v1
-    // (v2-v1) / (u2 - (((v1-v0) + dy_0 * u0) / dy_0) ) = dy_2
-    // (v2-v1) = dy_2 * (u2 - (((v1-v0) + dy_0 * u0) / dy_0) )
-    // (v2-v1) = dy_2 * u2 -  (dy_2/dy_0 * ( (v1-v0) + dy_0 * u0 ) ) 
-    // (v2-v1) = dy_2 * u2 -  (  (dy_2/dy_0) * v1 + (dy_2/dy_0) * (-v0) + dy_2 * u0 ) 
-    // (v2-v1) = dy_2 * u2 -(dy_2/dy_0) * v1 - (dy_2/dy_0) * (-v0) - dy_2 * u0
-    // - v1 + v1(dy_2/dy_0) = dy_2 * u2  - (dy_2/dy_0) * (-v0) - dy_2 * u0 - v2
-    // v1 (-1 + dy_2/dy_0) = dy_2 * u2  - (dy_2/dy_0) * (-v0) - dy_2 * u0 - v2
-    // v1  = (dy_2 * u2  - (dy_2/dy_0) * (-v0) - dy_2 * u0 - v2) / (dy_2/dy_0 - 1)
-
-    // if(verbose) printf("dy_0_proj %f dy_2_proj %f ((dy_2_proj/dy_0_proj) - 1) %f \n", dy_0_proj, dy_2_proj, ((dy_2_proj/dy_0_proj) - 1));
-
-    //c_{1y}'
+   
     double v1_proj = (dy_2_proj * c2_x_proj + (dy_2_proj/dy_0_proj) * (y_0_proj) - dy_2_proj * c0_x_proj - y_2_proj) / ((dy_2_proj/dy_0_proj) - 1);
-    //c_{1x}'
     double u1_proj = (((v1_proj-y_0_proj) + dy_0_proj*c0_x_proj) / dy_0_proj);
 
-    // if(verbose) printf("u1_proj %f v1_proj %f \n", u1_proj, v1_proj);
-
-    // if(verbose) printf("sqr_segment_length %f x(low(segment)) %d \n", sqr_segment_length, x(low(segment)));
-
     // Project Back
-    //c_{1y}
     double u1 = (segm_vec_x * u1_proj - segm_vec_y * v1_proj) /
         sqr_segment_length + x(low(segment));
-    //c_{1x}
     double v1 = (segm_vec_x * v1_proj + segm_vec_y * u1_proj) /
         sqr_segment_length + y(low(segment));
-
-    // if(verbose) printf("u1 %f v1 %f \n", u1, v1);
 
     c1.x(u1);
     c1.y(v1);
@@ -320,28 +253,6 @@ void calc_control_points(
     control_points->push_back(c2);
 
 }
-
-// void sample_curved_edge(
-//     const edge_type& edge,
-//     std::vector<point_type>* sampled_edge,
-//     std::vector<point_type>* control_points,
-//     std::vector<point_type> pointSites,
-//     std::vector<segment_type> lineSites,
-//     std::vector<double> bbox)
-// {
-//   double xl = bbox[0];
-//   double xh = bbox[2];
-//   coordinate_type max_dist = 1E-3 * (xh - xl);
-//   point_type point = edge.cell()->contains_point() ?
-//       retrieve_point(*edge.cell(), pointSites, lineSites) :
-//       retrieve_point(*edge.twin()->cell(), pointSites, lineSites);
-//   segment_type segment = edge.cell()->contains_point() ?
-//       retrieve_segment(*edge.twin()->cell(), pointSites, lineSites) :
-//       retrieve_segment(*edge.cell(), pointSites, lineSites);
-//   voronoi_visual_utils<coordinate_type>::discretize(
-//       point, segment, max_dist, sampled_edge, bbox);
-//   calc_control_points(point, segment, control_points);
-// }
 
 void createVertex(
   const voronoi_diagram<double>::edge_type& edge,
@@ -374,7 +285,6 @@ bool clip_add_finite_edge(
   int i
   ) {
 
-  // std::vector<point_type> samples_;
   std::vector<point_type> controll_points_;
   double xl = bbox[0];
   double xh = bbox[2];
@@ -386,7 +296,6 @@ bool clip_add_finite_edge(
   || (edge.vertex0()->x() >= xh && edge.vertex1()->x() >= xh)
   || (edge.vertex0()->y() <= yl && edge.vertex1()->y() <= yl)
   || (edge.vertex0()->y() >= yh && edge.vertex1()->y() >= yh)){
-    // printf("compl outside \n");
     return false;
   }
 
@@ -405,18 +314,10 @@ bool clip_add_finite_edge(
   if(edge.vertex0()->x() < xl){
     edgeResult->x1 = edge.vertex0()->x() + (xl - edge.vertex0()->x()) ;
     edgeResult->y1 = edge.vertex0()->y() + (xl - edge.vertex0()->x()) * dydx;
-
-    // printf("clip x1a %f -> %f \n",
-    //   edge.vertex0()->x(),
-    //   edgeResult->x1);
   }
   else if(edge.vertex0()->x() > xh){
     edgeResult->x1 = edge.vertex0()->x() + (xh - edge.vertex0()->x());
     edgeResult->y1 = edge.vertex0()->y() + (xh - edge.vertex0()->x()) * dydx;
-
-    // printf("clip x1b %f -> %f \n",
-    //   edge.vertex0()->x(),
-    //   edgeResult->x1);
   }
   else {
     edgeResult->x1 = edge.vertex0()->x();
@@ -427,18 +328,10 @@ bool clip_add_finite_edge(
   if(edge.vertex1()->x() < xl){
     edgeResult->x2 = edge.vertex1()->x() + (xl - edge.vertex1()->x());
     edgeResult->y2 = edge.vertex1()->y() + (xl - edge.vertex1()->x()) * dydx;
-
-    // printf("clip x2a %f -> %f \n",
-    //   edge.vertex1()->x(),
-    //   edgeResult->x2);
   }
   else if(edge.vertex1()->x() > xh){
     edgeResult->x2 = edge.vertex1()->x() + (xh - edge.vertex1()->x());
     edgeResult->y2 = edge.vertex1()->y() + (xh - edge.vertex1()->x()) * dydx;
-
-    // printf("clip x2b %f -> %f \n",
-    //   edge.vertex1()->x(),
-    //   edgeResult->x2);
   }
   else {
     edgeResult->x2 = edge.vertex1()->x();
@@ -447,53 +340,27 @@ bool clip_add_finite_edge(
 
   // Clip Y1
   if(edgeResult->y1 < yl){
-    // printf("clip y1a %f -> %f \n",
-    //   edgeResult->y1,
-    //   edgeResult->y1 + (yl - edgeResult->y1));
-
     edgeResult->x1 = edgeResult->x1 + (yl - edgeResult->y1) * dxdy;
     edgeResult->y1 = edgeResult->y1 + (yl - edgeResult->y1);
   }
   else if(edgeResult->y1 > yh){
-    // printf("clip y1b %f -> %f \n",
-    //   edgeResult->y1,
-    //   edgeResult->y1 + (yh - edgeResult->y1));
-
     edgeResult->x1 = edgeResult->x1 + (yh - edgeResult->y1) * dxdy;
     edgeResult->y1 = edgeResult->y1 + (yh - edgeResult->y1);
   }
-  // else // unchanged
 
   // Clip Y2
   if(edgeResult->y2 < yl){
-    // printf("clip y2a %f -> %f \n",
-    //   edgeResult->y2,
-    //   edgeResult->y2 + (yl - edgeResult->y2));
-
     edgeResult->x2 = edgeResult->x2 + (yl - edgeResult->y2) * dxdy;
     edgeResult->y2 = edgeResult->y2 + (yl - edgeResult->y2);
 
   }
   else if(edgeResult->y2 > yh){
-    // printf("clip y2b %f -> %f \n",
-    //   edgeResult->y2,
-    //   edgeResult->y2 + (yh - edgeResult->y2));
-
     edgeResult->x2 = edgeResult->x2 + (yh - edgeResult->y2) * dxdy;
     edgeResult->y2 = edgeResult->y2 + (yh - edgeResult->y2);
   }
-  // else // unchanged
 
-  // printf("finite %d %f %f - %f %f \n",
-  //   edge.is_primary(),
-  //   edgeResult->x1,
-  //   edgeResult->y1,
-  //   edgeResult->x2,
-  //   edgeResult->y2);
 
   if (edge.is_curved()) { // only finite edges can be curved
-    // samples_.push_back(point_type(edgeResult->x1, edgeResult->y1));
-    // samples_.push_back(point_type(edgeResult->x2, edgeResult->y2));    
     controll_points_.push_back(point_type(edgeResult->x1, edgeResult->y1));
     controll_points_.push_back(point_type(edgeResult->x2, edgeResult->y2));
     Point point = edge.cell()->contains_point() ?
@@ -502,36 +369,14 @@ bool clip_add_finite_edge(
     Segment segment = edge.cell()->contains_point() ?
       retrieve_segment(edge.twin()->cell(), pointSites, lineSites) :
       retrieve_segment(edge.cell(), pointSites, lineSites);
-
-    // if(result->edges.size() == 889){
-    //   printf("edgeResult->x1 %f edgeResult->y1 %f \n", edgeResult->x1, edgeResult->y1 );
-    //   printf("edgeResult->x2 %f edgeResult->y2 %f \n", edgeResult->x2, edgeResult->y2 );
-    //   printf("high.x %d high.y %d \n", high(segment).x(), high(segment).y() );
-    //   printf("low.x %d low.y %d \n", low(segment).x(), low(segment).y() );
-    // }
-    calc_control_points(point, segment, &controll_points_, result->edges.size() == 889);
-    // sample_curved_edge(edge, &samples_, &controll_points_, pointSites, lineSites, bbox);
+    calc_control_points(point, segment, &controll_points_);
   }
-  // for (size_t i = 0; i < samples_.size(); i++)
-  // {
-  //   edgeResult->samples.push_back(samples_[i].x());
-  //   edgeResult->samples.push_back(samples_[i].y());
-  // }
+
   for (size_t i = 0; i < controll_points_.size(); i++)
   {
     edgeResult->controll_points.push_back(controll_points_[i].x());
     edgeResult->controll_points.push_back(controll_points_[i].y());
   }
-
-  // if(result->edges.size() == 889){
-  //   printf("Edge %zu \n", result->edges.size());
-  //   printf("CP size %zu \n", edgeResult->controll_points.size());
-  //   printf("is_curved %d \n", edge.is_curved());
-  //   for(int i = 0; i < controll_points_.size(); i++)
-  //     printf("CP %d: %f %f \n",i,  controll_points_[i].x(), controll_points_[i].y());
-
-  // }
-
   result->edges.push_back(*edgeResult);
   return true;
 }
@@ -547,16 +392,6 @@ bool clip_add_infinite_edge(
   ) {
     // vertex - voronoi vertex from which the voronoi edge starts
     // p1, p2 - sitePoints that the edge is equal distance from
-
-    // if (edge.vertex0() == NULL)
-    //   return false;
-
-    // printf("infinite %d %f %f - %f %f \n",
-    //   edge.is_primary(),
-    //   edge.vertex0()->x(),
-    //   edge.vertex0()->y(),
-    //   edge.vertex1()->x(),
-    //   edge.vertex1()->y());
 
     double xl = bbox[0];
     double xh = bbox[2];
@@ -586,12 +421,6 @@ bool clip_add_infinite_edge(
 
     const voronoi_diagram<double>::cell_type* cell1 = edge.cell();
     const voronoi_diagram<double>::cell_type* cell2 = edge.twin()->cell();
-    // if (i == 125) printf("v %p %p %s %s \n", edge.vertex0(), edge.vertex1(), 
-    // (edge.vertex0() == NULL) ? "true" : "false", 
-    // (edge.vertex1() != NULL) ? "true" : "false"
-    // );
-
-    // if (i == 125) printf("swaping %s \n", vertex0isZero ? "true" : "false");
     if(vertex0isZero){
       cell1 = edge.twin()->cell();
       cell2 = edge.cell();
@@ -602,17 +431,10 @@ bool clip_add_infinite_edge(
     if (cell1->contains_point() && cell2->contains_point()) {
       Point p1 = retrieve_point(cell1, pointSites, lineSites);
       Point p2 = retrieve_point(cell2, pointSites, lineSites);
-      // printf("p1 %f %f p2 %f %f \n",
-      //   p1.x(),
-      //   p1.y(),
-      //   p2.x(),
-      //   p2.y());
       origin.x((p1.x() + p2.x()) * 0.5);
       origin.y((p1.y() + p2.y()) * 0.5);
       direction.x(p1.y() - p2.y()); // orthogonal to the direction between the points
       direction.y(p2.x() - p1.x());
-      // if (i == 125) printf("direction A %f %f \n", direction.x(), direction.y());
-
     } else {
       origin = cell1->contains_segment() ?
           retrieve_point(cell2, pointSites, lineSites) :
@@ -629,27 +451,16 @@ bool clip_add_infinite_edge(
         direction.x(-dy);
         direction.y(dx);
       }
-      // if (i == 125) printf("direction B %f %f \n", direction.x(), direction.y());
-
     }
 
     if(isnan(direction.x()) || isnan(direction.y())){
       return false;
     }
 
-
     //normalize
     double l = sqrt(direction.x()*direction.x() + direction.y()*direction.y());
     direction.x(direction.x() / l);
     direction.y(direction.y() / l);
-
-    // printf("  origin %f %f \n",
-    //   origin.x(),
-    //   origin.y());
-    // printf("  direction %f %f \n",
-    //   direction.x(),
-    //   direction.y()
-    //   );
 
     double fm, fb;
 
@@ -660,16 +471,10 @@ bool clip_add_infinite_edge(
       }
       // downward
       if (direction.y() < 0) {
-        // printf("v %f %f \n",
-        //   origin.x(),
-        //   yl);
         createVertex(edge, edgeResult, origin.x(), yl);
       }
       // upward
       else {
-        // printf("v %f %f \n",
-        //   origin.x(),
-        //   yh);
         createVertex(edge, edgeResult, origin.x(), yh);
       }
     }
@@ -692,24 +497,16 @@ bool clip_add_infinite_edge(
       double tmin = (t0x < t0y) ? t0x : t0y; // (3333 < 50) = 50
       double tmax = (t1x > t1y) ? t1x : t1y; // (-833,33 > -252,27) = -252,27
 
-      // printf("t %f %f \n",
-      //   tmin,
-      //   tmax);
+
       // the one in the same dir as the ray is >0
       if(tmin > 0){
         double cx = origin.x() + tmin * direction.x();
         double cy = origin.y() + tmin * direction.y();
-        // printf("c %f %f \n",
-        //   cx,
-        //   cy);
         createVertex(edge, edgeResult, cx, cy);
       }
       else if(tmax > 0){
         double cx = origin.x() + tmax * direction.x();
         double cy = origin.y() + tmax * direction.y();
-        // printf("c %f %f \n",
-        //   cx,
-        //   cy);
         createVertex(edge, edgeResult, cx, cy);
       }
     }
@@ -728,29 +525,14 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
   std::vector<Point> pointSites;
   std::vector<Segment> lineSites;
 
-  // printf("size %zu \n",
-  //         points.size());
   for (size_t i = 0; i < points.size(); i += 2)
   {
       pointSites.push_back(Point(points[i], points[i+1]));
-      // printf("pointSite %zu %f %f \n",
-      //     i,
-      //     pointSites[i/2].x(),
-      //     pointSites[i/2].y());
   }
 
-  // printf("segment size %zu \n",
-  //         segments.size());
   for (size_t i = 0; i < segments.size(); i += 4)
   {
       lineSites.push_back(Segment(segments[i], segments[i+1], segments[i+2], segments[i+3]));
-      // printf("segmentSite %zu %d %d %d %d \n",
-      //   i,
-      //   lineSites[i/4].p0.x(),
-      //   lineSites[i/4].p0.y(),
-      //   lineSites[i/4].p1.x(),
-      //   lineSites[i/4].p1.y()
-      //   );
   }
 
 
@@ -797,14 +579,11 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
     }
 
     if(cellResult.source_category == 0){
-      // printf("1 idx %zu color %d \n",cell.source_index(), pointColors[cell.source_index()] );
       cell.color(pointColors[cell.source_index()]);
       cellResult.tile_idx = pointTileIdxs[cell.source_index()];
     }else{
-      // printf("2 idx %zu color %d \n",cell.source_index(), segmentColors[cell.source_index()] );
       cell.color(segmentColors[cell.source_index()]);
       cellResult.tile_idx = segmentTileIdxs[cell.source_index()];
-      // printf("idx %zu tile_idx %d \n",cell.source_index(), segmentTileIdxs[cell.source_index()] );
     }
 
     cellResult.is_degenerate = cell.is_degenerate();
@@ -819,7 +598,6 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
 
   // --------- EDGES --------------
   std::vector<const voronoi_diagram<double>::edge_type*> processed; // to Avoid Duplicates 
-  // printf("num_edges: %zu \n", vd.num_edges());
   int i = 0;
   for (voronoi_diagram<double>::const_edge_iterator it = vd.edges().begin(); it != vd.edges().end(); ++it) {
     const voronoi_diagram<double>::edge_type* edge = &(*it);
@@ -843,46 +621,15 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
     edgeResult.isFinite = edge->is_finite();
     edgeResult.isPrimary = edge->is_primary();
     edgeResult.isCurved = edge->is_curved();
-    // edgeResult.isWithinCell = edge->cell()->color() == edge->twin()->cell()->color();
     edgeResult.isWithinCell = segmentTileIdxs[edge->cell()->source_index()] == segmentTileIdxs[edge->twin()->cell()->source_index()];
   
     bool added = false;
-    
-    // if(result.edges.size() == 97){
-    //   printf("Edge before %d %s %zu %d %zu %d %f %f %f %f \n",
-    //     i,
-    //     edge->is_finite() ? "true" : "false",
-    //     edge->cell()->source_index(),
-    //     edge->cell()->source_category(),
-    //     edge->twin()->cell()->source_index(),
-    //     edge->twin()->cell()->source_category(),
-    //     (edge->vertex0() != NULL) ? (edge->vertex0()->x()) : NAN ,
-    //     (edge->vertex0() != NULL) ? (edge->vertex0()->y()) : NAN ,
-    //     (edge->vertex1() != NULL) ? (edge->vertex1()->x()) : NAN ,
-    //     (edge->vertex1() != NULL) ? (edge->vertex1()->y()) : NAN 
-    //   );
-    // }
 
     if(edge->is_finite()){
       added = clip_add_finite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox, i);
     }else{
       added = clip_add_infinite_edge(*edge, &result, &edgeResult, pointSites, lineSites, bbox, i);
     }
-
-    // if(result.edges.size() == 98){
-    //   printf("Edge after %d %s %zu %d %zu %d %f %f %f %f \n",
-    //     i,
-    //     edge->is_finite() ? "true" : "false",
-    //     edge->cell()->source_index(),
-    //     edge->cell()->source_category(),
-    //     edge->twin()->cell()->source_index(),
-    //     edge->twin()->cell()->source_category(),
-    //     edgeResult.x1,
-    //     edgeResult.y1,
-    //     edgeResult.x2,
-    //     edgeResult.y2
-    //   );
-    // }
 
     if(added){
       processed.push_back(edge);
@@ -895,22 +642,6 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
   i = 0;
   for (voronoi_diagram<double>::const_vertex_iterator it = vd.vertices().begin(); it != vd.vertices().end(); ++it) {
     const voronoi_diagram<double>::vertex_type& vertex = *it;
-    
-    // // if(i == 255){
-    //   printf("Vertex %d %f %f %s %p %f %f %f %f \n",
-    //     i,
-    //     vertex.x(),
-    //     vertex.y(),
-    //     vertex.is_degenerate() ? "true" : "false",
-    //     vertex.incident_edge(),
-    //     vertex.incident_edge()->vertex0()->x(),
-    //     vertex.incident_edge()->vertex0()->y(),
-    //     vertex.incident_edge()->vertex1()->x(),
-    //     vertex.incident_edge()->vertex1()->y()
-    //     );
-    // // }
-    // i++;
-
     result.vertices.push_back(vertex.x());
     result.vertices.push_back(vertex.y());
   }
@@ -924,7 +655,6 @@ EMSCRIPTEN_KEEPALIVE DiagrammResult compute(
     const voronoi_diagram<double>::edge_type* edge = cell.incident_edge();
       do {
         for (int i = 0; i < result.edges.size(); i++){
-          // if(result.edges[i].edge_ref == edge || result.edges[i].edge_ref == edge->twin()){
           if(result.edges[i].edge_ref == edge){
             result.cells[j].edge_indices.push_back(i);
           }
@@ -963,7 +693,6 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
     .field("isFinite", &EdgeResult::isFinite)
     .field("isCurved", &EdgeResult::isCurved)
     .field("isPrimary", &EdgeResult::isPrimary)
-    // .field("samples", &EdgeResult::samples)
     .field("controll_points", &EdgeResult::controll_points)
     .field("isWithinCell", &EdgeResult::isWithinCell)
     ;
@@ -976,7 +705,5 @@ EMSCRIPTEN_BINDINGS(myvoronoi) {
     ;
 
   emscripten::function("computevoronoi", &compute);
-
-
 
 }

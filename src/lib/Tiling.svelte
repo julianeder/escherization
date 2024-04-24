@@ -4,7 +4,7 @@
   import { BBox, type Edge, SitePoint, SiteSegment, type Vertex, Sites, type Cell, type Tile, Point } from "./voronoiDataStructures";
   import instantiate_wasmVoronoi, { type VoronoiWasmModule, type EdgeResult, type DiagrammResult, type CellResult } from "../lib/wasm/wasmVoronoi";
   import instantiate_wasmMorph, { type FeatureLine, type MorphWasmModule } from "../lib/wasm/wasmMorph";
-  import { IsohedralTiling, makeMatrix, mulSegment } from "./tactile/tactile";
+  import { IsohedralTiling } from "./tactile/tactile";
   import ColorPicker from "svelte-awesome-color-picker";
   import { type Matrix, compose, scale, toSVG, translate, rotate, applyToPoint, flipX, flipY, identity } from "transformation-matrix";
   import { canvasSize, ImageStoreContent, imageStore, siteStore, originStore, SymGroupParams, dataBackStore } from "./state";
@@ -16,45 +16,43 @@
   import p3 from "./images/p3.png";
   import p6 from "./images/p6.png";
   import p6m from "./images/p6m.png";
-  import p4g from "./images/p4g.png";
   import p4 from "./images/p4.png";
 
+  // wasm modules
   let wasmVoronoi: VoronoiWasmModule;
   let wasmMorph: MorphWasmModule;
+  
+  // state
   let bbox: BBox = new BBox(0, 500, 0, 500);
-
   let tiles: Tile[] = [];
   let tileSitePoints: SitePoint[] = [];
   let tileSiteSegments: SiteSegment[] = [];
   let outlines: FeatureLine[] = [];
-
-  let isUptoDate: boolean = false;
+  let mostCenterTile: Tile;
 
   let tilingSitePoints: SitePoint[] = [];
   let tilingSiteSegments: SiteSegment[] = [];
-  let tileWidth: number = 300;
-  let tileHeight: number = 300;
-  let voronoiVertices: Vertex[] = [];
   let voronoiEdges: Edge[] = [];
   let voronoiCells: Cell[] = [];
+  
+  let lastError: any = "";
+  let showSecondary: boolean = false;
+  let isUptoDate: boolean = false;
+
+  let tilingIdx = 0;
+  let prevTilingIndex = -1;
+
+  // parameters
+  let tileWidth: number = 300;
+  let tileHeight: number = 300;
   let tilingScaleFactor: number = 1;
   let tilingSize: number = 100;
-
+  
   let tileSize: number = 1;
   let tileRotation: number = 0;
   let tileCenter: Point = new Point(150, 150);
   let imageOffset: Point;
-
-  let backgroundImage: HTMLImageElement | null;
-  let imageData: ImageData | null;
-  let imageDataProcessed: ImageData | null;
-
-  let showSecondary: boolean = false;
-
-  let lastError: any = "";
-
-  let tilingParams: number[] = [];
-
+  
   let autoUpdate: boolean = false;
   let showBorder: boolean = true;
   let showSkeleton: boolean = true;
@@ -62,26 +60,44 @@
   let showBackground: boolean = true;
   let showBackgroundImage: boolean = true;
   let showDebugMorphLines: boolean = false;
+  
+  let tilingParams: number[] = [];
 
-  let morphedSiteSegments: SiteSegment[] = []; // Debug only
-  let mostCenterTile: Tile;
+  let doMorph: boolean = true;
+  let p: number = 0.6;
+  let a: number = 1;
+  let b: number = 2;
+  let t: number = 1;
+
+  let borderColor: string = "#0000ffff";
+  let skelletonColor: string = "#ff0000ff";
+
+  let color1: string = "#e06d4380";
+  let color2: string = "#59da5980";
+  let color3: string = "#c3c63580";
+  
+  //data
+  let backgroundImage: HTMLImageElement | null;
+  let imageData: ImageData | null;
+  let imageDataProcessed: ImageData | null;
+  let updatePromise: Promise<void> | null = null;
+  
+  // debug
+  let morphedSiteSegments: SiteSegment[] = []; 
   let morphedBBox: number[] = [];
   let morphedBBox_transf: BBox = new BBox(0, 0, 0, 0);
 
+
+
+  // tiling consts
   const p2ParameterNames = {
     0: { name: "Spacing Column 1-2", min: 0.01, max: 0.6, stepSize: 0.01, initialValue: 0.2 },
     1: { name: "Height Offset", min: 0.12, max: 0.25, stepSize: 0.01, initialValue: 0 },
-    // 2: {name:"2", min: 0.01, max: 2, stepSize: 0.01, initialValue: 0.2},
-    // 3: {name:"3", min: 0.01, max: 2, stepSize: 0.01, initialValue: 0.2},
-    // 4: {name:"4", min: 0.01, max: 2, stepSize: 0.01, initialValue: 0.2},
-    // 5: {name:"5", min: 0.01, max: 2, stepSize: 0.01, initialValue: 0.2},
   };
 
   const p1ParameterNames = {
     0: { name: "Column Spacing", min: 0.01, max: 0.3, stepSize: 0.01, initialValue: 0.12239750492 },
     1: { name: "Height Offset", min: 0.0, max: 0.2, stepSize: 0.01, initialValue: 0.1 },
-    // 2: {name:"2", min: 0.01, max: 2, stepSize: 0.01, initialValue: 0.143395479017},
-    // 3: {name:"3", min: 0.01, max: 2, stepSize: 0.01, initialValue: 0.625},
   };
 
   const p3ParameterNames = {
@@ -105,38 +121,11 @@
     { symGroup: "p2", IH: 4, origin: "ul", name: "2 Rotations", image: p2, tilingScaleFactor: 0.66, parameterNames: p2ParameterNames },
     { symGroup: "p3", IH: 7, origin: "center", name: "3 Rotations", image: p3, tilingScaleFactor: 0.66, parameterNames: p3ParameterNames },
     { symGroup: "p4", IH: 28, origin: "center", name: "4 Rotations", image: p4, tilingScaleFactor: 0.5, parameterNames: p4ParameterNames },
-    // { symGroup: "p4g", IH: 71, origin: "ul", name: "4 Rotations", image: p4g, tilingScaleFactor: 0.5, parameterNames: {},},
     { symGroup: "p6", IH: 21, origin: "center", name: "6 Rotations", image: p6, tilingScaleFactor: 0.5, parameterNames: p6ParameterNames },
     { symGroup: "p6m", IH: 37, origin: "center", name: "6 Rotations Mirrored", image: p6m, tilingScaleFactor: 0.5, parameterNames: {} },
-    // "4": {symGroup: "p2",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
-    // "5": {symGroup: "pgg",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
-    // "12":{symGroup: "cm",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
-    // "13":{symGroup: "pmg",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
-    // "16":{symGroup: "p31m", origin: "center", name:"", image: null, tilingScaleFactor: 1},
-    // "26":{symGroup: "cmm",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
-    // "42":{symGroup: "pm",   origin: "center", name:"", image: null, tilingScaleFactor: 1},
-    // "72":{symGroup: "pmm",  origin: "center", name:"", image: null, tilingScaleFactor: 1},
   ];
 
-  let tilingIdx = 0;
-  let prevTilingIndex = -1;
 
-  let borderColor: string = "#0000ffff";
-  let skelletonColor: string = "#ff0000ff";
-
-  let color1: string = "#e06d4380";
-  let color2: string = "#59da5980";
-  let color3: string = "#c3c63580";
-
-  let doMorph: boolean = true;
-  let p: number = 0.6;
-  let a: number = 1;
-  let b: number = 2;
-  let t: number = 1;
-
-  let updatePromise: Promise<void> | null = null;
-
-  let mousePoint: Point = { x: -1, y: -1 };
 
   function clean() {
     tiles = [];
@@ -156,28 +145,12 @@
           updateTilingParameters();
           updateTiling();
 
-          // const tilingTime = new Date().getTime();
-          // const durationTiling = tilingTime - startTime;
-
           if (checkIntersections(tilingSiteSegments)) {
             lastError = "Collision between tiles detected, please change the paremeters (e.g. decrease Tile Size)";
           } else {
             lastError = "";
-            // startTime = new Date().getTime();
-
             updateVoronoi();
-
-            // const voronoiTime = new Date().getTime();
-            // const durationVoronoi = voronoiTime - startTime;
-
-            // startTime = new Date().getTime();
-
             updateMorph();
-
-            // const morphTime = new Date().getTime();
-            // const durationMorph = morphTime - startTime;
-
-            // console.log(`${durationTiling} ${durationVoronoi} ${durationMorph}`);
           }
         } catch (e) {
           lastError = e;
@@ -201,14 +174,12 @@
         sqrDist = sd;
       }
     }
-    // console.log(idx  + " " + Math.sqrt(sqrDist));
     return tiles[idx];
   }
 
   function updateMorph() {
     mostCenterTile = GetMostCenterTileIdx(tiles);
 
-    // Get Outline
     outlines = [];
     let T2I: Matrix;
     let I2T: Matrix;
@@ -217,7 +188,6 @@
       if (tiles[i].tileIdx == mostCenterTile.tileIdx) {
         T2I = getInverseTransformation(tiles[i].M, tiles[i].origin, true);
         I2T = getTransformation(tiles[i].M, tiles[i].origin, false, true);
-        // console.log("origin " + tiles[i].origin.x + " " + tiles[i].origin.y)
 
         voronoiCells
           .filter((c) => c.tileIdx == tiles[i].tileIdx)
@@ -265,46 +235,15 @@
             endPoint: { x: s.endPoint.x, y: s.endPoint.y },
           }),
         );
-        // console.log(outlines);
 
-        // console.log("For 0 0")
-        // let s1 = applyToPoint(T2I!, new Point(0,0))
-        // let s2 = applyToPoint(I2T!, s1)
-        // console.log("T2I " + 0 + " " + 0 + " -> " + s1.x + " " + s1.y)
-        // console.log("I2T " + " -> " + s2.x + " " + s2.y)
 
         let outlines_Img: FeatureLine[] = [];
         for (let i = 0; i < outlines.length; i++) {
-          let s1 = applyToPoint(T2I!, new Point(outlines[i].startPoint.x, outlines[i].startPoint.y));
-          let e1 = applyToPoint(T2I!, new Point(outlines[i].endPoint.x, outlines[i].endPoint.y));
+          let s = applyToPoint(T2I!, new Point(outlines[i].startPoint.x, outlines[i].startPoint.y));
+          let e = applyToPoint(T2I!, new Point(outlines[i].endPoint.x, outlines[i].endPoint.y));
 
-          let s2 = applyToPoint(I2T!, s1);
-          let e2 = applyToPoint(I2T!, e1);
-
-          // if(i==0){
-          //   console.log("NUMBER 0 ")
-          //   console.log("T2I " + outlines[i].startPoint.x + " " + outlines[i].startPoint.y + " -> " + s1.x + " " + s1.y)
-          //   console.log("I2T " + " -> " + s2.x + " " + s2.y)
-
-          // }
-
-          outlines_Img.push({ startPoint: s1, endPoint: e1 });
-
-          // if(outlines[i].startPoint.x != s2.x || outlines[i].startPoint.y != s2.y
-          // || outlines[i].endPoint.x != e2.x || outlines[i].endPoint.y != e2.y ){
-          //   console.log("UNQUAL ")
-          //   console.log(outlines[i])
-          //   console.log(s2)
-          //   console.log(e2)
-
-          // }
-
-          // outlines[i].startPoint.x = s2.x;
-          // outlines[i].startPoint.y = s2.y;
-          // outlines[i].endPoint.x = e2.x;
-          // outlines[i].endPoint.y = e2.y;
+          outlines_Img.push({ startPoint: s, endPoint: e });
         }
-        // outlines = outlines;
 
         if (showDebugMorphLines) {
           dataBackStore.set(outlines_Img);
@@ -357,18 +296,14 @@
             morphedSiteSegments.push(new SiteSegment(morphedOutline.get(i)!.startPoint.x, morphedOutline.get(i)!.startPoint.y, morphedOutline.get(i)!.endPoint.x, morphedOutline.get(i)!.endPoint.y));
           }
           morphedSiteSegments = morphedSiteSegments;
-          // console.log("lengths: " + outlines.length + " " + morphedSiteSegments.length);
         }
 
         let result = wasmMorph.doMorph(imageDataProcessed.width, imageDataProcessed.height, p, a, b, t, imageDataVector, imageDataProcessedVector, skelletonLinesVector, outlineLinesVector, mInvVector);
 
-        // console.log("result.size " + result.size());
         let morphedImageData: ImageData = new ImageData(morphedBBox[2] - morphedBBox[0], morphedBBox[3] - morphedBBox[1]);
         for (let i = 0; i < result.size(); i++) {
-          // let e: number = result.get(i);
           morphedImageData.data[i] = result.get(i)!;
         }
-        // console.log(morphedBackgroundImageData.data);
 
         backgroundImage = imagedataToImage(morphedImageData);
       } else {
@@ -408,23 +343,11 @@
   }
 
   function updateTiling() {
-    // console.log(
-    //   "updateTiling " +
-    //     tileWidth +
-    //     "x" +
-    //     tileHeight +
-    //     " l " +
-    //     tileSitePoints.length +
-    //     " / " +
-    //     tileSiteSegments.length,
-    // );
-
     tiles = [];
     tilingSitePoints = [];
     tilingSiteSegments = [];
     let tiling: IsohedralTiling = new IsohedralTiling(Number(symGroups[tilingIdx].IH));
     tiling.setParameters(tilingParams);
-    // console.log(tilingParams);
 
     for (let i of tiling.fillRegionBounds(bbox.xl / (tilingSize * tilingScaleFactor), bbox.yl / (tilingSize * tilingScaleFactor), bbox.xh / (tilingSize * tilingScaleFactor), bbox.yh / (tilingSize * tilingScaleFactor))) {
       // Use a simple colouring algorithm to pick a colour for this tile
@@ -450,11 +373,6 @@
 
       let o = applyToPoint(I2T, { x: 0, y: 0 });
       let origin = new SitePoint(o.x, o.y);
-      // scalePoint(
-      //   SitePoint.mulPoint(M,
-      //     new SitePoint(0, 0)),
-      //   tilingSize * tilingScaleFactor, tilingSize * tilingScaleFactor
-      // );
       let tile: Tile = { origin: origin, M: M, tileIdx: tiles.length - 1 }; //tileIndex counting up
 
       tiles.push(tile);
@@ -510,12 +428,9 @@
         segmentTileIdxVector.push_back(ss.tileIdx);
       });
 
-      // console.log(tilingSiteSegments[72]);
-
       let result: DiagrammResult = wasmVoronoi.computevoronoi(bboxVector, pointVector, segmentVector, pointColorVector, segmentColorVector, pointTileIdxVector, segmentTileIdxVector);
       let newVoronoiVertices: Vertex[] = [];
       for (let i = 0; i < result.vertices.size(); i += 2) {
-        // console.log("Vert: ", result.vertices.get(i));
         let valid = true;
         if (Number.isNaN(result.vertices.get(i)) || Number.isNaN(result.vertices.get(i + 1))) {
           console.log("Vertex " + i + ": " + result.vertices.get(i) + " " + result.vertices.get(i + 1));
@@ -554,19 +469,12 @@
         newVoronoiEdges.push({
           va: { x: e.x1, y: e.y1, isValid: valid },
           vb: { x: e.x2, y: e.y2, isValid: valid },
-          // samples: samples,
           isCurved: e.isCurved,
           controlPoints: controlPoints,
           isPrimary: e.isPrimary,
           isValid: valid,
           isWithinCell: e.isWithinCell,
         });
-
-        // if (newVoronoiEdges.length == 98) {
-        //   console.log(newVoronoiEdges[97]);
-        // }
-
-        // console.log(e.isWithinCell);
       }
 
       let newVoronoiCells: Cell[] = [];
@@ -583,57 +491,21 @@
           tileIdx: c.tileIdx,
         };
 
-        // if(c.sourceIndex = 332){
-        //   console.log(c.tileIdx);
-        //   console.log(c.tileIdx);
-        // }
-
         newVoronoiCells.push(newCell);
         for (let j = 0; j < c.edgeIndices.size(); j++) {
           let newIndex: number = c.edgeIndices.get(j)!;
           if (newIndex >= newVoronoiEdges.length) console.warn("Index too high " + newIndex + " for cell " + c.sourceIndex + " isDegenerate " + c.isDegenerate);
           else newCell.edgeIndices.push(newIndex);
         }
-        // console.log(newVoronoiCells[newVoronoiCells.length-1]);
       }
 
-      voronoiVertices = newVoronoiVertices;
       voronoiEdges = newVoronoiEdges;
       voronoiCells = newVoronoiCells;
 
-      // checks();
     } catch (e) {
       lastError = e;
       throw e;
     }
-  }
-
-  function scalePoint(p: SitePoint, sX: number, sY: number): SitePoint {
-    return new SitePoint(p.x * sX, p.y * sY, p.color, p.tileIdx);
-  }
-
-  function scaleSegment(s: SiteSegment, sX: number, sY: number) {
-    return new SiteSegment(s.x1 * sX, s.y1 * sY, s.x2 * sX, s.y2 * sY, s.color, s.tileIdx);
-  }
-
-  function translateSegment(s: SiteSegment, offset: Point): SiteSegment {
-    return new SiteSegment(s.x1 + offset.x, s.y1 + offset.y, s.x2 + offset.x, s.y2 + offset.y, s.color, s.tileIdx);
-  }
-
-  function translatePoint(p: SitePoint, offset: Point): SitePoint {
-    return new SitePoint(p.x + offset.x, p.y + offset.y, p.color, p.tileIdx);
-  }
-
-  function addPoint(event: MouseEvent) {
-    tilingSitePoints = [...tilingSitePoints, new SitePoint(event.offsetX, event.offsetY)]; // This syntax triggeres Sveltes reactive reload
-    siteStore.set({
-      sitePoints: tilingSitePoints,
-      siteSegments: tilingSiteSegments,
-      tileWidth: tileWidth,
-      tileHeight: tileHeight,
-      tileCenter: tileCenter,
-      imageOffset: imageOffset,
-    });
   }
 
   function downloadSVG() {
@@ -658,14 +530,6 @@
       if (Number.isNaN(voronoiEdges[c.edgeIndices[i]].va.x) || Number.isNaN(voronoiEdges[c.edgeIndices[i]].va.y)) return false;
     }
 
-    // if (
-    //   voronoiEdges[c.edgeIndices[i - 1]].vb.x !=
-    //   voronoiEdges[c.edgeIndices[i]].va.x ||
-    //   voronoiEdges[c.edgeIndices[i - 1]].vb.y !=
-    //   voronoiEdges[c.edgeIndices[i]].va.y
-    //   )
-    //   return false;
-
     // close loop
     let i = c.edgeIndices.length - 1;
     if (voronoiEdges[c.edgeIndices[i]].vb.x != voronoiEdges[c.edgeIndices[0]].va.x || voronoiEdges[c.edgeIndices[i]].vb.y != voronoiEdges[c.edgeIndices[0]].va.y) return false;
@@ -674,7 +538,6 @@
   }
 
   function getCellPath(c: Cell): string {
-    // console.log("Cell " + c.sourceIndex);
     let e: Edge = voronoiEdges[c.edgeIndices[0]];
 
     let d: string;
@@ -684,9 +547,6 @@
       d = "M " + voronoiEdges[c.edgeIndices[0]].va.x + " " + voronoiEdges[c.edgeIndices[0]].va.y + " ";
     }
 
-    // console.log("(" + voronoiEdges[c.edgeIndices[0]].va.x + ' ' + voronoiEdges[c.edgeIndices[0]].va.y + ") ("
-    //                 + voronoiEdges[c.edgeIndices[0]].vb.x + ' ' + voronoiEdges[c.edgeIndices[0]].vb.y + ")");
-
     for (let i: number = 1; i < c.edgeIndices.length; i++) {
       let e: Edge = voronoiEdges[c.edgeIndices[i]];
       let eprev: Edge = voronoiEdges[c.edgeIndices[i - 1]];
@@ -695,8 +555,6 @@
         d = d + "L " + e.controlPoints[0].x + " " + e.controlPoints[0].y + "Q " + e.controlPoints[1].x + " " + e.controlPoints[1].y + " " + e.controlPoints[2].x + " " + e.controlPoints[2].y + " ";
       } else {
         d = d + "L " + e.va.x + " " + e.va.y + " ";
-        // console.log("(" + e.va.x + ' ' + e.va.y + ") ("
-        //               + e.vb.x + ' ' + e.vb.y + ")");
       }
 
       if (eprev.vb.x != e.va.x || eprev.vb.y != e.va.y) console.log("Inconsistent: (" + eprev.vb.x + " " + eprev.vb.y + ") (" + e.va.x + " " + e.va.y + ")");
@@ -707,8 +565,6 @@
 
     if (!eprev.isCurved) {
       d = d + "L " + e.vb.x + " " + e.vb.y + " ";
-      // console.log("(" + e.va.x + ' ' + e.va.y + ") ("
-      //                 + e.vb.x + ' ' + e.vb.y + ")");
     }
 
     if (eprev.vb.x != e.va.x || eprev.vb.y != e.va.y) console.log("Inconsistent: (" + eprev.vb.x + " " + eprev.vb.y + ") (" + e.va.x + " " + e.va.y + ")");
@@ -753,29 +609,6 @@
     if (autoUpdate) updatePromise = update();
   }
 
-  function onResetParams() {
-    let tiling: IsohedralTiling = new IsohedralTiling(Number(symGroups[tilingIdx].IH));
-
-    tilingParams = [];
-
-    if (tiling.numParameters() > 0) {
-      tilingParams = tiling.getParameters();
-      for (let i = 0; i < tilingParams.length; i++) {
-        tilingParams[i] = symGroups[tilingIdx].parameterNames[i]?.initialValue ?? tilingParams[i]; // If we have other initial values, use them
-      }
-    }
-
-    tilingParams = [...tilingParams];
-    tilingSize = 100;
-    tileSize = 1;
-
-    if (autoUpdate) updatePromise = update();
-  }
-
-  function color1Changed(rgba: any) {
-    console.log(rgba);
-  }
-
   function onTilingSizeChanged(newValue: number) {
     tilingSize = newValue;
     if (autoUpdate) updatePromise = update();
@@ -793,8 +626,8 @@
 
   function getTransformation(M: Matrix, origin: Point, includeMorphedBBox: boolean, scaleCanvasSize: boolean): Matrix {
     // Decompose M into Translation, Rotation, Scale Matrices
-    M.e = 0; //MM.e*tilingSize;
-    M.f = 0; //MM.f*tilingSize;
+    M.e = 0;
+    M.f = 0;
     let sx = Math.sqrt(M.a * M.a + M.b * M.b);
     let sy = Math.sqrt(M.c * M.c + M.d * M.d);
 
@@ -821,8 +654,8 @@
 
     if (Math.sign(M.c) != Math.sign(M.b)) Mtransform = compose(Mtransform, flipY());
 
+    // and reassemble the matrix
     Mtransform = compose(
-      // translate(tx_image, ty_image),
       rotate(angle, origin.x, origin.y),
       scale(sx, sy, origin.x, origin.y),
       translate(tx, ty),
@@ -851,16 +684,18 @@
       sy = tileHeight / (sy * tilingSize * tilingScaleFactor * tileSize);
     }
 
-    // sx = canvasSize.x / (sx * tilingSize * tilingScaleFactor * tileSize); // canvasSize.x statt tileWidth ?
-    // sy = canvasSize.y / (sy * tilingSize * tilingScaleFactor * tileSize); // canvasSize.y statt tileHeight ?
-
     let Mtransform = identity();
 
     if (Math.sign(M.a) != Math.sign(M.d)) Mtransform = compose(Mtransform, flipX());
 
     if (Math.sign(M.c) != Math.sign(M.b)) Mtransform = compose(Mtransform, flipY());
 
-    Mtransform = compose(translate(tx, ty), scale(sx, sy, origin.x, origin.y), rotate(-angle, origin.x, origin.y));
+    // and reassemble the matrix
+    Mtransform = compose(
+      translate(tx, ty), 
+      scale(sx, sy, origin.x, origin.y), 
+      rotate(-angle, origin.x, origin.y)
+    );
 
     return Mtransform;
   }
@@ -890,21 +725,12 @@
       imageData = value.imageData;
       imageDataProcessed = value.imageDataProcessed;
       isUptoDate = false;
-      // console.log(backgroundImage);
-      // if (autoUpdate)  updatePromise = update();
     });
 
     originStore.set(symGroups[tilingIdx]);
 
-    tileSitePoints = [new SitePoint(100, 50), new SitePoint(300, 50), new SitePoint(100, 250), new SitePoint(300, 250), new SitePoint(200, 150)];
-    tilingSiteSegments = [
-      // new SiteSegment(2, 2, 498, 2),
-      // new SiteSegment(498, 2, 498, 298),
-      // new SiteSegment(498, 298, 2, 298),
-      // new SiteSegment(2, 298, 2, 2),
-      // new SiteSegment(100, 100, 100, 200),
-      // new SiteSegment(200, 100, 200, 200),
-    ];
+    tileSitePoints = [];
+    tilingSiteSegments = [];
     siteStore.set({
       sitePoints: tilingSitePoints,
       siteSegments: tilingSiteSegments,
@@ -917,19 +743,14 @@
     tilingScaleFactor = symGroups[tilingIdx].tilingScaleFactor;
   });
 
-  function handleMousemove(event: any) {
-    mousePoint.x = event.offsetX;
-    mousePoint.y = event.offsetY;
-  }
 </script>
 
 <div class="flex flex-row flex-wrap flex-grow">
   <div class="flex-1 min-w-fit grid grid-cols-1 justify-items-center content-start gap-4 pl-10">
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <svg id="voronoiSvg" width={bbox.xh} height={bbox.yh} viewBox="{bbox.xl + 100} {bbox.yl + 100} {bbox.xh - 200} {bbox.yh - 200}" xmlns="http://www.w3.org/2000/svg" on:click={addPoint} on:mousemove={handleMousemove}>
+    <svg id="voronoiSvg" width={bbox.xh} height={bbox.yh} viewBox="{bbox.xl + 100} {bbox.yl + 100} {bbox.xh - 200} {bbox.yh - 200}" xmlns="http://www.w3.org/2000/svg">
       <rect x={bbox.xl + 100} y={bbox.yl + 100} width={bbox.xh - 200} height={bbox.yh - 200} stroke="rgb(2 132 199)" stroke-width="0.66" fill="white" />
-      <!-- fill="rgb(248 250 252)" -->
       {#await updatePromise}
         <text x="250" y="220" text-anchor="middle" class="svgText">Loading...</text>
       {:then}
@@ -963,8 +784,6 @@
           {/if}
           {#each voronoiEdges as e, idx}
             {#if e.isValid && !e.isWithinCell && showBorder}
-              <!-- <circle cx={e.va.x} cy={e.va.y} r="2" fill="green"></circle>
-              <circle cx={e.vb.x} cy={e.vb.y} r="2" fill="green"></circle> -->
               {#if e.isCurved && e.controlPoints.length == 3}
                 <path id={"edge_" + idx} d="M {e.controlPoints[0].x} {e.controlPoints[0].y} Q {e.controlPoints[1].x} {e.controlPoints[1].y} {e.controlPoints[2].x} {e.controlPoints[2].y}" stroke={borderColor} stroke-width="0.66" fill="none"></path>
               {:else if e.isPrimary}
@@ -997,24 +816,10 @@
         <text x="250" y="250" text-anchor="middle" class="svgText">Error: {someError.message}.</text>
       {/await}
     </svg>
-
-    <!-- <p class="min-h-8">
-      {"Mouse: (" + mousePoint.x + "," + mousePoint.y + ")"}
-    </p> -->
-
     <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center min-w-52" on:click={() => (updatePromise = update())}>
       <span class="material-symbols-outlined me-2"> refresh </span>
       Update
     </button>
-    <!-- <div class="grid grid-cols-2 gap-4"> -->
-    <!-- <div class="bg-slate-100 flex items-center justify-center max-h-12">
-        <label class="p-2">
-          <input type="checkbox" bind:checked={autoUpdate} />
-          Auto Update
-        </label>
-      </div> -->
-    <!-- </div> -->
-
     <button
       class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center min-w-52"
       on:click={() => {
@@ -1024,14 +829,11 @@
       <span class="material-symbols-outlined me-2"> download </span>
       Download SVG
     </button>
-
     <div class="lastErrorContainer max-w-96 max-h-24">
       <p class="text-red-700 text-sm break-words">{lastError}</p>
     </div>
   </div>
   <div class="flex-1 min-w-fit grid grid-cols-1 justify-items-center gap-2 content-start">
-    <!-- <div class="grid grid-rows-4 content-start"> -->
-
     <p class="text-xl font-sans text-center text-sky-400 p-2">Tiling Settings</p>
     <div class="grid grid-cols-4">
       <p class="">Tile Size [%]</p>
@@ -1063,7 +865,6 @@
       <div class="bg-slate-100 flex items-center justify-center p-4 h-10 min-w-52">
         <p class="text-center">
           {symGroups[tilingIdx].name}
-          <!-- / {symGroups[tilingIdx].symGroup}  / IH {symGroups[tilingIdx].IH} -->
         </p>
       </div>
       <img class="max-w-20" src={symGroups[tilingIdx].image} alt="Preview..." />
@@ -1098,14 +899,6 @@
         {/if}
       {/each}
     </div>
-    <!-- <button
-        class="bg-sky-300 hover:bg-sky-500 text-black py-2 px-4 rounded min-w-48"
-        on:click={() => {
-          onResetParams();
-        }}
-      >
-        Reset Params
-      </button> -->
     <p class="text-xl font-sans text-center text-sky-400 p-2">Morph Settings</p>
     <div class="bg-slate-100 flex items-center justify-center h-10 rounded">
       <label class="p-4">

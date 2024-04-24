@@ -78,10 +78,10 @@
         <li> The "Tiling Size" changes the scale of the whole tiling</li>
         <li> The "Base Type" of the tiling can be changed using the "&lt;" and "&gt;" buttons</li>
         <li> In the Morph Settings area image morphing (warping) can be disabled and the behaviour of the morph can be modified</li>
-        <li> t - amount of warping (none vs. full) </li>
-        <li> p - all lines influence the same vs. longer lines have greater influence </li>
-        <li> a - precision vs. smoothness of the warping </li>
-        <li> b - affection of all lines vs. closest line to a pixel </li>
+        <li> amount of warping (none vs. full) (t) </li>
+        <li> all lines influence the same vs. longer lines have greater influence (p) </li>
+        <li> precision vs. smoothness of the warping (a) </li>
+        <li> affection of all lines vs. closest line to a pixel (b) </li>
         <li> The Display Settings area can be used to customize which parts of the output are displayed and in which colors</li>
         <li> Press the "Download SVG" button to save the generate tiling as an SVG file. SVGs can be displayed using most Web-Browsers and further Edited using Software like Incscape, Adobe Illustrator etc.</li>
 

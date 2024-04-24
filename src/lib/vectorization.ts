@@ -1,4 +1,4 @@
-import TraceSkeleton from "./trace_skeleton.vanilla";
+import TraceSkeleton from "./thinning/thinning";
 import { Point, SiteSegment } from "./voronoiDataStructures";
 
 class Node {
@@ -44,13 +44,7 @@ export class Vectorization {
 
         Vectorization.fixSmallPassages(imageData);
 
-        // console.log('w ' + width + ' h ' +  height + ' imgX ' + imgX + ' imgY ' + imgY);
-        // console.log(imageData);
-        // let { polylines, rects, thinImag } = TraceSkeleton.fromImageData(imageData, resolution);
         let binaryImg: number[] = TraceSkeleton.imageDataToBinary(imageData);
-
-
-        // let borderImg: number[] = Vectorization.getBorderImg(binaryImg);
 
         let thinImag = TraceSkeleton.thinningZS(
             binaryImg,
@@ -61,9 +55,7 @@ export class Vectorization {
         // Erode to 4-Neighbourhood, but keep potential corners
         Vectorization.erodeKeepCrossings(thinImag);
 
-
         let { thinImagRGB, crossings, ends } = Vectorization.detectEndsAndCrossings(thinImag, imageData);
-
 
         let n: Node | null = Vectorization.vectorize(thinImag, crossings, ends);
         
@@ -71,14 +63,6 @@ export class Vectorization {
         Vectorization.visualizePoints(crossings, thinImagRGB, [0,255,255]);
         Vectorization.visualizePoints(ends, thinImagRGB, [255,0,0]);
         
-        // for (let x = 0; x < Vectorization.tileWidth; x++) {
-        //     for (let y = 0; y < Vectorization.tileHeight; y++) {
-        //         if(borderImg[this.fromXY(x,y)] == 1){
-        //             thinImagRGB[this.fromXY(x,y) * 4] = 255;
-        //         }
-        //     }
-        // }
-
         var thinImgageData = new ImageData(
             new Uint8ClampedArray(thinImagRGB),
             tileWidth,
@@ -154,27 +138,6 @@ export class Vectorization {
                 (F && !A && !B && !C && !D && !E && !G && !H) ||
                 (G && !A && !B && !C && !D && !E && !F && !H) ||
                 (H && !A && !B && !C && !D && !E && !F && !G);
-
-            // if(x == 205 - imgX && y == 113 - imgY)
-            //     console.log('neighbourCnt ' + neighbourCnt8 + ' '
-            //     + 'e ' + thinImag[fromXY(x,y)] + ' '
-            //     + 'A ' + A + ' '
-            //     + 'B ' + B + ' '
-            //     + 'C ' + C + ' '
-            //     + 'D ' + D + ' '
-            //     + 'E ' + E + ' '
-            //     + 'F ' + F + ' '
-            //     + 'G ' + G + ' '
-            //     + 'H ' + H + ' '
-            //     + thinImag[fromXY(x-1, y-1)] + ' ' //
-            //     + thinImag[fromXY(x  , y-1)] + ' ' //
-            //     + thinImag[fromXY(x+1, y-1)] + ' ' //
-            //     + thinImag[fromXY(x+1, y  )] + ' ' //
-            //     + thinImag[fromXY(x+1, y+1)] + ' ' //
-            //     + thinImag[fromXY(x  , y+1)] + ' ' //
-            //     + thinImag[fromXY(x-1, y+1)] + ' ' //
-            //     + thinImag[fromXY(x-1, y  )] + ' ' //
-            // );
 
             if (C1 || C2 || C3 || C4) {
                 //Crossing
@@ -285,7 +248,6 @@ export class Vectorization {
                         img.data[this.fromXY(x, y) * 4 + 1] = 0;
                         img.data[this.fromXY(x, y) * 4 + 2] = 0;
                         img.data[this.fromXY(x, y) * 4 + 3] = 0;
-                        // console.log("cleared: " + x + " " + y);
                     }
 
                     let n: Array<Point> =  []; 
@@ -322,10 +284,7 @@ export class Vectorization {
                             img.data[this.fromXY(n[i].x, n[i].y) * 4 + 1] = lastCol[1];
                             img.data[this.fromXY(n[i].x, n[i].y) * 4 + 2] = lastCol[2];
                             img.data[this.fromXY(n[i].x, n[i].y) * 4 + 3] = lastCol[3];
-
                         }
-                        // console.log("filled: " + x + " " + y);
-
                     }
                 }
             }
@@ -608,11 +567,6 @@ export class Vectorization {
                 }
             }
         }
-        // n.loops.forEach(l => {
-        //     segments.push(new SiteSegment(n.sitePoint!.x, n.sitePoint!.y, l.sitePoint!.x, l.sitePoint!.y));
-        //     segemntsFromTreeRec(l, segments);
-        // });
-
         return segments;
     }
 
@@ -626,22 +580,6 @@ export class Vectorization {
             thinImagRGB[Vectorization.fromXY(p.x, p.y) * 4 + 2] = col[2];
         });        
 
-        // thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4    ] = col[0];
-        // thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4 + 1] = col[1];
-        // thinImagRGB[fromXY(n.sitePoint!.x+1, n.sitePoint!.y) * 4 + 2] = col[2];
-
-        // thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4    ] = col[0];
-        // thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4 + 1] = col[1];
-        // thinImagRGB[fromXY(n.sitePoint!.x-1, n.sitePoint!.y) * 4 + 2] = col[2];
-
-        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4    ] = col[0];
-        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4 + 1] = col[1];
-        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y+1) * 4 + 2] = col[2];
-
-        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4    ] = col[0];
-        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4 + 1] = col[1];
-        // thinImagRGB[fromXY(n.sitePoint!.x, n.sitePoint!.y-1) * 4 + 2] = col[2];
-
         n.children.forEach((c) => {
             Vectorization.visualizeTreeRec(c, thinImagRGB);
         });
@@ -650,8 +588,6 @@ export class Vectorization {
     static subdivideTreeRec(n: Node | null) {
         if(n == null) return;
         n.children.forEach((c) => {
-            // if(c.sitePoint!.x == 186 && c.sitePoint!.y == 104)
-            //     console.log(n.children);
             if (c.pixel.length > 10) {
                 let idx = Math.floor(c.pixel.length / 2);
                 let halfPoint = c.pixel[idx];
@@ -680,7 +616,6 @@ export class Vectorization {
                 }
                 dist = Math.abs(dist);
                 if (dist > Vectorization.deviation) {
-                    // console.log('dividing (' + n.sitePoint!.x + ',' + n.sitePoint!.y + ') (' + c.sitePoint!.x + ',' + c.sitePoint!.y + ') -> (' + halfPoint.x + ' ' + halfPoint.y + ')');
                     let center = new Node(halfPoint, null, []);
 
                     center.parent = n;

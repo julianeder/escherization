@@ -17,7 +17,6 @@ voronoi.cpp ^
 -s ASSERTIONS ^
 -sINITIAL_MEMORY=65536000 ^
 -s EXPORTED_RUNTIME_METHODS=['cwrap','ccall']
-@REM --post-js voronoi.post.js ^
 
 echo export default function instantiate_wasmVoronoi(mod^?: any): Promise^<VoronoiWasmModule^>^; >> ../src/lib/wasm/wasmVoronoi.d.ts
 

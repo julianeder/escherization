@@ -48,8 +48,6 @@ export class SitePoint extends Point {
     static mulPoint(A: Matrix, B: SitePoint): SitePoint {
         // Matrix * Point
         return new SitePoint(
-            // A[0] * B.x + A[1] * B.y + A[2],
-            // A[3] * B.x + A[4] * B.y + A[5],
             A.a * B.x + A.c * B.y + A.e,
             A.b * B.x + A.d * B.y + A.f,
             B.color,
@@ -115,7 +113,6 @@ export interface Vertex {
 export interface Edge {
     va: Vertex;
     vb: Vertex;
-    // samples: Vertex[];
     controlPoints: Vertex[];
     isPrimary: boolean;
     isCurved: boolean;

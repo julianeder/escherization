@@ -1,25 +1,16 @@
 <script lang="ts">
     import Range from "./Range.svelte";
-    import TraceSkeleton2 from "./wasmSkelleton/index";
     import { onMount } from "svelte";
-    import {
-        Point,
-        SitePoint,
-        SiteSegment,
-    } from "./voronoiDataStructures";
+    import { Point, SitePoint, SiteSegment } from "./voronoiDataStructures";
     import { Vectorization } from "./vectorization";
     import { canvasSize, imageStore, siteStore, originStore, SymGroupParams, dataBackStore } from "./state";
     import { checkIntersections } from "./collisionDetection";
-
-    import ExampleImage from './images/Tux.png';
     import { toSVG, type Matrix, compose, scale, translate } from "transformation-matrix";
     import type { FeatureLine } from "./wasm/wasmMorph";
-    // import DropFile from '@svelte-parts/drop-file'
+    import ExampleImage from './images/Tux.png';
 
-    let tracer: any;
-
-
-    let inputImage: any, fileinput: any;
+    let inputImage: any;
+    let fileinput: any;
 
     let canvas: HTMLCanvasElement;
     let ctx: CanvasRenderingContext2D | null = null;
@@ -39,28 +30,15 @@
         cursorDraggable: "move",
         cursorBackground: "default",
     };
+    
     $: cssVarStyles = Object.entries(styles)
         .map(([key, value]) => `--${key}:${value}`)
         .join(";");
 
     let tileCenter = new Point(tileWidth / 2, tileHeight / 2);
 
-    const initialSitePoints: SitePoint[] = [
-        // new SitePoint(50, 50),
-        // new SitePoint(250, 50),
-        // new SitePoint(50, 250),
-        // new SitePoint(250, 250),
-        // new SitePoint(150, 150),
-    ];
-    const initialSiteSegments: SiteSegment[] = [
-        //   new SiteSegment(2, 2, 498, 2),
-        //   new SiteSegment(498, 2, 498, 298),
-        //   new SiteSegment(498, 298, 2, 298),
-        //   new SiteSegment(2, 298, 2, 2),
-    ];
-
-    let sitePoints: Array<SitePoint> = initialSitePoints; // local copy of Segments for visualization as svg
-    let siteSegments: Array<SiteSegment> = initialSiteSegments; // local copy of Segments for visualization as svg
+    let sitePoints: Array<SitePoint> = []; // local copy of Segments for visualization as svg
+    let siteSegments: Array<SiteSegment> = []; // local copy of Segments for visualization as svg
 
     let creatingSegmet: SiteSegment | null = null;
 
@@ -71,9 +49,7 @@
     let outlines_Img: FeatureLine[] = [];
 
     function update() {
-        // const startTimeInMs = new Date().getTime();
 
-        //Trigger Reactive Update?
         siteSegments = Vectorization.updateSkelleton(
             ctx!,
             imgX,
@@ -83,11 +59,6 @@
             deviation,
         );
         updateStore();
-
-        // const endTimeInMs = new Date().getTime();
-        // const durationInMs = endTimeInMs - startTimeInMs;
-        // console.log(`skelletonization: ${durationInMs} ms`);
-
     }
 
     function updateStore() {
@@ -141,8 +112,6 @@
                 });
                 ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
                 let imageData:ImageData | null = drawImageScaled(imageElement);
-                // ctx.fillStyle = ctx.createPattern(image, 'repeat');
-                // ctx.fillRect(0, 0, width, height);
                 updateOrigin()
                 update();
 
@@ -153,44 +122,11 @@
                             tileHeight,
                         );
 
-                // console.log("w h" + imageData?.width + " " + imageData?.height);
                 imageStore.set({image: imageElement, imageData: imageData, imageDataProcessed: imageDataProcessed});
             });
             imageElement.src = ExampleImage;
 
     }
-
-    // function onDrop(files){
-    //     // alert(`Files: ${files.map(d => d.name).join(', ')}`)
-
-    //     sitePoints = [];
-    //     let imageFile = files[0];
-    //     if(imageFile){
-    //         let reader = new FileReader();
-    //         reader.readAsDataURL(imageFile);
-    //         reader.onload = (e) => {
-    //             inputImage = e.target?.result;
-
-    //             let image: HTMLImageElement = new Image();
-    //             image.onload = () =>
-    //                 Promise.resolve().then(() => {
-    //                     ctx = canvas.getContext("2d", {
-    //                         willReadFrequently: true,
-    //                     });
-    //                     ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
-    //                     let imageData:ImageData | null = drawImageScaled(image);
-    //                     // ctx.fillStyle = ctx.createPattern(image, 'repeat');
-    //                     // ctx.fillRect(0, 0, width, height);
-    //                     updateOrigin()
-    //                     update();
-    //                     // console.log("w h" + imageData?.width + " " + imageData?.height);
-    //                     imageStore.set({image: image, imageData: imageData});
-    //                 });
-    //             image.src = inputImage;
-    //             // let img = inputImage;
-    //         };
-    //     }
-    // }
 
     function handleFileUpload(e: any) {
         sitePoints = [];
@@ -209,8 +145,6 @@
                         });
                         ctx?.clearRect(0, 0, canvasSize.x, canvasSize.y);
                         let imageData:ImageData | null = drawImageScaled(imageElement);
-                        // ctx.fillStyle = ctx.createPattern(image, 'repeat');
-                        // ctx.fillRect(0, 0, width, height);
                         updateOrigin()
                         update();
 
@@ -222,11 +156,9 @@
                             tileHeight,
                         );
 
-                        // console.log("w h" + imageData?.width + " " + imageData?.height);
                         imageStore.set({image: imageElement, imageData: imageData, imageDataProcessed: imageDataProcessed});
                     });
                     imageElement.src = inputImage;
-                // let img = inputImage;
             };
         }
     }
@@ -245,16 +177,13 @@
         imgX = Math.floor(centerShift_x);
         imgY = Math.floor(centerShift_y);
 
-        // ctx.clearRect(0,0,canvas.width, canvas.height);
-        // ctx.drawImage(img, 0,0, img.width, img.height,
-        //                     centerShift_x,centerShift_y,width, height);
-
         let offScreenCanvas = document.createElement("canvas");
         let context = offScreenCanvas.getContext("2d");
         offScreenCanvas.width = img.width;
         offScreenCanvas.height = img.height;
         context!.drawImage(img, 0, 0);
         let imgageData = context!.getImageData(0, 0, img.width, img.height);
+
         // Nearest Neighbour Resampling
         let imagRGBA: number[] = [];
         for (let y = 0; y < tileHeight; y++) {
@@ -280,16 +209,14 @@
 
     function onDeviationToleranceChanged(newRes: number) {
         deviation = newRes;
-        Promise.resolve().then(update); // Run Async
+        Promise.resolve().then(update); // run async
     }
 
     function translatePoint(p: SitePoint, tileCenter: Point): SitePoint {
         return new SitePoint(
             p.x - tileCenter.x,
             p.y - tileCenter.y,
-            p.color,
-            p.M,
-            p.tileIdx,
+            p.tileIdx
         );
     }
 
@@ -299,9 +226,7 @@
             s.y1 - tileCenter.y,
             s.x2 - tileCenter.x,
             s.y2 - tileCenter.y,
-            s.color,
-            s.M,
-            s.tileIdx,
+            s.tileIdx
         );
     }
 
@@ -316,7 +241,6 @@
 
         let Mtransform = compose(
             scale(canvasSize.x / imageElement.width, canvasSize.y / imageElement.height, 0, 0), 
-            // translate(imgX, imgY)
         );
 
         return Mtransform;
@@ -379,8 +303,6 @@
                 if (evt.target.classList.contains("draggable")) {
                     selectedElement = evt.target;
                     offset = getMousePosition(evt);
-                    // console.log(selectedElement.getAttributeNS(null, "cx"));
-                    // console.log(offset);
                     offset.x -= parseFloat(
                         selectedElement.getAttributeNS(null, "cx"),
                     );
@@ -442,7 +364,7 @@
                     );
                     let idx: number = Number(
                         (selectedElement.id as string).substring(10),
-                    ); //Requires specific id numbering scheme
+                    );  //requires us to use a specific id numbering scheme to work
                     sitePoints[idx].x = coord.x - offset.x;
                     sitePoints[idx].y = coord.y - offset.y;
                 } else if (
@@ -460,7 +382,7 @@
                     );
                     let idx: number = Number(
                         (selectedElement.id as string).substring(17),
-                    ); //Requires specific id numbering scheme
+                    ); //requires us to use a specific id numbering scheme to work
                     let ss: SiteSegment;
                     if (idx % 2 == 0) {
                         ss = siteSegments[idx / 2];
@@ -529,8 +451,6 @@
 
     function setActiveTool(newTool: string) {
         activeTool = newTool;
-        // console.log("activeTool " + activeTool)
-
         if (activeTool == "move") {
             styles.cursorDraggable = "move";
             styles.cursorBackground = "default";
@@ -552,9 +472,10 @@
                 let idx: number = Number(
                     (evt.target.id as string).substring(17),
                 );
-                if (idx % 2 == 0) idx = idx / 2;
-                else idx = (idx - 1) / 2;
-                // console.log(idx)
+                if (idx % 2 == 0) 
+                    idx = idx / 2;
+                else 
+                    idx = (idx - 1) / 2;
                 siteSegments.splice(idx, 1);
                 siteSegments = [...siteSegments];
                 updateStore();
@@ -569,7 +490,6 @@
                 let idx: number = Number(
                     (evt.target.id as string).substring(10),
                 );
-                // console.log(idx)
                 sitePoints.splice(idx, 1);
                 sitePoints = sitePoints; // Trigger Reactive Update
                 updateStore();
@@ -588,7 +508,6 @@
             outlines_Img = value;
         });
 
-        tracer = await TraceSkeleton2.load();
         updateStore();
     });
 
@@ -617,27 +536,6 @@
                         <span class="material-icons md-36">open_with</span>
                     </button>
                 {/if}
-                <!-- {#if activeTool == "add"}
-                    <button
-                        class="bg-sky-500 hover:bg-sky-300 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => {
-                            setActiveTool("add");
-                        }}
-                    >
-                        <span class="material-icons md-36">add</span>
-                        <div class="relative -top-4 left-3 text-xs">P</div>
-                    </button>
-                {:else}
-                    <button
-                        class="bg-slate-50 hover:bg-slate-200 border border-sky-600 p-2 rounded w-10 h-10 m-1"
-                        on:click={() => {
-                            setActiveTool("add");
-                        }}
-                    >
-                        <span class="material-icons md-36">add</span>
-                        <div class="relative -top-4 left-3 text-xs">P</div>
-                    </button>
-                {/if} -->
                 {#if activeTool == "addSegment"}
                     <button
                         class="bg-sky-500 hover:bg-sky-300 border border-sky-600 p-2 rounded w-10 h-10 m-1"
@@ -687,15 +585,6 @@
                     height={canvasSize.y}
                     style="width: {canvasSize.x}px; height: {canvasSize.y}px"
                 ></canvas>
-
-                <!-- {#if inputImage == null}
-                    <div
-                        class="col-start-1 row-start-1 m-10"
-                    >
-                        <DropFile onDrop={onDrop} />
-                    </div>
-
-                {:else} -->
                     <div
                         class="overdrawSvg col-start-1 row-start-1"
                         bind:this={svgContainer}
@@ -807,8 +696,6 @@
                             </g>
                         </svg>
                     </div>
-                <!-- {/if} -->
-
                 <div class="lastErrorContainer max-w-72">
                     <p class="text-red-700 text-sm break-words">{lastError}</p>
                 </div>

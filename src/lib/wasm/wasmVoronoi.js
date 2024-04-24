@@ -2828,10 +2828,10 @@ function invoke_iii(index, a1, a2) {
  }
 }
 
-function invoke_viiii(index, a1, a2, a3, a4) {
+function invoke_viii(index, a1, a2, a3) {
  var sp = stackSave();
  try {
-  getWasmTableEntry(index)(a1, a2, a3, a4);
+  getWasmTableEntry(index)(a1, a2, a3);
  } catch (e) {
   stackRestore(sp);
   if (!(e instanceof EmscriptenEH)) throw e;
@@ -2949,10 +2949,10 @@ function invoke_viiiiiiii(index, a1, a2, a3, a4, a5, a6, a7, a8) {
  }
 }
 
-function invoke_viii(index, a1, a2, a3) {
+function invoke_viiii(index, a1, a2, a3, a4) {
  var sp = stackSave();
  try {
-  getWasmTableEntry(index)(a1, a2, a3);
+  getWasmTableEntry(index)(a1, a2, a3, a4);
  } catch (e) {
   stackRestore(sp);
   if (!(e instanceof EmscriptenEH)) throw e;
